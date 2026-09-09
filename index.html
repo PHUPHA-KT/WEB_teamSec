@@ -255,6 +255,40 @@
     .item-row{gap:8px;}
     .person-head{font-size:14px;}
   }
+
+  /* ===== แท็บ: เลื่อนแนวนอน แทนการตัดคำเป็นหลายบรรทัด ===== */
+  .tabs{ overflow-x:auto; flex-wrap:nowrap; scrollbar-width:none; }
+  .tabs::-webkit-scrollbar{ display:none; }
+  .tab-btn{ white-space:nowrap; flex:0 0 auto; }
+
+  /* ปุ่มเปิด/ปิดตัวกรอง — โผล่เฉพาะจอแคบ */
+  .filter-toggle{ display:none; }
+
+  @media (max-width:720px){
+    /* ปุ่มชุดบนเคย position:absolute แล้วลอยทับหัวเรื่อง — ย้ายลงมาอยู่ในแถวของตัวเอง */
+    header{ display:flex; flex-direction:column; padding:16px 14px 14px; }
+    header h1{ font-size:18px; }
+    header p{ display:none; }
+    .header-btns{
+      position:static; order:3; max-width:none; margin:10px 0 0;
+      flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start; scrollbar-width:none;
+    }
+    .header-btns::-webkit-scrollbar{ display:none; }
+    .header-btns .help-btn{ flex:0 0 auto; padding:6px 11px; font-size:12px; }
+
+    /* สถิติ: เหลือเฉพาะตัวที่ต้องดูทุกวัน (ทำวันนี้แล้ว / ตอนค้าง) */
+    .stat-row{ order:4; gap:8px; margin-top:12px; }
+    .stat-chip.stat-min{ display:none; }
+
+    /* ตัวกรองกินพื้นที่ 5 แถว — ยุบไว้ใต้ปุ่ม */
+    .filter-toggle{ display:inline-flex; }
+    .filter-panel{ display:none; }
+    .filter-panel.open{ display:block; }
+
+    .tabs{ padding:8px 10px 0; }
+    .tab-btn{ padding:9px 12px; font-size:13.5px; }
+    main{ padding:12px 10px; }
+  }
 </style>
 </head>
 <body>
@@ -653,6 +687,7 @@
       return;
     }
     uid = res.data.user.id;
+    try{ sb.realtime.setAuth(res.data.session.access_token); }catch(e){}
     $('agPass').value = '';
     hideGate();
     signalReady();
@@ -677,7 +712,11 @@
     }
     let session = null;
     try{ const r = await sb.auth.getSession(); session = r.data ? r.data.session : null; }catch(e){}
-    if(session && session.user){ uid = session.user.id; hideGate(); signalReady(); }
+    if(session && session.user){
+      uid = session.user.id;
+      try{ sb.realtime.setAuth(session.access_token); }catch(e){}
+      hideGate(); signalReady();
+    }
     else showGate();
   })();
 
@@ -735,6 +774,28 @@
       };
       return true;
     }
+  };
+
+  // ---------- realtime ----------
+  // แจ้งเตือนเมื่อมีคนอื่นเขียนแถวนี้ ใช้แทนการ poll ทุก 12 วิ
+  // คืน object ที่บอกสถานะ ให้แอปเลือกได้ว่าจะ poll ถี่หรือห่าง
+  window.storage.subscribe = function(key, shared, onChange){
+    const state = { connected: false, channel: null };
+    if(!sb) return state;
+    const scope = scopeOf(shared);
+    state.channel = sb
+      .channel('kv-' + scope + '-' + key)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: TABLE, filter: 'key=eq.' + key },
+        (payload) => {
+          const row = payload.new || payload.old;
+          if(row && row.scope !== scope) return;   // filter ได้ทีละคอลัมน์ กรอง scope เองอีกชั้น
+          try{ onChange(); }catch(e){}
+        })
+      .subscribe((status) => {
+        state.connected = (status === 'SUBSCRIBED');
+      });
+    return state;
   };
 })();
 </script>
@@ -1105,12 +1166,45 @@ async function getAppData(){
   return found ? legacy : null;
 }
 // เซฟ: อ่านก้อนล่าสุด → merge ทุก collection เทียบฐาน (กันงานคนอื่นหาย) → เขียนกลับ 1 ครั้ง
-// คิวเซฟ: ให้การเซฟทำทีละครั้ง ไม่ให้ซ้อนกันจนค่าเพี้ยน (เช่นกดเปลี่ยนสถานะรัวๆ)
+// คิวเซฟ: ให้การเซฟทำทีละครั้ง ไม่ให้ซ้อนกันจนค่าเพี้ยน
 let saveChain = Promise.resolve();
+
+// รวบการแก้ที่ติดๆ กันเป็นการเขียนครั้งเดียว (ติ๊ก 4 ช่องรวด = เขียน 1 ครั้ง ไม่ใช่ 4)
+const SAVE_DEBOUNCE_MS = 700;
+let saveTimer = null;
+let saveWaiter = null;   // {promise, resolve} ของรอบที่กำลังรออยู่
+let saveToastWanted = false;
+
 function persistData(toast){
+  if(toast) saveToastWanted = true;
+  if(!saveWaiter){
+    let resolve;
+    const promise = new Promise(r=>{ resolve = r; });
+    saveWaiter = { promise, resolve };
+  }
+  const waiter = saveWaiter;
+  if(saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(runQueuedSave, SAVE_DEBOUNCE_MS);
+  return waiter.promise;
+}
+
+function runQueuedSave(){
+  if(saveTimer){ clearTimeout(saveTimer); saveTimer = null; }
+  const waiter = saveWaiter;
+  if(!waiter) return saveChain;
+  saveWaiter = null;
+  const toast = saveToastWanted;
+  saveToastWanted = false;
   saveChain = saveChain.then(()=>persistDataNow(toast)).catch(()=>{});
+  saveChain.then(()=>waiter.resolve(), ()=>waiter.resolve());
   return saveChain;
 }
+
+// เขียนทันทีไม่ต้องรอ debounce — ใช้ตอนปิดหน้า/สลับแท็บ/ก่อนส่งออกข้อมูล
+function flushSaveNow(){
+  return saveWaiter ? runQueuedSave() : saveChain;
+}
+
 async function persistDataNow(toast){
   try{
     let remote = null;
@@ -1343,25 +1437,43 @@ async function pollOnce(){
   }
 }
 
+// Realtime: ทีมเห็นการแก้ของกันภายใน <1 วิ — poll เหลือไว้เป็นตัวสำรองเฉยๆ
+let rtState = null;
+let currentPollMs = 0;
+
 function startRealtimeSync(){
   if(pollTimer) return;
+  if(window.storage && window.storage.subscribe){
+    try{ rtState = window.storage.subscribe('appdata', true, ()=>{ pollOnce(); }); }
+    catch(e){ rtState = null; }
+  }
   startPollTimer();
-  // พักการซิงก์เมื่อสลับไปแท็บอื่น (ลดโหลด storage ตอนเปิดค้างไว้เฉยๆ) — กลับมาแล้วดึงทันที
+  // พักการซิงก์เมื่อสลับไปแท็บอื่น (และเขียนของค้างให้จบก่อน)
   document.addEventListener('visibilitychange', ()=>{
     if(document.hidden){
       flushActivityNow();
+      flushSaveNow();
       stopPollTimer();
     } else {
       pollOnce();       // ดึงข้อมูลล่าสุดทันทีที่กลับมา
       startPollTimer(); // เริ่มซิงก์ต่อ
     }
   });
-  // เขียนประวัติที่ค้างก่อนปิดหน้า
-  window.addEventListener('beforeunload', ()=>{ flushActivityNow(); });
+  // เขียนของที่ค้างก่อนปิดหน้า
+  window.addEventListener('beforeunload', ()=>{ flushActivityNow(); flushSaveNow(); });
+}
+
+function pollIntervalMs(){
+  return (rtState && rtState.connected) ? 45000 : 12000;
 }
 function startPollTimer(){
   if(pollTimer) return;
-  pollTimer = setInterval(pollOnce, 12000); // เช็คทุก 12 วินาที
+  currentPollMs = pollIntervalMs();
+  pollTimer = setInterval(()=>{
+    pollOnce();
+    // realtime เพิ่งต่อติด/เพิ่งหลุด -> ปรับจังหวะ poll ตาม
+    if(currentPollMs !== pollIntervalMs()){ stopPollTimer(); startPollTimer(); }
+  }, currentPollMs);
 }
 function stopPollTimer(){
   if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
@@ -1399,6 +1511,7 @@ function exportData(auto){
 }
 
 async function importData(event){
+  await flushSaveNow();   // เขียนของค้างให้จบก่อน กันเซฟเก่าทับข้อมูลที่เพิ่งกู้คืน
   const file = event.target.files && event.target.files[0];
   event.target.value = ''; // ให้เลือกไฟล์เดิมซ้ำได้
   if(!file) return;
@@ -1474,12 +1587,12 @@ function renderStats(){
   const totalSpent = expenses.reduce((s,e)=>s+Number(e.amount||0),0);
   const upcoming = scheduleEntries.filter(e=>e.status!=='opened' && e.date && daysUntil(e.date)>=0).length;
   document.getElementById('statRow').innerHTML = `
-    <div class="stat-chip"><b>${total}</b> เรื่องประจำ</div>
+    <div class="stat-chip stat-min"><b>${total}</b> เรื่องประจำ</div>
     <div class="stat-chip"><b>${doneToday}</b> ทำวันนี้แล้ว</div>
     ${episodesOverdue ? `<div class="stat-chip" style="background:rgba(224,64,58,.35);"><b>${episodesOverdue}</b> ตอนค้าง (${storiesOverdue} เรื่อง)</div>` : ''}
-    <div class="stat-chip"><b>${newStories.length}</b> เรื่องเปิดใหม่</div>
-    ${upcoming ? `<div class="stat-chip"><b>${upcoming}</b> เรื่องจะเปิดเร็วๆนี้</div>` : ''}
-    <div class="stat-chip"><b>${totalSpent.toLocaleString('th-TH')}</b> บาทที่ใช้ไป</div>
+    <div class="stat-chip stat-min"><b>${newStories.length}</b> เรื่องเปิดใหม่</div>
+    ${upcoming ? `<div class="stat-chip stat-min"><b>${upcoming}</b> เรื่องจะเปิดเร็วๆนี้</div>` : ''}
+    <div class="stat-chip stat-min"><b>${totalSpent.toLocaleString('th-TH')}</b> บาทที่ใช้ไป</div>
   `;
   renderPendingAlert(episodesOverdue, storiesOverdue);
 }
@@ -1538,6 +1651,22 @@ function matchesFilters(item){
   return true;
 }
 
+// ตัวกรองบนมือถือ: ยุบไว้ใต้ปุ่ม (เดสก์ท็อปโชว์ตลอด — CSS จัดการเอง)
+let filtersOpen = false;
+function toggleFilters(){ filtersOpen = !filtersOpen; renderRecurring(); }
+function filterSummary(){
+  const bits = [];
+  if(dayFilter && dayFilter !== 'ทั้งหมด') bits.push(dayFilter);
+  if(personFilter && personFilter !== 'ทั้งหมด') bits.push(personFilter);
+  if(showOnlyPending) bits.push('เฉพาะตอนค้าง');
+  if(showDropped) bits.push('ดรอป/จบ');
+  return bits.length ? ' · ' + bits.join(' · ') : '';
+}
+function filterToggleHtml(){
+  const label = filtersOpen ? '✕ ปิดตัวกรอง' : '🔍 ตัวกรอง' + esc(filterSummary());
+  return '<button class="btn btn-ghost filter-toggle" onclick="toggleFilters()" style="margin-bottom:10px;">' + label + '</button>';
+}
+
 function renderRecurring(){
   const container = document.getElementById('mainContent');
   const activeEl = document.activeElement;
@@ -1551,6 +1680,8 @@ function renderRecurring(){
       <button class="btn btn-primary" onclick="openRecurringModal()">+ เพิ่มเรื่อง</button>
       <button class="btn btn-ghost" onclick="resetDailyDone()">รีเซ็ตสถานะที่ทำ/งด/เลื่อนแล้ว</button>
     </div>
+    ${filterToggleHtml()}
+    <div class="filter-panel${filtersOpen?' open':''}">
     ${workloadPanelHtml()}
     ${dayLinksBarHtml()}
     <div class="chip-scroll" style="margin-bottom:6px;">
@@ -1566,6 +1697,7 @@ function renderRecurring(){
     </div>
     <div class="chip-scroll" style="margin-bottom:14px;">
       ${personChips.map(p=>`<div class="filter-chip ${personFilter===p?'active':''}" onclick="setPersonFilter('${p}')">${p}</div>`).join('')}
+    </div>
     </div>
   `;
 

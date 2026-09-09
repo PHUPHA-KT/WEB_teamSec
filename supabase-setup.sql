@@ -46,3 +46,21 @@ create policy app_kv_update on public.app_kv
   for update to authenticated
   using (public.kv_allowed(scope))
   with check (public.kv_allowed(scope));
+
+-- ============================================================
+-- 6) เปิด Realtime ให้ตาราง app_kv
+--    ทีมจะเห็นการแก้ของกันภายใน <1 วิ แทนที่จะรอ poll 12 วิ
+--    (RLS ยังบังคับใช้กับ realtime ด้วย — คนไม่ล็อกอินไม่ได้รับ event)
+-- ============================================================
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'app_kv'
+  ) then
+    alter publication supabase_realtime add table public.app_kv;
+  end if;
+end
+$$;
