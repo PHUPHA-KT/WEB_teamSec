@@ -686,26 +686,53 @@
   // shared === false -> แถวส่วนตัวของแต่ละคน (scope = user id)
   function scopeOf(shared){ return shared ? 'global' : ('u:' + uid); }
 
+  // แคชตาม updated_at: poll ทุก 12 วิ ไม่ต้องโหลด appdata ทั้งก้อนซ้ำ
+  // ถามแค่ updated_at (~100 bytes) ถ้าไม่เปลี่ยน คืนค่าที่แคชไว้
+  const cache = Object.create(null);
+
   window.storage = {
     async get(key, shared){
       await ready;
+      const scope = scopeOf(shared);
+      const ck = scope + '|' + key;
+      const hit = cache[ck];
+
+      if(hit){
+        const meta = await sb.from(TABLE)
+          .select('updated_at')
+          .eq('scope', scope).eq('key', key)
+          .maybeSingle();
+        if(meta.error) throw new Error(meta.error.message);
+        if(!meta.data){ delete cache[ck]; return null; }          // ถูกลบไปแล้ว
+        if(meta.data.updated_at === hit.updated_at){
+          return { value: hit.value };                            // ไม่มีใครแก้ = ใช้ของเดิม
+        }
+      }
+
       const r = await sb.from(TABLE)
-        .select('value')
-        .eq('scope', scopeOf(shared))
-        .eq('key', key)
+        .select('value,updated_at')
+        .eq('scope', scope).eq('key', key)
         .maybeSingle();
       if(r.error) throw new Error(r.error.message);
-      return r.data ? { value: r.data.value } : null;
+      if(!r.data){ delete cache[ck]; return null; }
+      cache[ck] = { updated_at: r.data.updated_at, value: r.data.value };
+      return { value: r.data.value };
     },
+
     async set(key, value, shared){
       await ready;
+      const scope = scopeOf(shared);
+      const val = String(value);
+      const stamp = new Date().toISOString();
       const r = await sb.from(TABLE).upsert({
-        scope: scopeOf(shared),
-        key: key,
-        value: String(value),
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'scope,key' });
-      if(r.error) throw new Error(r.error.message);
+        scope: scope, key: key, value: val, updated_at: stamp
+      }, { onConflict: 'scope,key' }).select('updated_at').maybeSingle();
+      if(r.error){ delete cache[scope + '|' + key]; throw new Error(r.error.message); }
+      // แคชค่าที่เพิ่งเขียน (ใช้ updated_at ที่ DB คืนมาจริง ไม่ใช่ที่เราส่งไป)
+      cache[scope + '|' + key] = {
+        updated_at: (r.data && r.data.updated_at) ? r.data.updated_at : stamp,
+        value: val
+      };
       return true;
     }
   };
@@ -830,7 +857,16 @@ let searchText = '';
 
 function uid(prefix){ return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
+// ลิงก์ที่ผู้ใช้กรอกเอง: อนุญาตแค่ http/https/mailto — กัน javascript: ที่กดแล้วรันโค้ด
+function safeUrl(u){
+  const s = String(u==null?'':u).trim();
+  if(!s) return '#';
+  const lower = s.toLowerCase();
+  if(lower.startsWith('http://') || lower.startsWith('https://') || lower.startsWith('mailto:')) return esc(s);
+  // ไม่มี scheme แต่หน้าตาเป็นโดเมน (drive.google.com/...) -> เติม https:// ให้
+  if(/^[A-Za-z0-9][A-Za-z0-9.-]*\.[A-Za-z]{2,}([/?#]|$)/.test(s)) return esc('https://' + s);
+  return '#';   // javascript:, data:, อย่างอื่น -> ตัดทิ้ง
+}
 // ===== โหมดมืด/สว่าง (บันทึกเฉพาะเครื่องผู้ใช้ ไม่แชร์) =====
 function applyTheme(mode){
   const dark = mode === 'dark';
@@ -1130,6 +1166,18 @@ function trashLabelOf(coll, item){
   if(coll==='schedule') return item.title || '(ไม่มีชื่อ)';
   return '(รายการ)';
 }
+// ถังขยะโตไม่จำกัด = ทุกครั้งที่เซฟต้องเขียน blob ใหญ่ขึ้นเรื่อยๆ
+const TRASH_MAX = 200;      // เก็บมากสุดกี่รายการ
+const TRASH_KEEP_DAYS = 30; // เก็บนานกี่วัน
+function pruneTrash(){
+  const cutoff = Date.now() - TRASH_KEEP_DAYS * 86400000;
+  trash = trash.filter(t=>{
+    const ts = t.deletedAt ? Date.parse(t.deletedAt) : NaN;
+    return isNaN(ts) ? true : ts >= cutoff;   // ไม่มีวันที่/อ่านไม่ออก = เก็บไว้ก่อน
+  });
+  if(trash.length > TRASH_MAX) trash = trash.slice(-TRASH_MAX);
+}
+
 async function moveToTrash(coll, item){
   trash.push({
     trashId: uid('t'),
@@ -1138,6 +1186,7 @@ async function moveToTrash(coll, item){
     label: trashLabelOf(coll, item),
     item
   });
+  pruneTrash();
   await persistTrash();
 }
 async function restoreFromTrash(trashId){
@@ -1699,7 +1748,7 @@ function dayLinksBarHtml(){
     const links = dayLinksOf(d);
     const linkItems = links.map(l=>`
       <div class="daylink-item">
-        <a class="btn btn-ghost" style="font-size:12px;padding:6px 10px;flex:1;justify-content:flex-start;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" href="${esc(l.url)}" target="_blank">📥 ${esc(l.label || 'เปิดโฟลเดอร์โหลด')}</a>
+        <a class="btn btn-ghost" style="font-size:12px;padding:6px 10px;flex:1;justify-content:flex-start;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" href="${safeUrl(l.url)}" target="_blank">📥 ${esc(l.label || 'เปิดโฟลเดอร์โหลด')}</a>
         <button class="icon-btn" onclick="editDayLink('${l.id}')" title="แก้ลิงก์" style="color:#6b7480;">✎</button>
         <button class="icon-btn" onclick="removeDayLink('${l.id}')" title="ลบลิงก์นี้">✕</button>
       </div>`).join('');
@@ -1808,7 +1857,7 @@ function renderDayLinksArchive(){
         if(!dayLinksList.length) return '';
         return dayLinksList.map((l,i)=>`<div class="arch-link">
           <span class="day-pill" style="${dayPillStyle(d)}">${i===0?d:''}</span>
-          <a href="${esc(l.url)}" target="_blank" style="font-size:12px;color:var(--blue);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📥 ${esc(l.label || l.url)}</a>
+          <a href="${safeUrl(l.url)}" target="_blank" style="font-size:12px;color:var(--blue);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📥 ${esc(l.label || l.url)}</a>
         </div>`).join('');
       }).join('') : ''}
     </div>`;
@@ -2057,8 +2106,8 @@ function renderNewStories(){
       <div class="new-card-top">
         <div>
           <div class="new-code">${esc(item.code)}</div>
-          ${item.link?`<a href="${esc(item.link)}" target="_blank" style="font-size:12px;color:#1c6fd1;margin-right:8px;">🔗 ลิงก์</a>`:''}
-          ${item.gdrive?`<a href="${esc(item.gdrive)}" target="_blank" style="font-size:12px;color:#1a9c6b;">📁 Drive</a>`:''}
+          ${item.link?`<a href="${safeUrl(item.link)}" target="_blank" style="font-size:12px;color:#1c6fd1;margin-right:8px;">🔗 ลิงก์</a>`:''}
+          ${item.gdrive?`<a href="${safeUrl(item.gdrive)}" target="_blank" style="font-size:12px;color:#1a9c6b;">📁 Drive</a>`:''}
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <span class="status-badge ${statusClass}">${statusLabel}</span>
@@ -2271,7 +2320,7 @@ function renderSchedule(){
           return `<tr>
             <td>${e.date?esc(e.date):'—'}</td>
             <td>${countdownLabel(e)}</td>
-            <td><b>${esc(e.title)}</b>${e.link?` <a href="${esc(e.link)}" target="_blank" style="font-size:12px;color:#1c6fd1;">🔗</a>`:''}</td>
+            <td><b>${esc(e.title)}</b>${e.link?` <a href="${safeUrl(e.link)}" target="_blank" style="font-size:12px;color:#1c6fd1;">🔗</a>`:''}</td>
             <td>${e.person?esc(e.person):'—'}</td>
             <td><span class="status-badge" style="background:${st.bg};color:${st.fg};">${st.label}</span></td>
             <td>${e.note?esc(e.note):'—'}</td>
