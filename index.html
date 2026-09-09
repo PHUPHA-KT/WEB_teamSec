@@ -1,0 +1,2415 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบจัดการงานคัดเรื่อง</title>
+<style>
+  :root{
+    --blue:#1c6fd1; --blue-bg:#eaf2fd;
+    --green:#1a9c6b; --green-bg:#e8f7f1;
+    --purple:#7b3fd4; --purple-bg:#f1eafd;
+    --orange:#e07a29; --orange-bg:#fdf1e6;
+    --gray:#8a94a3; --gray-bg:#f1f3f6;
+    --ink:#1f2430; --ink-soft:#5b6472; --line:#e4e8ee;
+    --bg:#f6f7fb; --card:#ffffff;
+    --fill:#ffffff; --surface-2:#f4f6fa; --hover:#fafbfd;
+    --radius:14px;
+  }
+  body.dark{
+    --ink:#e7ebf2; --ink-soft:#a2abba; --line:#2c333f;
+    --bg:#12151c; --card:#1a1f28;
+    --fill:#232a35; --surface-2:#20262f; --hover:#222834;
+    --gray-bg:#2a313c;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:"Segoe UI","Sarabun","Tahoma",sans-serif;
+    background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased;
+  }
+  header{
+    background:linear-gradient(135deg,#0b3d78,#1c6fd1);
+    color:#fff; padding:22px 20px 18px; position:relative;
+  }
+  header h1{margin:0 0 4px; font-size:22px; font-weight:800; letter-spacing:.2px;}
+  header p{margin:0; font-size:13px; opacity:.85;}
+  .help-btn{
+    position:absolute; top:18px; right:18px; border:1px solid rgba(255,255,255,.4);
+    background:rgba(255,255,255,.14); color:#fff; border-radius:999px; padding:7px 14px;
+    font-size:13px; font-weight:700; cursor:pointer;
+  }
+  .help-btn:hover{ background:rgba(255,255,255,.25); }
+  .header-btns{ position:absolute; top:18px; right:18px; display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; max-width:60%; }
+  .header-btns .help-btn{ position:static; }
+  .trash-row{
+    display:flex; align-items:center; gap:8px; padding:10px 4px; border-bottom:1px solid var(--line);
+  }
+  .trash-row:last-child{ border-bottom:none; }
+  .hist-row{
+    display:flex; align-items:flex-start; gap:10px; padding:9px 4px; border-bottom:1px solid var(--line);
+  }
+  .hist-row:last-child{ border-bottom:none; }
+  .hist-who{
+    flex-shrink:0; font-size:11.5px; font-weight:800; background:var(--surface-2); color:var(--ink-soft);
+    padding:3px 8px; border-radius:999px; min-width:44px; text-align:center;
+  }
+  .arch-block{ border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:10px; }
+  .arch-head{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+  .arch-link{ display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+  .arch-link:last-child{ margin-bottom:0; }
+  .wl-wrap{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+  .wl-card{
+    flex:1; min-width:120px; background:var(--card); border:1.5px solid var(--line); border-left-width:4px;
+    border-radius:10px; padding:8px 12px; cursor:pointer;
+  }
+  .wl-card.wl-mine{ box-shadow:0 0 0 2px rgba(28,111,209,.15); }
+  .wl-name{ font-weight:800; font-size:13.5px; }
+  .wl-nums{ font-size:12px; color:var(--ink-soft); margin-top:2px; }
+  .pending-alert{
+    margin:0 16px; margin-top:12px; background:#fdecec; border:1px solid #f0c9c2; color:#a3271b;
+    border-radius:12px; padding:12px 16px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    max-width:980px; margin-left:auto; margin-right:auto;
+  }
+  body.dark .pending-alert{ background:#3a1f1d; border-color:#5c2b26; color:#f0b5ad; }
+  .pending-alert b{ font-size:15px; }
+  .pending-alert .pa-btn{
+    border:none; background:#c0392b; color:#fff; border-radius:8px; padding:6px 12px; font-size:12.5px;
+    font-weight:700; cursor:pointer; margin-left:auto;
+  }
+  .pending-alert .pa-close{ border:none; background:transparent; color:inherit; cursor:pointer; font-size:16px; padding:0 2px; }
+  /* ตารางปฏิทิน */
+  .cal-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:14px; }
+  @media(max-width:720px){ .cal-grid{ grid-template-columns:1fr; } }
+  .cal-card{ border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--card); }
+  .cal-head{ padding:12px 16px; font-size:18px; font-weight:800; color:#fff; text-align:center; }
+  .cal-head-blue{ background:var(--blue); }
+  .cal-head-green{ background:var(--green); }
+  .cal-head-purple{ background:var(--purple); }
+  .cal-head-orange{ background:var(--orange); }
+  .cal-blue{ background:var(--blue-bg); }
+  .cal-green{ background:var(--green-bg); }
+  .cal-purple{ background:var(--purple-bg); }
+  .cal-orange{ background:var(--orange-bg); }
+  body.dark .cal-blue, body.dark .cal-green, body.dark .cal-purple, body.dark .cal-orange{ background:var(--card); }
+  .cal-table{ width:100%; border-collapse:collapse; }
+  .cal-table td{ padding:10px 14px; vertical-align:top; border-top:1px solid rgba(0,0,0,.06); font-size:13.5px; }
+  body.dark .cal-table td{ border-top-color:var(--line); }
+  .cal-table tr:first-child td{ border-top:none; }
+  .cal-day{ font-weight:800; white-space:nowrap; width:1%; color:var(--ink); }
+  .cal-items{ color:var(--ink); line-height:1.5; }
+  .cal-empty{ color:var(--ink-soft); }
+  .daylinks-bar{ margin-bottom:10px; }
+  .daylinks-bar.expanded{
+    background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:12px;
+  }
+  .daylink-row{ display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .daylink-day{ margin-bottom:10px; }
+  .daylink-day-head{ display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+  .daylink-item{ display:flex; align-items:center; gap:6px; margin-bottom:4px; margin-left:8px; }
+  .daylink-row:last-child{ margin-bottom:0; }
+  .drop-badge{
+    display:inline-block; font-size:10.5px; font-weight:800; padding:2px 7px; border-radius:999px; vertical-align:middle;
+  }
+  .help-body h4{ margin:16px 0 6px; font-size:14.5px; color:var(--ink); }
+  .help-body h4:first-child{ margin-top:0; }
+  .help-body p, .help-body li{ font-size:13.5px; color:var(--ink-soft); line-height:1.65; }
+  .help-body ul{ margin:4px 0 0; padding-left:18px; }
+  .help-body .tag{ display:inline-block; padding:1px 7px; border-radius:6px; font-size:12px; font-weight:700; }
+  .help-body .divider{ height:1px; background:var(--line); margin:14px 0; }
+  .stat-row{display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;}
+  .stat-chip{
+    background:rgba(255,255,255,.14); border-radius:10px; padding:8px 12px;
+    font-size:12.5px; display:flex; gap:6px; align-items:baseline;
+  }
+  .stat-chip b{font-size:16px;}
+  .tabs{
+    display:flex; gap:6px; padding:10px 16px 0; background:var(--bg);
+    position:sticky; top:0; z-index:5; border-bottom:1px solid var(--line);
+  }
+  .tab-btn{
+    border:none; background:transparent; padding:10px 16px; font-size:14.5px;
+    font-weight:700; color:var(--ink-soft); cursor:pointer; border-radius:10px 10px 0 0;
+  }
+  .tab-btn.active{color:var(--blue); background:var(--card); box-shadow:0 -1px 0 var(--line) inset;}
+  main{max-width:980px; margin:0 auto; padding:16px;}
+  .toolbar{
+    display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px;
+  }
+  .toolbar input[type=text]{
+    flex:1; min-width:160px; padding:10px 12px; border-radius:10px; border:1px solid var(--line);
+    font-size:14px; background:var(--card); color:var(--ink);
+  }
+  .chip-scroll{display:flex; gap:6px; overflow-x:auto; padding-bottom:2px;}
+  .filter-chip{
+    border:1px solid var(--line); background:var(--card); border-radius:999px;
+    padding:6px 12px; font-size:12.5px; white-space:nowrap; cursor:pointer; color:var(--ink-soft); font-weight:600;
+  }
+  .filter-chip.active{background:var(--blue); color:#fff; border-color:var(--blue);}
+  .btn{
+    border:none; border-radius:10px; padding:10px 16px; font-size:14px; font-weight:700;
+    cursor:pointer; display:inline-flex; align-items:center; gap:6px;
+  }
+  .btn-primary{background:var(--blue); color:#fff;}
+  .btn-ghost{background:var(--card); color:var(--ink); border:1px solid var(--line);}
+  .btn-danger-ghost{background:transparent; color:#c0392b; border:1px solid #f0c9c2;}
+  .btn:active{transform:scale(.97);}
+  .person-section{margin-bottom:18px; border-radius:var(--radius); overflow:hidden; border:1px solid var(--line); background:var(--card);}
+  .person-head{
+    padding:12px 14px; display:flex; justify-content:space-between; align-items:center; color:#fff; font-weight:800; font-size:15px;
+  }
+  .person-head small{font-weight:600; font-size:12px; opacity:.9;}
+  .item-row{
+    display:flex; gap:10px; align-items:center; padding:11px 14px; border-top:1px solid var(--line);
+    font-size:14px; flex-wrap:wrap;
+  }
+  .item-row:hover{background:var(--hover);}
+  .item-main{flex:1; min-width:160px;}
+  .item-code{font-weight:700; color:var(--ink);}
+  .item-name{color:var(--ink-soft); font-size:13px;}
+  .day-pill{
+    font-size:11.5px; font-weight:700; padding:3px 9px; border-radius:999px; white-space:nowrap;
+  }
+  .overdue-badge{
+    display:inline-block; font-size:10.5px; font-weight:800; color:#fff; background:#e0403a;
+    padding:2px 7px; border-radius:999px; vertical-align:middle;
+  }
+  .ep-line{ margin-top:4px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .ep-list{ font-size:12px; color:#c0392b; font-weight:600; }
+  .btn-ep{
+    border:1px dashed var(--line); background:var(--fill); color:var(--ink-soft); border-radius:8px;
+    padding:6px 9px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap;
+  }
+  .btn-ep:hover{ border-color:var(--blue); color:var(--blue); }
+  .ep-chip{
+    display:inline-flex; align-items:center; gap:6px; background:#fdecec; color:#c0392b;
+    border:1px solid #f0c9c2; border-radius:8px; padding:5px 8px; font-size:13px; font-weight:700;
+  }
+  .ep-chip button{
+    border:none; background:transparent; color:#c0392b; cursor:pointer; font-size:14px; line-height:1; padding:0;
+  }
+  .ep-chip-wrap{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; min-height:20px; }
+  .chapter-input{
+    width:56px; padding:6px 6px; border-radius:8px; border:1px solid var(--line); text-align:center; font-size:13px; background:var(--fill); color:var(--ink);
+  }
+  .link-btn{
+    width:32px; height:32px; border-radius:8px; border:1px solid var(--line); background:var(--fill);
+    display:flex; align-items:center; justify-content:center; text-decoration:none; color:var(--ink-soft); font-size:15px;
+  }
+  .link-btn.empty{color:#c7cdd6; border-style:dashed;}
+  .status-select{
+    border:none; border-radius:8px; padding:6px 8px; font-size:12px; font-weight:700; cursor:pointer;
+    -webkit-appearance:none; appearance:none; text-align:center; min-width:74px;
+  }
+  .table-wrap{
+    overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius); background:var(--card);
+  }
+  .data-table{ width:100%; border-collapse:collapse; font-size:13.5px; min-width:480px; }
+  .data-table thead th{
+    text-align:left; padding:10px 12px; background:var(--surface-2); color:var(--ink-soft); font-size:12px;
+    font-weight:700; border-bottom:1px solid var(--line); white-space:nowrap;
+  }
+  .data-table tbody td{ padding:10px 12px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  .data-table tbody tr:last-child td{ border-bottom:none; }
+  .data-table tbody tr:hover{ background:var(--hover); }
+  .icon-btn{
+    width:30px; height:30px; border-radius:8px; border:none; background:transparent; color:#b3bac5; cursor:pointer; font-size:15px;
+  }
+  .icon-btn:hover{background:#fdeceb; color:#c0392b;}
+  .empty-state{padding:40px 20px; text-align:center; color:var(--ink-soft); font-size:14px;}
+  .new-card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:14px; margin-bottom:10px;
+  }
+  .new-card-top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:10px;}
+  .new-code{font-weight:800; font-size:15px;}
+  .status-badge{font-size:11.5px; font-weight:700; padding:4px 10px; border-radius:999px;}
+  .status-done{background:#e6f7ee; color:#1a9c6b;}
+  .status-progress{background:#fdf3e3; color:#b9791b;}
+  .status-none{background:#f1f3f6; color:#8a94a3;}
+  .contrib-grid{display:flex; gap:8px; flex-wrap:wrap;}
+  .contrib-item{
+    display:flex; align-items:center; gap:6px; border:1px solid var(--line); border-radius:9px; padding:6px 10px; font-size:12.5px; font-weight:600; cursor:pointer; background:var(--fill);
+  }
+  .contrib-item input{width:15px; height:15px;}
+  .contrib-item.on{background:#eef7f1; border-color:#bfe4cd; color:#1a9c6b;}
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(20,25,35,.45); display:none; align-items:center; justify-content:center; z-index:50; padding:16px;
+  }
+  .modal-backdrop.show{display:flex;}
+  .modal{background:var(--card); border-radius:16px; padding:20px; width:100%; max-width:400px; max-height:90vh; overflow:auto;}
+  .modal h3{margin:0 0 14px; font-size:17px;}
+  .field{margin-bottom:12px;}
+  .field label{display:block; font-size:12.5px; font-weight:700; color:var(--ink-soft); margin-bottom:5px;}
+  .field input, .field select{
+    width:100%; padding:9px 10px; border-radius:9px; border:1px solid var(--line); font-size:14px; background:var(--fill); color:var(--ink);
+  }
+  .modal-actions{display:flex; gap:8px; margin-top:16px;}
+  .modal-actions .btn{flex:1; justify-content:center;}
+  .toast{
+    position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:#1f2430; color:#fff; padding:10px 18px;
+    border-radius:10px; font-size:13px; opacity:0; pointer-events:none; transition:.25s; z-index:60;
+  }
+  .toast.show{opacity:1;}
+  .loading-wrap{padding:60px 20px; text-align:center; color:var(--ink-soft);}
+  .footnote{font-size:11.5px; color:var(--ink-soft); text-align:center; padding:18px 12px 30px;}
+  @media (max-width:480px){
+    .item-row{gap:8px;}
+    .person-head{font-size:14px;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-btns">
+    <button class="help-btn" onclick="toggleTheme()" id="themeBtn" title="สลับโหมดมืด/สว่าง">🌙 มืด</button>
+    <button class="help-btn" onclick="openHistory()" title="ประวัติกิจกรรม">🕘 ประวัติ</button>
+    <button class="help-btn" onclick="openTrash()" id="trashBtn" title="ถังขยะ">🗑️ ถังขยะ</button>
+    <button class="help-btn" onclick="openModal('modalBackup')" title="สำรอง/กู้คืนข้อมูล">💾 สำรองข้อมูล</button>
+    <button class="help-btn" onclick="openModal('modalHelp')" title="คู่มือการใช้งาน">❓ คู่มือ</button>
+  </div>
+  <h1>ระบบจัดการงานคัดเรื่อง</h1>
+  <p>งานประจำรายวัน + เรื่องเปิดใหม่ · แก้ไขที่นี่แล้วทุกคนเห็นตรงกัน</p>
+  <div class="stat-row" id="statRow"></div>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="recurring">งานประจำ</button>
+  <button class="tab-btn" data-tab="calendar">ตารางปฏิทิน</button>
+  <button class="tab-btn" data-tab="newstories">เรื่องเปิดใหม่</button>
+  <button class="tab-btn" data-tab="expenses">ค่าใช้จ่าย</button>
+  <button class="tab-btn" data-tab="schedule">กำหนดการเปิดเรื่อง</button>
+</div>
+
+<div id="pendingAlert" class="pending-alert" style="display:none;"></div>
+
+<main id="mainContent">
+  <div class="loading-wrap">กำลังโหลดข้อมูล…</div>
+</main>
+
+<div class="footnote">ข้อมูลถูกบันทึกและแชร์ให้ทุกคนที่เปิดหน้านี้เห็นตรงกันแบบเรียลไทม์</div>
+
+<!-- Modal: add recurring -->
+<div class="modal-backdrop" id="modalRecurring">
+  <div class="modal">
+    <h3 id="recurringModalTitle">เพิ่มเรื่องประจำ</h3>
+    <div class="field"><label>รหัสเรื่อง (เช่น 4-9)</label><input id="rCode" type="text" placeholder="ไม่บังคับ"></div>
+    <div class="field"><label>ชื่อเรื่อง</label><input id="rName" type="text" placeholder="ชื่อเรื่อง"></div>
+    <div class="field"><label>คนทำ</label>
+      <select id="rPerson"><option value="">— ยังไม่ระบุ —</option><option value="เหนือ">เหนือ</option><option value="บิ๊ก">บิ๊ก</option><option value="ยูตะ">ยูตะ</option><option value="น๊อต">น๊อต</option></select>
+    </div>
+    <div class="field"><label>วัน</label>
+      <select id="rDay">
+        <option>จันทร์</option><option>อังคาร</option><option>พุธ</option><option>พฤหัสบดี</option>
+        <option>ศุกร์</option><option>เสาร์</option><option>อาทิตย์</option><option>ไม่ระบุวัน</option><option>จบแล้ว</option>
+      </select>
+    </div>
+    <div class="field"><label>ลิงก์ต้นทาง (ไม่บังคับ)</label><input id="rLink" type="text" placeholder="https://"></div>
+    <div class="field"><label>ลิงก์ Google Drive (ไม่บังคับ)</label><input id="rDrive" type="text" placeholder="https://drive.google.com/..."></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modalRecurring')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveNewRecurring()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: add new story -->
+<div class="modal-backdrop" id="modalNew">
+  <div class="modal">
+    <h3 id="newModalTitle">เพิ่มเรื่องเปิดใหม่</h3>
+    <div class="field"><label>รหัส/ชื่อเรื่อง</label><input id="nCode" type="text" placeholder="เช่น 18-27 หรือ ชื่อเรื่อง"></div>
+    <div class="field"><label>ลิงก์ต้นทาง (ไม่บังคับ)</label><input id="nLink" type="text" placeholder="https://"></div>
+    <div class="field"><label>ลิงก์ Google Drive (ไม่บังคับ)</label><input id="nDrive" type="text" placeholder="https://drive.google.com/..."></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modalNew')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveNewStory()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: add expense -->
+<div class="modal-backdrop" id="modalExpense">
+  <div class="modal">
+    <h3 id="expenseModalTitle">เพิ่มค่าใช้จ่าย</h3>
+    <div class="field"><label>แพลตฟอร์ม</label>
+      <input id="xPlatform" type="text" list="platformList" placeholder="เช่น toptoon, Ridi, lezhin, Mrblue">
+      <datalist id="platformList">
+        <option value="toptoon"><option value="Ridi"><option value="lezhin"><option value="Mrblue">
+      </datalist>
+    </div>
+    <div class="field"><label>จำนวนเงิน (บาท)</label><input id="xAmount" type="number" placeholder="0"></div>
+    <div class="field"><label>วันที่ (ไม่บังคับ)</label><input id="xDate" type="date"></div>
+    <div class="field"><label>หมายเหตุ (ไม่บังคับ)</label><input id="xNote" type="text" placeholder="เช่น เติมพ้อยท์"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modalExpense')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveExpense()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: day-links archive -->
+<div class="modal-backdrop" id="modalDayArchive">
+  <div class="modal" style="max-width:460px;">
+    <h3>📚 คลังลิงก์โหลดย้อนหลัง</h3>
+    <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 10px;">ลิงก์โหลดรายวันของสัปดาห์ก่อนๆ ที่เก็บไว้ตอนกดล้าง เปิดดู/เข้าลิงก์ย้อนหลังได้ (แชร์ทั้งทีม) · กดที่หัวแต่ละชุดเพื่อกางดูลิงก์</p>
+    <div id="dayArchiveControls" style="display:flex; gap:8px; margin-bottom:10px;">
+      <input id="archSearch" type="text" placeholder="ค้นหา (วันที่/ลิงก์/ชื่อคน)..." oninput="renderDayLinksArchive()" style="flex:1; padding:8px 10px; border-radius:9px; border:1px solid var(--line); font-size:13px; background:var(--fill); color:var(--ink);">
+      <select id="archMonth" onchange="renderDayLinksArchive()" style="padding:8px 10px; border-radius:9px; border:1px solid var(--line); font-size:13px; background:var(--fill); color:var(--ink);"></select>
+    </div>
+    <div id="dayArchiveList" style="max-height:52vh; overflow:auto;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modalDayArchive')" style="flex:1; justify-content:center;">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: activity history -->
+<div class="modal-backdrop" id="modalHistory">
+  <div class="modal" style="max-width:460px;">
+    <h3>🕘 ประวัติกิจกรรม</h3>
+    <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 10px;">บันทึกล่าสุด (ใครทำอะไรเมื่อไหร่) เก็บ 150 รายการล่าสุด · แชร์ทั้งทีม · ตั้งชื่อตัวเองที่ปุ่ม ⚙️ ในแท็บงานประจำ เพื่อให้บันทึกว่าเป็นคุณ</p>
+    <div id="historyList" style="max-height:50vh; overflow:auto;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger-ghost" onclick="clearHistory()" style="flex:1; justify-content:center;">ล้างประวัติ</button>
+      <button class="btn btn-ghost" onclick="closeModal('modalHistory')" style="flex:1; justify-content:center;">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: trash -->
+<div class="modal-backdrop" id="modalTrash">
+  <div class="modal" style="max-width:460px;">
+    <h3>🗑️ ถังขยะ</h3>
+    <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 10px;">รายการที่ลบจะมาอยู่ที่นี่ กู้คืนกลับที่เดิมได้ หรือลบถาวร (แชร์ทั้งทีม)</p>
+    <div id="trashList"></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger-ghost" onclick="emptyTrash()" style="flex:1; justify-content:center;">ล้างถังขยะทั้งหมด</button>
+      <button class="btn btn-ghost" onclick="closeModal('modalTrash')" style="flex:1; justify-content:center;">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: backup / restore -->
+<div class="modal-backdrop" id="modalBackup">
+  <div class="modal" style="max-width:440px;">
+    <h3>💾 สำรอง / กู้คืนข้อมูล</h3>
+    <div class="help-body">
+      <h4>ส่งออก (สำรองข้อมูล)</h4>
+      <p>ดาวน์โหลดข้อมูลทั้งหมด (งานประจำ, เรื่องเปิดใหม่, ค่าใช้จ่าย, กำหนดการ, ลิงก์โหลดรายวัน + คลังย้อนหลัง) เป็นไฟล์เดียว เก็บไว้กันข้อมูลหาย ควรทำเป็นระยะๆ</p>
+      <button class="btn btn-primary" onclick="exportData()" style="width:100%; justify-content:center; margin-top:6px;">⬇️ ดาวน์โหลดไฟล์สำรอง</button>
+
+      <div class="divider"></div>
+
+      <h4>นำเข้า (กู้คืนข้อมูล)</h4>
+      <p style="color:#c0392b;">⚠️ การนำเข้าจะ<b>เขียนทับข้อมูลปัจจุบันทั้งหมด</b> และทุกคนในทีมจะเห็นข้อมูลชุดที่นำเข้าแทน — ใช้เมื่อต้องการกู้คืนจากไฟล์สำรองเท่านั้น</p>
+      <input type="file" id="importFile" accept=".json,application/json" style="display:none;" onchange="importData(event)">
+      <button class="btn btn-ghost" onclick="document.getElementById('importFile').click()" style="width:100%; justify-content:center; margin-top:6px;">⬆️ เลือกไฟล์สำรองเพื่อกู้คืน</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modalBackup')" style="flex:1; justify-content:center;">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: help / user guide -->
+<div class="modal-backdrop" id="modalHelp">
+  <div class="modal" style="max-width:460px;">
+    <h3>📖 คู่มือการใช้งาน</h3>
+    <div class="help-body">
+      <p>ระบบจัดคิวงานคัดเรื่องของทีม — แชร์ข้อมูลร่วมกันทุกคน ใครแก้อะไรทุกคนเห็นเหมือนกัน <b>อัปเดตเองอัตโนมัติทุกไม่กี่วินาที</b> ไม่ต้องรีเฟรช · ถ้ากำลังพิมพ์/แก้อะไรอยู่ ระบบรอให้เสร็จก่อนค่อยอัปเดต · หลายคนแก้คนละเรื่องพร้อมกันได้ ระบบรวมให้ไม่ทับกัน</p>
+
+      <h4 style="color:var(--blue);">🚀 เริ่มใช้ครั้งแรก</h4>
+      <p>กด <b>⚙️</b> ในแท็บงานประจำ ตั้งว่า "ฉันคือใคร" (เหนือ/บิ๊ก/ยูตะ/น๊อต) — จำเฉพาะเครื่องคุณ ใช้สำหรับปุ่ม ⭐ งานของฉัน และบันทึกประวัติว่าเป็นคุณ</p>
+
+      <div class="divider"></div>
+      <p style="font-weight:800;font-size:14px;color:var(--ink);">📑 4 แท็บหลัก</p>
+
+      <h4>📅 งานประจำ</h4>
+      <p>เรื่องที่ลงประจำแต่ละวัน จัดกลุ่มตามคนทำ แต่ละแถวมี:</p>
+      <ul>
+        <li><b>สถานะรายวัน</b>: <span class="tag" style="background:#f1f3f6;color:#5b6472;">ยังไม่ทำ</span> <span class="tag" style="background:#e6f7ee;color:#1a9c6b;">ทำแล้ว</span> <span class="tag" style="background:#fdf3e3;color:#b9791b;">งด</span>(ต้นทางงดลง) <span class="tag" style="background:#f1eafd;color:#7b3fd4;">เลื่อน</span></li>
+        <li><b>＋ ตอน</b>: จัดการตอนที่ค้าง — เพิ่มเลขตอน, ติ๊กออกเมื่อทำเสร็จ, หรือ "เคลียร์ทุกตอน"</li>
+        <li><b>🔗 / 📁</b>: ลิงก์ต้นทาง / ลิงก์ Google Drive (กดตอนว่างเพื่อใส่)</li>
+        <li><b>⏏</b>: ดรอปเรื่อง (จบซีซั่น / LC) · <b>✎</b>: แก้ไข · <b>✕</b>: ลบ (ไปถังขยะ)</li>
+      </ul>
+
+      <h4>📆 ตารางปฏิทิน</h4>
+      <p>ภาพรวมงานประจำทั้งหมดในหน้าเดียว จัดเป็นการ์ดรายคน (สีประจำตัว) แยกเป็นแถวรายวัน — <b>สร้างจากข้อมูลจริง อัปเดตอัตโนมัติ</b> พอแก้เรื่องในแท็บงานประจำ ตารางนี้เปลี่ยนตามทันที · เรื่องที่มีตอนค้างจะมีป้าย (ค้าง N) · กด <b>📷 บันทึกเป็นรูป</b> เซฟเป็น PNG ไปแชร์ได้ (ไม่รวมเรื่องที่ดรอป)</p>
+
+      <h4>🆕 เรื่องเปิดใหม่</h4>
+      <p>ติดตามเรื่องที่กำลังจะเปิด ติ๊กว่าใครทำเสร็จบ้าง (4 คน) สถานะรวมคิดให้อัตโนมัติ · ✎ แก้ได้ (ที่ติ๊กไว้ไม่หาย)</p>
+
+      <h4>💰 ค่าใช้จ่าย</h4>
+      <p>ลงค่าใช้จ่ายแยกแพลตฟอร์ม เห็นยอดรวมแต่ละเจ้า + รวมทั้งหมดในตาราง · ✎ แก้แต่ละรายการได้</p>
+
+      <h4>🗓️ กำหนดการเปิดเรื่อง</h4>
+      <p>วางแผนล่วงหน้าว่าเรื่องไหนเปิดวันไหน มีนับถอยหลัง ("อีก 3 วัน") ใกล้ถึง/เลยกำหนดขึ้นป้ายเตือน</p>
+
+      <div class="divider"></div>
+      <p style="font-weight:800;font-size:14px;color:var(--ink);">⭐ ตัวช่วยในแท็บงานประจำ</p>
+
+      <h4>📍 กรองมาที่ "วันนี้" อัตโนมัติ</h4>
+      <p>เปิดเว็บวันไหน จะกรองงานของวันนั้นให้เองอัตโนมัติ · <b>นับวันเปลี่ยนตอน 2 ทุ่ม</b> — ก่อน 20:00 ยังแสดงงานของวันก่อนหน้า พอถึง 2 ทุ่มค่อยเปลี่ยนเป็นวันปัจจุบัน (เช่น อาทิตย์ก่อน 2 ทุ่มเห็นงานเสาร์ พอ 2 ทุ่มเปลี่ยนเป็นอาทิตย์) · กดชิป <b>📍 วันนี้อัตโนมัติ</b> เพื่อปิด/เปิด (จำเฉพาะเครื่องคุณ) · จะกดดูวันอื่นหรือ "ทั้งหมด" เมื่อไหร่ก็ได้</p>
+
+      <h4>👤 งานของฉัน + ภาระแต่ละคน</h4>
+      <p>การ์ดด้านบนสรุปว่าแต่ละคนมีกี่เรื่อง/กี่ตอนค้าง (กดการ์ดเพื่อกรอง) · ปุ่ม <b>⭐ งานของฉัน</b> กรองเห็นเฉพาะงานตัวเองในคลิกเดียว</p>
+
+      <h4>🔴 ป้าย "ค้าง" + แจ้งเตือนงานค้าง</h4>
+      <p>เรื่องที่มีตอนค้างขึ้นป้ายแดงบอกจำนวน + เลขตอน เช่น "ค้าง 3 ตอน · ตอน 1,2,3" — <b>ยิ่งค้างเยอะสียิ่งเข้ม</b> · ถ้ามีงานค้าง จะมี<b>แถบเตือนสีแดงบนสุด</b>ตอนเปิดเว็บ บอกว่าค้างกี่ตอน กด "ดูงานค้าง" เพื่อกรองเห็นเฉพาะเรื่องที่ค้างทันที (กดปิดแถบเตือนได้)</p>
+
+      <h4>⏏ ดรอปเรื่อง (จบซีซั่น / LC)</h4>
+      <p>เรื่องจบซีซั่นหรือโดน LC (ถูกลิขสิทธิ์) กด ⏏ พิมพ์ "จบ" หรือ "lc" · <b>ถ้ายังมีตอนค้าง เรื่องจะยังอยู่ในงานปกติ</b> (ขึ้นป้าย ⏳ รอดรอป) ให้ทำตอนที่ค้างต่อได้ พอเคลียร์ตอนค้างหมด <b>ระบบจะย้ายเข้าดรอป/จบให้เองอัตโนมัติ</b> — งานค้างไม่หายไปเฉยๆ · กด <b>📥 ดูเรื่องดรอป/จบ</b> เพื่อดู แล้ว "↩ เอากลับ" ได้</p>
+
+      <h4>📥 ลิงก์โหลดรายวัน + 📚 คลังย้อนหลัง</h4>
+      <p>แถบ "ลิงก์โหลดรายวัน" กดขยายเพื่อแปะลิงก์โฟลเดอร์โหลด raw แยกตามวัน (จ.–อา.) ทั้งทีมใช้ร่วมกัน · <b>ใส่ได้หลายลิงก์ต่อวัน</b> (กด ＋ ลิงก์ ของแต่ละวัน ตั้งชื่อกำกับได้ เช่น "ตอนหลัก"/"ตอนพิเศษ") · ✎ แก้ · ✕ ลบทีละลิงก์ · ถ้าลิงก์เปลี่ยนทุกอาทิตย์ กด <b>🧹 ล้าง+เก็บเข้าคลัง</b> ระบบเก็บชุดปัจจุบันเข้าคลังก่อนล้าง · เปิด <b>📚 คลังย้อนหลัง</b> ดูลิงก์สัปดาห์ก่อนๆ ได้ (พับไว้ กดกางดู, ค้นหา/กรองตามเดือนได้)</p>
+
+      <h4>🔄 รีเซ็ตอัตโนมัติรายสัปดาห์</h4>
+      <p>ขึ้นสัปดาห์ใหม่ (จันทร์) ระบบรีเซ็ตสถานะ "ทำแล้ว/งด/เลื่อน" กลับเป็น "ยังไม่ทำ" ให้เอง — แต่<b>ตอนที่ค้างไม่หาย</b> · กดปุ่มรีเซ็ตเองระหว่างสัปดาห์ก็ได้</p>
+
+      <div class="divider"></div>
+      <p style="font-weight:800;font-size:14px;color:var(--ink);">🛡️ เครื่องมือบนหัวเว็บ</p>
+
+      <h4>🗑️ ถังขยะ</h4>
+      <p>ทุกอย่างที่ลบ (ทุกแท็บ) มาอยู่ที่นี่ กู้คืนกลับที่เดิมได้ หรือลบถาวรทีหลัง เป็นถังกลางทั้งทีม เผลอลบก็ไม่หายทันที</p>
+
+      <h4>🕘 ประวัติกิจกรรม</h4>
+      <p>บันทึกว่าใครทำอะไรเมื่อไหร่ (เพิ่ม/ลบ/เปลี่ยนสถานะ/ดรอป/กู้คืน ฯลฯ) เก็บ 150 รายการล่าสุด แชร์ทั้งทีม — ต้องตั้งชื่อที่ ⚙️ ก่อน ไม่งั้นขึ้น "ไม่ระบุ"</p>
+
+      <h4>💾 สำรอง / กู้คืน</h4>
+      <p><b>ส่งออก</b> = ดาวน์โหลดข้อมูลทั้งหมดเก็บกันหาย · <b>นำเข้า</b> = โหลดไฟล์กลับมา (⚠️ เขียนทับทั้งทีม — ระบบดาวน์โหลดสำรองของปัจจุบันให้ก่อนอัตโนมัติ กันพลาด) แนะนำสำรองเป็นระยะ</p>
+
+      <h4>🌙 โหมดมืด/สว่าง</h4>
+      <p>กดสลับได้ตลอด จำค่า<b>เฉพาะเครื่องแต่ละคน</b> ไม่กระทบคนอื่น</p>
+
+      <div class="divider"></div>
+
+      <h4>💡 เกร็ดควรรู้</h4>
+      <ul>
+        <li>รหัสเรื่องเลขนำหน้า = วัน (1=จันทร์ … 7=อาทิตย์, 8=ไม่ระบุ, <b>0=จบแล้ว</b>)</li>
+        <li>ข้อมูลบันทึกอัตโนมัติทุกครั้งที่แก้ ไม่ต้องกดเซฟ</li>
+        <li>แก้แล้วหน้าไม่เด้งขึ้นบน เลื่อนดูตรงไหนก็แก้ต่อได้</li>
+        <li>ต้องเปิดผ่าน Claude เท่านั้น ระบบแชร์ข้อมูลถึงทำงาน</li>
+      </ul>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeModal('modalHelp')" style="flex:1; justify-content:center;">เข้าใจแล้ว</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: episode manager -->
+<div class="modal-backdrop" id="modalEpisodes">
+  <div class="modal">
+    <h3 id="epModalTitle">จัดการตอนที่ค้าง</h3>
+    <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 10px;">กด ✕ บนตอนที่ทำเสร็จเพื่อเอาออก · พิมพ์เลขตอนเพิ่มได้หลายตอน (คั่นด้วยเว้นวรรคหรือจุลภาค)</p>
+    <div class="ep-chip-wrap" id="epChips"></div>
+    <div id="epClearWrap" style="margin-bottom:12px;">
+      <button class="btn btn-danger-ghost" id="epClearBtn" style="width:100%; justify-content:center;">✓ ทำเสร็จหมดแล้ว — เคลียร์ทุกตอน</button>
+    </div>
+    <div class="field">
+      <label>เพิ่มตอนที่ค้าง</label>
+      <div style="display:flex; gap:8px;">
+        <input id="epAddInput" type="text" placeholder="เช่น 12, 13, 14" style="flex:1;">
+        <button class="btn btn-primary" id="epAddBtn" style="white-space:nowrap;">เพิ่ม</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeModal('modalEpisodes')" style="flex:1; justify-content:center;">เสร็จ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: add schedule entry -->
+<div class="modal-backdrop" id="modalSchedule">
+  <div class="modal">
+    <h3 id="scheduleModalTitle">เพิ่มกำหนดการเปิดเรื่อง</h3>
+    <div class="field"><label>วันที่จะเปิด</label><input id="sDate" type="date"></div>
+    <div class="field"><label>รหัส/ชื่อเรื่อง</label><input id="sTitle" type="text" placeholder="เช่น 18-28 หรือ ชื่อเรื่อง"></div>
+    <div class="field"><label>คนทำ (ไม่บังคับ)</label>
+      <select id="sPerson">
+        <option value="">— ยังไม่ระบุ —</option>
+        <option value="เหนือ">เหนือ</option><option value="บิ๊ก">บิ๊ก</option>
+        <option value="ยูตะ">ยูตะ</option><option value="น๊อต">น๊อต</option>
+      </select>
+    </div>
+    <div class="field"><label>สถานะ</label>
+      <select id="sStatus">
+        <option value="planned">วางแผนไว้</option>
+        <option value="preparing">กำลังเตรียม</option>
+        <option value="opened">เปิดแล้ว</option>
+      </select>
+    </div>
+    <div class="field"><label>ลิงก์ (ไม่บังคับ)</label><input id="sLink" type="text" placeholder="https://"></div>
+    <div class="field"><label>หมายเหตุ (ไม่บังคับ)</label><input id="sNote" type="text" placeholder=""></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modalSchedule')">ยกเลิก</button>
+      <button class="btn btn-primary" id="scheduleSaveBtn" onclick="saveSchedule()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Generic confirm dialog -->
+<div class="modal-backdrop" id="modalConfirm">
+  <div class="modal">
+    <h3 id="confirmTitle">ยืนยัน</h3>
+    <p id="confirmMsg" style="font-size:14px; color:var(--ink-soft); margin:0 0 4px; white-space:pre-line;"></p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="confirmCancel">ยกเลิก</button>
+      <button class="btn btn-primary" id="confirmOk">ตกลง</button>
+    </div>
+  </div>
+</div>
+
+<!-- Generic prompt dialog -->
+<div class="modal-backdrop" id="modalPrompt">
+  <div class="modal">
+    <h3 id="promptTitle">กรอกข้อมูล</h3>
+    <div class="field"><input id="promptInput" type="text" placeholder=""></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="promptCancel">ยกเลิก</button>
+      <button class="btn btn-primary" id="promptOk">ตกลง</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ============================================================
+     Supabase storage shim + login gate
+     เพิ่มเข้ามาเพื่อรันบน GitHub Pages โดยไม่แก้โค้ดแอปเดิม
+     ตั้งค่า SUPABASE_URL / SUPABASE_ANON_KEY ด้านล่าง
+     ============================================================ -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  #authGate{position:fixed;inset:0;z-index:99999;background:#f6f7fb;display:flex;align-items:center;justify-content:center;padding:20px;font-family:inherit}
+  #authGate .box{background:#fff;border:1px solid #e4e8ee;border-radius:16px;padding:28px 26px;width:100%;max-width:360px;box-shadow:0 10px 40px rgba(0,0,0,.08)}
+  #authGate h2{margin:0 0 4px;font-size:19px;color:#1f2430}
+  #authGate p.sub{margin:0 0 20px;font-size:13px;color:#8a94a3}
+  #authGate label{display:block;font-size:12px;color:#5b6472;margin:12px 0 5px}
+  #authGate input{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #e4e8ee;border-radius:9px;font-size:14px;font-family:inherit;background:#fff;color:#1f2430}
+  #authGate input:focus{outline:none;border-color:#1c6fd1}
+  #authGate button{width:100%;margin-top:20px;padding:11px;border:0;border-radius:9px;background:#1c6fd1;color:#fff;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer}
+  #authGate button:disabled{opacity:.55;cursor:default}
+  #authGate .err{margin-top:12px;font-size:12.5px;color:#d13b3b;min-height:17px;line-height:1.5}
+  #logoutBtn{position:fixed;left:10px;bottom:10px;z-index:9998;font-size:11px;padding:5px 10px;border:1px solid #e4e8ee;border-radius:7px;background:#fff;color:#8a94a3;cursor:pointer;font-family:inherit;opacity:.65}
+  #logoutBtn:hover{opacity:1}
+</style>
+<script>
+(function(){
+  // ===== 1) ใส่ค่าจาก Supabase → Project Settings → API =====
+  const SUPABASE_URL      = 'https://xlmjtnfoacqhypieeitc.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsbWp0bmZvYWNxaHlwaWVlaXRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NDgyMTksImV4cCI6MjEwNDUyNDIxOX0.ZOx_iTOGFsgALncubDGvjzhDwEXNziLlSPMTrjTR_HQ';
+  // =========================================================
+
+  const TABLE = 'app_kv';
+  let sb = null;
+
+  let uid = null;
+  let signalReady;
+  const ready = new Promise(function(res){ signalReady = res; });
+
+  // ---------- login gate ----------
+  const gate = document.createElement('div');
+  gate.id = 'authGate';
+  gate.innerHTML =
+    '<div class="box">' +
+      '<h2>ระบบจัดการงานคัดเรื่อง</h2>' +
+      '<p class="sub">เข้าสู่ระบบเพื่อใช้งาน</p>' +
+      '<label for="agEmail">อีเมล</label>' +
+      '<input id="agEmail" type="email" autocomplete="username">' +
+      '<label for="agPass">รหัสผ่าน</label>' +
+      '<input id="agPass" type="password" autocomplete="current-password">' +
+      '<button id="agBtn" type="button">เข้าสู่ระบบ</button>' +
+      '<div class="err" id="agErr"></div>' +
+    '</div>';
+  document.body.appendChild(gate);
+
+  const $ = function(id){ return document.getElementById(id); };
+
+  function showGate(){ gate.style.display = 'flex'; setTimeout(function(){ $('agEmail').focus(); }, 50); }
+  function hideGate(){
+    gate.style.display = 'none';
+    if(!$('logoutBtn')){
+      const b = document.createElement('button');
+      b.id = 'logoutBtn'; b.type = 'button'; b.textContent = 'ออกจากระบบ';
+      b.onclick = async function(){
+        if(!confirm('ออกจากระบบ?')) return;
+        await sb.auth.signOut();
+        location.reload();
+      };
+      document.body.appendChild(b);
+    }
+  }
+
+  async function doLogin(){
+    const btn = $('agBtn'), err = $('agErr');
+    const email = $('agEmail').value.trim(), pass = $('agPass').value;
+    if(!email || !pass){ err.textContent = 'กรอกอีเมลและรหัสผ่าน'; return; }
+    btn.disabled = true; btn.textContent = 'กำลังเข้าสู่ระบบ...'; err.textContent = '';
+    const res = await sb.auth.signInWithPassword({ email: email, password: pass });
+    btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ';
+    if(res.error){
+      err.textContent = /Invalid login/i.test(res.error.message)
+        ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' : ('เข้าสู่ระบบไม่สำเร็จ: ' + res.error.message);
+      return;
+    }
+    uid = res.data.user.id;
+    $('agPass').value = '';
+    hideGate();
+    signalReady();
+  }
+
+  $('agBtn').addEventListener('click', doLogin);
+  gate.addEventListener('keydown', function(e){ if(e.key === 'Enter') doLogin(); });
+
+  (async function boot(){
+    try{
+      if(SUPABASE_URL.indexOf('https://') !== 0 || SUPABASE_ANON_KEY.indexOf('PASTE_') === 0){
+        throw new Error('ยังไม่ได้ใส่ SUPABASE_URL / SUPABASE_ANON_KEY ในไฟล์ index.html');
+      }
+      sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: { persistSession: true, autoRefreshToken: true }
+      });
+    }catch(e){
+      showGate();
+      $('agBtn').disabled = true;
+      $('agErr').textContent = 'ตั้งค่าไม่ครบ: ' + e.message;
+      return;
+    }
+    let session = null;
+    try{ const r = await sb.auth.getSession(); session = r.data ? r.data.session : null; }catch(e){}
+    if(session && session.user){ uid = session.user.id; hideGate(); signalReady(); }
+    else showGate();
+  })();
+
+  // ---------- storage shim (API เดิมของแอป) ----------
+  // shared === true  -> แถวรวมของทีม (scope 'global')
+  // shared === false -> แถวส่วนตัวของแต่ละคน (scope = user id)
+  function scopeOf(shared){ return shared ? 'global' : ('u:' + uid); }
+
+  window.storage = {
+    async get(key, shared){
+      await ready;
+      const r = await sb.from(TABLE)
+        .select('value')
+        .eq('scope', scopeOf(shared))
+        .eq('key', key)
+        .maybeSingle();
+      if(r.error) throw new Error(r.error.message);
+      return r.data ? { value: r.data.value } : null;
+    },
+    async set(key, value, shared){
+      await ready;
+      const r = await sb.from(TABLE).upsert({
+        scope: scopeOf(shared),
+        key: key,
+        value: String(value),
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'scope,key' });
+      if(r.error) throw new Error(r.error.message);
+      return true;
+    }
+  };
+})();
+</script>
+<script>
+const SEED_RECURRING = []; // ข้อมูลจริงย้ายไป Supabase แล้ว (backup: seed-backup.json)
+const SEED_NEW = []; // ข้อมูลจริงย้ายไป Supabase แล้ว (backup: seed-backup.json)
+const CODE_GDRIVE_MAP = {}; // ข้อมูลจริงย้ายไป Supabase แล้ว (backup: seed-backup.json)
+const CODE_PENDING_MAP = {}; // ข้อมูลจริงย้ายไป Supabase แล้ว (backup: seed-backup.json)
+const SEED_EXPENSES = []; // ข้อมูลจริงย้ายไป Supabase แล้ว (backup: seed-backup.json)
+const SEED_SCHEDULE = []; // ข้อมูลจริงย้ายไป Supabase แล้ว (backup: seed-backup.json)
+
+
+const PEOPLE = ['เหนือ','บิ๊ก','ยูตะ','น๊อต'];
+const PERSON_COLOR = {'เหนือ':'blue','บิ๊ก':'green','ยูตะ':'purple','น๊อต':'orange'};
+const DAY_ORDER = ['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์','ไม่ระบุวัน','จบแล้ว'];
+const STATUS_META = {
+  pending: {label:'ยังไม่ทำ', bg:'#f1f3f6', fg:'#5b6472'},
+  done:    {label:'ทำแล้ว',   bg:'#e6f7ee', fg:'#1a9c6b'},
+  skipped: {label:'งด',       bg:'#fdf3e3', fg:'#b9791b'},
+  delayed: {label:'เลื่อน',   bg:'#f1eafd', fg:'#7b3fd4'},
+};
+const WEEKDAY_ONLY = DAY_ORDER.slice(0,7); // days that carry real overdue meaning
+
+function todayWeekdayIndex(){
+  // JS getDay(): 0=Sun..6=Sat -> convert to 0=Mon..6=Sun to match WEEKDAY_ONLY order
+  return (new Date().getDay() + 6) % 7;
+}
+function todayDateStr(){
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+// วันของเรื่องนี้ผ่านไปแล้วในสัปดาห์ปัจจุบันหรือยัง (ไม่สนสถานะ)
+function dayHasPassedThisWeek(item){
+  const idx = WEEKDAY_ONLY.indexOf(item.day);
+  if(idx === -1) return false; // ไม่ระบุวัน / จบแล้ว - ไม่มีวันตายตัว
+  return idx < todayWeekdayIndex();
+}
+// ค้าง = ยัง pending และ (วันผ่านไปแล้วสัปดาห์นี้ หรือเคยเริ่มนับค้างมาจากสัปดาห์ก่อนแล้ว)
+// ใช้ pendingSinceDate เป็นตัวคงสถานะข้ามสัปดาห์ ไม่ให้ป้ายหายไปเองตอนขึ้นสัปดาห์ใหม่
+function isOverdue(item){
+  if(item.status !== 'pending') return false;
+  return dayHasPassedThisWeek(item) || !!item.pendingSinceDate;
+}
+// จำนวนสัปดาห์เต็มที่ผ่านไปตั้งแต่เรื่องนี้เริ่มค้าง (0 = เพิ่งค้างในสัปดาห์นี้, 1 = ค้างข้ามมา 1 สัปดาห์แล้ว, ...)
+function weeksOverdueCount(item){
+  if(!item.pendingSinceDate) return 0;
+  const then = new Date(item.pendingSinceDate + 'T00:00:00');
+  const now = new Date(todayDateStr() + 'T00:00:00');
+  const days = Math.floor((now - then) / (24*60*60*1000));
+  return Math.max(0, Math.floor(days / 7));
+}
+const OVERDUE_COLORS = ['#e0403a','#c0392b','#922b21','#641e16'];
+// จำนวนตอนที่ค้างของเรื่องนี้
+function pendingEpCount(item){
+  return (item.pendingEpisodes && item.pendingEpisodes.length) || 0;
+}
+// เรื่องที่ "ดรอปจริง" = ทำเครื่องหมายดรอปแล้ว และไม่มีตอนค้างเหลือ
+// ถ้ากดดรอปแต่ยังมีตอนค้าง จะยังอยู่ในงานปกติจนกว่าจะเคลียร์หมด แล้วค่อยย้ายเข้าดรอปเอง
+function isEffectivelyDropped(item){
+  return !!item.dropped && pendingEpCount(item)===0;
+}
+// สีป้ายเข้มขึ้นตามจำนวนตอนที่ค้าง
+function pendingEpColor(n){
+  if(n >= 10) return '#641e16';
+  if(n >= 6)  return '#922b21';
+  if(n >= 3)  return '#c0392b';
+  return '#e0403a';
+}
+// ป้ายค้าง: โชว์จำนวน + เลขตอนที่ค้างจริง แทนการนับสัปดาห์
+function overdueBadgeHtml(item){
+  const eps = (item.pendingEpisodes || []).slice().sort((a,b)=>a-b);
+  if(!eps.length) return '';
+  const bg = pendingEpColor(eps.length);
+  const list = eps.join(', ');
+  return `<div class="ep-line">`
+    + `<span class="overdue-badge" style="background:${bg}">ค้าง ${eps.length} ตอน</span>`
+    + ` <span class="ep-list">ตอน ${esc(list)}</span></div>`;
+}
+function currentWeekMondayStr(){
+  const now = new Date();
+  const idx = (now.getDay()+6)%7; // 0=Mon..6=Sun
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate()-idx);
+  return monday.getFullYear()+'-'+String(monday.getMonth()+1).padStart(2,'0')+'-'+String(monday.getDate()).padStart(2,'0');
+}
+// รีเซ็ตแบบไม่ทำลายประวัติเรื่องค้าง: แตะเฉพาะเรื่องที่ "ทำแล้ว/งด/เลื่อน" ให้กลับเป็นยังไม่ทำ
+// ส่วนเรื่องที่ "ยังไม่ทำ" (ค้างอยู่) จะไม่ถูกแตะเลย ตัวนับสัปดาห์ค้างเดินต่อตามปกติ
+function resetNonPendingToPending(items){
+  let changed = false;
+  items.forEach(item=>{
+    if(item.status !== 'pending'){
+      item.status = 'pending';
+      item.pendingSinceDate = null;
+      changed = true;
+    }
+  });
+  return changed;
+}
+
+let recurring = [];
+let newStories = [];
+let expenses = [];
+let scheduleEntries = [];
+let trash = [];
+let dayLinks = [];       // ลิงก์โหลดรายวัน (แชร์ทั้งทีม): [{id:'จันทร์', day, url}]
+let dayLinksArchive = []; // คลังลิงก์โหลดย้อนหลัง (แชร์): [{id, savedAt, links:[{day,url}]}]
+let myPerson = '';       // "ฉันคือใคร" เก็บเฉพาะเครื่อง (ไม่แชร์)
+let autoTodayFilter = true;  // เปิดเว็บแล้วกรองมาที่วันนี้อัตโนมัติ (เก็บเฉพาะเครื่อง)
+let lastAutoDay = '';        // วันที่ระบบตั้งให้ล่าสุด (ใช้ตรวจว่าผู้ใช้เปลี่ยนวันเองหรือยัง)
+let activity = [];       // ประวัติกิจกรรม (แชร์ทั้งทีม): [{id, who, text, at}]
+let activeTab = 'recurring';
+let dayFilter = 'ทั้งหมด';  // ตั้งเป็นวันนี้อัตโนมัติตอนโหลด (ดู applyTodayFilter)
+let personFilter = 'ทั้งหมด';
+let showDropped = false;   // แสดงเรื่องที่ดรอป/จบซีซั่นหรือไม่
+let showOnlyPending = false; // แสดงเฉพาะเรื่องที่มีตอนค้าง (จากปุ่ม "ดูงานค้าง")
+const DROP_META = {
+  ended: {label:'จบซีซั่น', bg:'#eef1f6', fg:'#5b6472'},
+  lc:    {label:'LC (ถูกลิขสิทธิ์)', bg:'#fdeaea', fg:'#c0392b'},
+};
+let searchText = '';
+
+function uid(prefix){ return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// ===== โหมดมืด/สว่าง (บันทึกเฉพาะเครื่องผู้ใช้ ไม่แชร์) =====
+function applyTheme(mode){
+  const dark = mode === 'dark';
+  document.body.classList.toggle('dark', dark);
+  const btn = document.getElementById('themeBtn');
+  if(btn) btn.textContent = dark ? '☀️ สว่าง' : '🌙 มืด';
+}
+async function toggleTheme(){
+  const dark = !document.body.classList.contains('dark');
+  const mode = dark ? 'dark' : 'light';
+  applyTheme(mode);
+  try{ await window.storage.set('theme', mode, false); }catch(e){}
+}
+async function loadTheme(){
+  let mode = 'light';
+  try{
+    const t = await window.storage.get('theme', false);
+    if(t && t.value) mode = t.value;
+  }catch(e){}
+  applyTheme(mode);
+}
+
+function showToast(msg){  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 1800);
+}
+
+// กล่องยืนยันที่สร้างเอง (แทน confirm ของเบราว์เซอร์ ซึ่งถูกบล็อกใน sandbox)
+function uiConfirm(message, title){
+  return new Promise(resolve=>{
+    const back = document.getElementById('modalConfirm');
+    document.getElementById('confirmTitle').textContent = title || 'ยืนยัน';
+    document.getElementById('confirmMsg').textContent = message || '';
+    const okBtn = document.getElementById('confirmOk');
+    const cancelBtn = document.getElementById('confirmCancel');
+    function cleanup(result){
+      back.classList.remove('show');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      resolve(result);
+    }
+    function onOk(){ cleanup(true); }
+    function onCancel(){ cleanup(false); }
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    back.classList.add('show');
+  });
+}
+
+// กล่องกรอกข้อความที่สร้างเอง (แทน prompt ของเบราว์เซอร์)
+function uiPrompt(message, placeholder){
+  return new Promise(resolve=>{
+    const back = document.getElementById('modalPrompt');
+    document.getElementById('promptTitle').textContent = message || 'กรอกข้อมูล';
+    const input = document.getElementById('promptInput');
+    input.value = '';
+    input.placeholder = placeholder || '';
+    const okBtn = document.getElementById('promptOk');
+    const cancelBtn = document.getElementById('promptCancel');
+    function cleanup(result){
+      back.classList.remove('show');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      input.removeEventListener('keydown', onKey);
+      resolve(result);
+    }
+    function onOk(){ cleanup(input.value.trim() || null); }
+    function onCancel(){ cleanup(null); }
+    function onKey(e){ if(e.key==='Enter') onOk(); if(e.key==='Escape') onCancel(); }
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    input.addEventListener('keydown', onKey);
+    back.classList.add('show');
+    setTimeout(()=>input.focus(), 50);
+  });
+}
+
+async function loadAll(){
+  await loadTheme();
+  // อ่านข้อมูลรวมทั้งก้อนในคำสั่งเดียว (ย้ายจาก key เก่าอัตโนมัติถ้ามี)
+  const app = await getAppData();
+  recurring       = (app && Array.isArray(app.recurring_stories)) ? app.recurring_stories : null;
+  newStories      = (app && Array.isArray(app.new_stories))       ? app.new_stories : null;
+  expenses        = (app && Array.isArray(app.expenses))          ? app.expenses : null;
+  scheduleEntries = (app && Array.isArray(app.schedule_entries))  ? app.schedule_entries : null;
+  trash           = (app && Array.isArray(app.trash))             ? app.trash : [];
+  dayLinks        = (app && Array.isArray(app.day_links))         ? app.day_links : [];
+  dayLinksArchive = (app && Array.isArray(app.day_links_archive)) ? app.day_links_archive : [];
+  activity        = (app && Array.isArray(app.activity))          ? app.activity : [];
+
+  let needSave = false;
+  if(!recurring){ recurring = SEED_RECURRING; needSave = true; }
+  if(!newStories){ newStories = SEED_NEW; needSave = true; }
+  if(!expenses){ expenses = SEED_EXPENSES; needSave = true; }
+  if(!scheduleEntries){ scheduleEntries = SEED_SCHEDULE; needSave = true; }
+
+  // migration: backfill Google Drive links + ตอนค้าง สำหรับข้อมูลที่บันทึกก่อนมีฟิลด์นี้
+  let migrated = false;
+  const codeCounts = {};
+  recurring.forEach(it=>{ codeCounts[it.code] = (codeCounts[it.code]||0)+1; });
+  const codeUnique = code => codeCounts[code] === 1;
+  recurring.forEach(item=>{
+    if(!item.gdrive && CODE_GDRIVE_MAP[item.code] && codeUnique(item.code)){
+      item.gdrive = CODE_GDRIVE_MAP[item.code]; migrated = true;
+    }
+    if(!item.status){
+      item.status = item.done ? 'done' : 'pending'; delete item.done; migrated = true;
+    }
+    if(item.status==='pending' && dayHasPassedThisWeek(item) && !item.pendingSinceDate){
+      item.pendingSinceDate = todayDateStr(); migrated = true;
+    }
+    if(item.status!=='pending' && item.pendingSinceDate){
+      item.pendingSinceDate = null; migrated = true;
+    }
+    if(item.pendingEpisodes === undefined){
+      item.pendingEpisodes = (CODE_PENDING_MAP[item.code] && codeUnique(item.code)) ? [...CODE_PENDING_MAP[item.code]] : [];
+      migrated = true;
+    }
+  });
+
+  // รีเซ็ตอัตโนมัติเมื่อขึ้นสัปดาห์ใหม่ (แตะเฉพาะเรื่องที่ทำแล้ว/งด/เลื่อน ไม่แตะเรื่องค้าง)
+  let lastResetWeek = null;
+  try{
+    const w = await window.storage.get('last_reset_week', true);
+    lastResetWeek = w ? w.value : null;
+  }catch(e){ lastResetWeek = null; }
+  const thisWeekMonday = currentWeekMondayStr();
+  let weekReset = false;
+  if(lastResetWeek !== thisWeekMonday){
+    if(resetNonPendingToPending(recurring)) weekReset = true;
+    try{ await window.storage.set('last_reset_week', thisWeekMonday, true); }catch(e){}
+    if(lastResetWeek !== null){
+      showToast('ขึ้นสัปดาห์ใหม่ — รีเซ็ตสถานะที่ทำ/งด/เลื่อนแล้วให้อัตโนมัติ');
+    }
+  }
+
+  try{
+    const me = await window.storage.get('me', false);
+    myPerson = me && me.value ? me.value : '';
+  }catch(e){ myPerson = ''; }
+  try{
+    const atf = await window.storage.get('auto_today', false);
+    autoTodayFilter = atf ? (atf.value === '1') : true; // ค่าเริ่มต้น: เปิด
+  }catch(e){ autoTodayFilter = true; }
+  applyTodayFilter();
+
+  snapshotAll();
+  // บันทึกครั้งเดียวถ้ามีการ seed/migrate/reset (เขียน appdata ก้อนเดียว)
+  if(needSave || migrated || weekReset) await persistData(false);
+  render();
+  startRealtimeSync();
+}
+
+// รวมข้อมูล 2 ฝั่งแบบรายรายการ (ใช้ id เป็นตัวจับคู่) โดยเทียบกับฐาน (สถานะที่รู้ล่าสุด)
+// - รายการที่เราแก้ → ใช้ของเรา
+// - รายการที่คนอื่นแก้ (เราไม่ได้แตะ) → ใช้ของเขา
+// - รายการที่เพิ่มใหม่ทั้งสองฝั่ง → เก็บไว้ทั้งคู่
+// - รายการที่ถูกลบ → ลบก็ต่อเมื่ออีกฝั่งไม่ได้แก้ (ถ้าอีกฝั่งแก้ ให้คงไว้ กันงานหาย)
+function mergeById(baseArr, oursArr, theirsArr){
+  const bm = {}, om = {}, tm = {};
+  (baseArr||[]).forEach(x=>bm[x.id]=x);
+  (oursArr||[]).forEach(x=>om[x.id]=x);
+  (theirsArr||[]).forEach(x=>tm[x.id]=x);
+  const S = x => x===undefined ? null : JSON.stringify(x);
+  // ลำดับ: ยึดของเราก่อน แล้วต่อท้ายด้วยรายการที่มีเฉพาะฝั่งเขา (เพื่อความเสถียร)
+  const orderIds = [];
+  const seen = new Set();
+  (oursArr||[]).forEach(x=>{ if(!seen.has(x.id)){orderIds.push(x.id);seen.add(x.id);} });
+  (theirsArr||[]).forEach(x=>{ if(!seen.has(x.id)){orderIds.push(x.id);seen.add(x.id);} });
+  const result = [];
+  for(const id of orderIds){
+    const b = bm[id], o = om[id], t = tm[id];
+    const weChanged = S(o) !== S(b);     // รวมกรณีเพิ่ม (b ไม่มี) และลบ (o ไม่มี)
+    const theyChanged = S(t) !== S(b);
+    if(o === undefined){            // เราลบ
+      if(theyChanged && t !== undefined) result.push(t); // เขาแก้ทีหลัง → คงของเขาไว้
+      continue;                                          // ไม่งั้นลบตามเรา
+    }
+    if(t === undefined){            // เขาลบ
+      if(weChanged) result.push(o); // เราแก้ → คงของเราไว้
+      continue;                                          // ไม่งั้นลบตามเขา
+    }
+    if(weChanged) result.push(o);
+    else if(theyChanged) result.push(t);
+    else result.push(o);
+  }
+  return result;
+}
+
+// เซฟแบบรวมข้อมูลก่อน กันงานของคนอื่นที่แก้พร้อมกันหาย
+// ===== ระบบเก็บข้อมูลรวมก้อนเดียว (ลดจำนวนคำสั่ง storage เพื่อกัน rate limit) =====
+// เก็บทุก collection ไว้ใน key เดียว 'appdata' — ทุกการเซฟ = อ่าน 1 + เขียน 1
+const DATA_KEYS = ['recurring_stories','new_stories','expenses','schedule_entries','trash','day_links','day_links_archive','activity'];
+function getColl(k){
+  switch(k){
+    case 'recurring_stories': return recurring;
+    case 'new_stories': return newStories;
+    case 'expenses': return expenses;
+    case 'schedule_entries': return scheduleEntries;
+    case 'trash': return trash;
+    case 'day_links': return dayLinks;
+    case 'day_links_archive': return dayLinksArchive;
+    case 'activity': return activity;
+  }
+}
+function setColl(k, v){
+  switch(k){
+    case 'recurring_stories': recurring = v; break;
+    case 'new_stories': newStories = v; break;
+    case 'expenses': expenses = v; break;
+    case 'schedule_entries': scheduleEntries = v; break;
+    case 'trash': trash = v; break;
+    case 'day_links': dayLinks = v; break;
+    case 'day_links_archive': dayLinksArchive = v; break;
+    case 'activity': activity = v; break;
+  }
+}
+// อ่านข้อมูลรวมทั้งก้อน (1 คำสั่ง) — ถ้ายังไม่มี 'appdata' ให้ย้ายจาก key เก่า (migration)
+async function getAppData(){
+  let obj = null;
+  try{
+    const res = await window.storage.get('appdata', true);
+    if(res && res.value) obj = JSON.parse(res.value);
+  }catch(e){ obj = null; }
+  if(obj && typeof obj==='object') return obj;
+  // ย้ายข้อมูลจากระบบเก่า (key แยก) มารวม
+  const legacy = {};
+  let found = false;
+  for(const k of DATA_KEYS){
+    try{
+      const r = await window.storage.get(k, true);
+      if(r && r.value){ legacy[k] = JSON.parse(r.value); found = true; }
+    }catch(e){}
+  }
+  return found ? legacy : null;
+}
+// เซฟ: อ่านก้อนล่าสุด → merge ทุก collection เทียบฐาน (กันงานคนอื่นหาย) → เขียนกลับ 1 ครั้ง
+// คิวเซฟ: ให้การเซฟทำทีละครั้ง ไม่ให้ซ้อนกันจนค่าเพี้ยน (เช่นกดเปลี่ยนสถานะรัวๆ)
+let saveChain = Promise.resolve();
+function persistData(toast){
+  saveChain = saveChain.then(()=>persistDataNow(toast)).catch(()=>{});
+  return saveChain;
+}
+async function persistDataNow(toast){
+  try{
+    let remote = null;
+    try{
+      const res = await window.storage.get('appdata', true);
+      if(res && res.value) remote = JSON.parse(res.value);
+    }catch(e){ remote = null; }
+    let pulledExternal = false;
+    const full = {};
+    for(const k of DATA_KEYS){
+      const ours = getColl(k) || [];
+      const theirs = remote && Array.isArray(remote[k]) ? remote[k] : null;
+      let merged = ours;
+      if(theirs){
+        const base = lastSeen[k] ? JSON.parse(lastSeen[k]) : theirs;
+        merged = mergeById(base, ours, theirs);
+        if(JSON.stringify(merged) !== JSON.stringify(ours)) pulledExternal = true;
+      }
+      setColl(k, merged);
+      full[k] = merged;
+      lastSeen[k] = JSON.stringify(merged);
+    }
+    // เขียน 1 ครั้ง — ล้มเหลวลองซ้ำเอง 1 ที (กัน rate limit ชั่วคราว)
+    const s = JSON.stringify(full);
+    try{
+      await window.storage.set('appdata', s, true);
+    }catch(e1){
+      await new Promise(r=>setTimeout(r, 900));
+      await window.storage.set('appdata', s, true);
+    }
+    if(toast) showToast('บันทึกแล้ว');
+    if(pulledExternal && !isBusyEditing()){
+      renderStats();
+      if(activeTab==='recurring') renderRecurring();
+      else if(activeTab==='newstories') renderNewStories();
+      else if(activeTab==='expenses') renderExpenses();
+      else renderSchedule();
+    }
+  }catch(e){ showToast('บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง'); }
+}
+
+async function persistRecurring(toast=true){ await persistData(toast); }
+async function persistNew(toast=true){ await persistData(toast); }
+async function persistExpenses(toast=true){ await persistData(toast); }
+async function persistSchedule(toast=true){ await persistData(toast); }
+async function persistTrash(toast=false){ await persistData(toast); }
+
+// ===== ถังขยะ: ลบแล้วเก็บไว้กู้คืนได้ =====
+const COLLECTION_LABELS = { recurring:'งานประจำ', newstories:'เรื่องเปิดใหม่', expenses:'ค่าใช้จ่าย', schedule:'กำหนดการ' };
+function trashLabelOf(coll, item){
+  if(coll==='recurring' || coll==='newstories') return (item.code? item.code+' · ':'') + (item.name || '(ไม่มีชื่อ)');
+  if(coll==='expenses') return (item.platform||'') + ' · ' + fmtBaht(item.amount) + ' บาท';
+  if(coll==='schedule') return item.title || '(ไม่มีชื่อ)';
+  return '(รายการ)';
+}
+async function moveToTrash(coll, item){
+  trash.push({
+    trashId: uid('t'),
+    coll,
+    deletedAt: new Date().toISOString(),
+    label: trashLabelOf(coll, item),
+    item
+  });
+  await persistTrash();
+}
+async function restoreFromTrash(trashId){
+  const idx = trash.findIndex(t=>t.trashId===trashId);
+  if(idx<0) return;
+  const entry = trash[idx];
+  // กันไอดีชนถ้ามีการเพิ่มเรื่องใหม่ทับ — ถ้าไอดีเดิมมีอยู่แล้วให้สร้างไอดีใหม่
+  const target = { recurring, newstories:newStories, expenses, schedule:scheduleEntries }[entry.coll];
+  const it = entry.item;
+  if(target.some(x=>x.id===it.id)) it.id = uid(entry.coll[0]);
+  if(entry.coll==='recurring'){ recurring.push(it); await persistRecurring(false); }
+  else if(entry.coll==='newstories'){ newStories.push(it); await persistNew(false); }
+  else if(entry.coll==='expenses'){ expenses.push(it); await persistExpenses(false); }
+  else if(entry.coll==='schedule'){ scheduleEntries.push(it); await persistSchedule(false); }
+  trash.splice(idx,1);
+  await persistTrash();
+  logActivity(`กู้คืนจากถังขยะ: ${entry.label}`);
+  renderStats(); renderTrash(); render();
+  showToast('กู้คืนแล้ว: ' + entry.label);
+}
+async function deleteFromTrashPermanently(trashId){
+  const entry = trash.find(t=>t.trashId===trashId);
+  if(!entry) return;
+  if(!await uiConfirm('ลบถาวร "'+entry.label+'" ออกจากถังขยะ? กู้คืนไม่ได้อีก', 'ลบถาวร')) return;
+  trash = trash.filter(t=>t.trashId!==trashId);
+  await persistTrash();
+  renderTrash(); renderStats();
+}
+async function emptyTrash(){
+  if(!trash.length) return;
+  if(!await uiConfirm('ล้างถังขยะทั้งหมด '+trash.length+' รายการ? กู้คืนไม่ได้อีก', 'ล้างถังขยะ')) return;
+  trash = [];
+  await persistTrash();
+  renderTrash(); renderStats();
+}
+function openTrash(){ renderTrash(); openModal('modalTrash'); }
+function openHistory(){ flushActivityNow(); renderHistory(); openModal('modalHistory'); }
+function renderHistory(){
+  const el = document.getElementById('historyList');
+  if(!activity.length){
+    el.innerHTML = '<div class="empty-state" style="padding:24px 10px;">ยังไม่มีประวัติ</div>';
+    return;
+  }
+  const sorted = [...activity].sort((a,b)=> (b.at||'').localeCompare(a.at||''));
+  el.innerHTML = sorted.map(a=>`
+    <div class="hist-row">
+      <div class="hist-who">${esc(a.who||'ไม่ระบุ')}</div>
+      <div style="flex:1; min-width:0;">
+        <div style="font-size:13px;">${esc(a.text)}</div>
+        <div style="font-size:11px; color:var(--ink-soft);">${timeAgo(a.at)}</div>
+      </div>
+    </div>`).join('');
+}
+async function clearHistory(){
+  if(!activity.length) return;
+  if(!await uiConfirm('ล้างประวัติกิจกรรมทั้งหมด? (กู้คืนไม่ได้)', 'ล้างประวัติ')) return;
+  activity = [];
+  await persistActivity();
+  renderHistory();
+}function timeAgo(iso){
+  const diff = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diff/60000);
+  if(min < 1) return 'เมื่อสักครู่';
+  if(min < 60) return min+' นาทีก่อน';
+  const hr = Math.floor(min/60);
+  if(hr < 24) return hr+' ชม.ก่อน';
+  const day = Math.floor(hr/24);
+  return day+' วันก่อน';
+}
+function renderTrash(){
+  const el = document.getElementById('trashList');
+  if(!trash.length){
+    el.innerHTML = '<div class="empty-state" style="padding:24px 10px;">ถังขยะว่าง</div>';
+    return;
+  }
+  const sorted = [...trash].sort((a,b)=> (b.deletedAt||'').localeCompare(a.deletedAt||''));
+  el.innerHTML = sorted.map(t=>`
+    <div class="trash-row">
+      <div style="flex:1; min-width:0;">
+        <div style="font-weight:700; font-size:13.5px; overflow:hidden; text-overflow:ellipsis;">${esc(t.label)}</div>
+        <div style="font-size:11.5px; color:var(--ink-soft);">${COLLECTION_LABELS[t.coll]||t.coll} · ${timeAgo(t.deletedAt)}</div>
+      </div>
+      <button class="btn btn-ghost" style="padding:6px 12px; font-size:12.5px;" onclick="restoreFromTrash('${t.trashId}')">กู้คืน</button>
+      <button class="icon-btn" onclick="deleteFromTrashPermanently('${t.trashId}')" title="ลบถาวร">✕</button>
+    </div>`).join('');
+}
+
+// ===== ซิงก์เรียลไทม์: ดึงข้อมูลใหม่จากทีมมาแสดงเอง ไม่ต้องรีเฟรช =====
+let lastSeen = {};       // ค่าล่าสุดที่เรารู้ของแต่ละ key (กันไม่ให้ถือว่าการเซฟของเราเองเป็นการเปลี่ยนจากภายนอก)
+let pollTimer = null;
+let pendingExternalRender = false;
+
+function snapshotAll(){
+  lastSeen['recurring_stories'] = JSON.stringify(recurring);
+  lastSeen['new_stories'] = JSON.stringify(newStories);
+  lastSeen['expenses'] = JSON.stringify(expenses);
+  lastSeen['schedule_entries'] = JSON.stringify(scheduleEntries);
+  lastSeen['trash'] = JSON.stringify(trash);
+  lastSeen['day_links'] = JSON.stringify(dayLinks);
+  lastSeen['day_links_archive'] = JSON.stringify(dayLinksArchive);
+  lastSeen['activity'] = JSON.stringify(activity);
+}
+
+// true ถ้ากำลังมีอะไรที่ไม่ควรถูกรบกวนด้วยการวาดใหม่ (พิมพ์ค้นหาอยู่ / เปิดหน้าต่างแก้ไขอยู่)
+function isBusyEditing(){
+  const ae = document.activeElement;
+  if(ae && (ae.id==='searchBox' || ae.id==='searchBox2')) return true;
+  // เปิดหน้าต่างแก้ไขที่มีฟอร์มค้างอยู่ (เว้น modalHelp/modalBackup ที่ไม่กระทบข้อมูล)
+  const editingModals = ['modalRecurring','modalNew','modalExpense','modalSchedule','modalEpisodes','modalConfirm','modalPrompt','modalTrash','modalHistory','modalDayArchive'];
+  return editingModals.some(id=>{
+    const el = document.getElementById(id);
+    return el && el.classList.contains('show');
+  });
+}
+
+async function pollOnce(){
+  let changed = false;
+  // ถ้าเปิดเว็บค้างไว้แล้วข้ามเวลา 2 ทุ่ม (หรือข้ามวัน) ให้เลื่อนตัวกรองไปวันใหม่อัตโนมัติ
+  if(autoTodayFilter && activeTab==='recurring' && dayFilter !== todayThaiDay() && !isBusyEditing()){
+    // เลื่อนเฉพาะถ้าผู้ใช้ยังอยู่ที่ "วันเดิมที่ระบบเคยตั้งให้" (ไม่แย่งถ้าเขาเลือกวันอื่นเอง)
+    if(dayFilter === lastAutoDay){
+      dayFilter = todayThaiDay();
+      lastAutoDay = dayFilter;
+      pendingExternalRender = true;
+    }
+  }
+  let remote = null;
+  try{
+    const res = await window.storage.get('appdata', true); // อ่านก้อนเดียว
+    if(res && res.value) remote = JSON.parse(res.value);
+  }catch(e){ remote = null; }
+  if(remote && typeof remote==='object'){
+    for(const k of DATA_KEYS){
+      if(!Array.isArray(remote[k])) continue;
+      const val = JSON.stringify(remote[k]);
+      if(val !== lastSeen[k]){
+        setColl(k, remote[k]);
+        lastSeen[k] = val;
+        changed = true;
+      }
+    }
+  }
+  if(changed) pendingExternalRender = true;
+
+  // วาดใหม่เฉพาะตอนที่ปลอดภัย (ไม่ได้พิมพ์/แก้อะไรค้างอยู่)
+  if(pendingExternalRender && !isBusyEditing()){
+    pendingExternalRender = false;
+    renderStats();
+    if(activeTab==='recurring') renderRecurring();
+    else if(activeTab==='newstories') renderNewStories();
+    else if(activeTab==='expenses') renderExpenses();
+    else renderSchedule();
+    showToast('🔄 อัปเดตข้อมูลจากทีมแล้ว');
+  }
+}
+
+function startRealtimeSync(){
+  if(pollTimer) return;
+  startPollTimer();
+  // พักการซิงก์เมื่อสลับไปแท็บอื่น (ลดโหลด storage ตอนเปิดค้างไว้เฉยๆ) — กลับมาแล้วดึงทันที
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.hidden){
+      flushActivityNow();
+      stopPollTimer();
+    } else {
+      pollOnce();       // ดึงข้อมูลล่าสุดทันทีที่กลับมา
+      startPollTimer(); // เริ่มซิงก์ต่อ
+    }
+  });
+  // เขียนประวัติที่ค้างก่อนปิดหน้า
+  window.addEventListener('beforeunload', ()=>{ flushActivityNow(); });
+}
+function startPollTimer(){
+  if(pollTimer) return;
+  pollTimer = setInterval(pollOnce, 12000); // เช็คทุก 12 วินาที
+}
+function stopPollTimer(){
+  if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
+}
+
+
+// ===== สำรอง / กู้คืนข้อมูล =====
+function exportData(auto){
+  const payload = {
+    app: 'ระบบจัดการงานคัดเรื่อง',
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    data: {
+      recurring_stories: recurring,
+      new_stories: newStories,
+      expenses: expenses,
+      schedule_entries: scheduleEntries,
+      day_links: dayLinks,
+      day_links_archive: dayLinksArchive
+    }
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const d = new Date();
+  const stamp = d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')
+    +'-'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0');
+  a.href = url;
+  a.download = (auto ? `ก่อนกู้คืน-คัดเรื่อง-${stamp}.json` : `backup-คัดเรื่อง-${stamp}.json`);
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  if(!auto) showToast('ดาวน์โหลดไฟล์สำรองแล้ว');
+}
+
+async function importData(event){
+  const file = event.target.files && event.target.files[0];
+  event.target.value = ''; // ให้เลือกไฟล์เดิมซ้ำได้
+  if(!file) return;
+  let parsed;
+  try{
+    const text = await file.text();
+    parsed = JSON.parse(text);
+  }catch(e){
+    showToast('อ่านไฟล์ไม่สำเร็จ — ไฟล์อาจเสียหาย');
+    return;
+  }
+  const d = parsed && parsed.data;
+  if(!d || !Array.isArray(d.recurring_stories)){
+    showToast('ไฟล์นี้ไม่ใช่ไฟล์สำรองที่ถูกต้อง');
+    return;
+  }
+  const counts = `งานประจำ ${d.recurring_stories.length} · เรื่องใหม่ ${(d.new_stories||[]).length} · ค่าใช้จ่าย ${(d.expenses||[]).length} · กำหนดการ ${(d.schedule_entries||[]).length}${Array.isArray(d.day_links)?' · ลิงก์รายวัน '+d.day_links.length:''}`;
+  if(!await uiConfirm('จะเขียนทับข้อมูลปัจจุบันทั้งหมดด้วยไฟล์นี้:\n'+counts+'\n\nระบบจะดาวน์โหลดไฟล์สำรองของข้อมูลปัจจุบันให้ก่อนอัตโนมัติ\nทุกคนในทีมจะเห็นข้อมูลชุดใหม่แทน ยืนยันหรือไม่?', 'กู้คืนข้อมูล')) return;
+
+  // สำรองข้อมูลปัจจุบันอัตโนมัติก่อนเขียนทับ (กันกู้คืนผิดแล้วย้อนไม่ได้)
+  try{ exportData(true); }catch(e){}
+
+  recurring = d.recurring_stories;
+  newStories = Array.isArray(d.new_stories) ? d.new_stories : [];
+  expenses = Array.isArray(d.expenses) ? d.expenses : [];
+  scheduleEntries = Array.isArray(d.schedule_entries) ? d.schedule_entries : [];
+  // ลิงก์รายวัน + คลัง: ถ้าไฟล์มี (สำรองรุ่นใหม่) ให้กู้คืนด้วย; ถ้าไม่มี (ไฟล์เก่า) คงของเดิมไว้
+  if(Array.isArray(d.day_links)) dayLinks = d.day_links;
+  if(Array.isArray(d.day_links_archive)) dayLinksArchive = d.day_links_archive;
+
+  // กู้คืน = เขียนทับทั้งหมดแบบตรงไปตรงมา (ข้าม merge เพราะผู้ใช้ตั้งใจแทนที่ทั้งชุด)
+  // ถังขยะ/ประวัติเดิมคงไว้ (ไฟล์สำรองไม่รวมพวกนี้) แล้วเขียน appdata ก้อนเดียว
+  try{
+    const full = {
+      recurring_stories: recurring,
+      new_stories: newStories,
+      expenses: expenses,
+      schedule_entries: scheduleEntries,
+      trash: trash || [],
+      day_links: dayLinks || [],
+      day_links_archive: dayLinksArchive || [],
+      activity: activity || [],
+    };
+    const s = JSON.stringify(full);
+    await window.storage.set('appdata', s, true);
+    for(const k of DATA_KEYS) lastSeen[k] = JSON.stringify(full[k]);
+  }catch(e){ showToast('กู้คืนไม่สำเร็จ ลองใหม่อีกครั้ง'); return; }
+
+  closeModal('modalBackup');
+  render();
+  showToast('กู้คืนข้อมูลเรียบร้อยแล้ว');
+}
+
+function switchTab(tab){
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  render();
+}
+document.querySelectorAll('.tab-btn').forEach(b=>b.addEventListener('click', ()=>switchTab(b.dataset.tab)));
+document.getElementById('epAddBtn').addEventListener('click', addEpisodes);
+document.getElementById('epAddInput').addEventListener('keydown', e=>{ if(e.key==='Enter') addEpisodes(); });
+document.getElementById('epClearBtn').addEventListener('click', clearAllEpisodes);
+
+function openModal(id){ document.getElementById(id).classList.add('show'); }
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+
+function renderStats(){
+  const active = recurring.filter(r=>!isEffectivelyDropped(r));
+  const total = active.length;
+  const doneToday = active.filter(r=>r.status==='done').length;
+  const storiesOverdue = active.filter(r=>pendingEpCount(r)>0).length;
+  const episodesOverdue = active.reduce((s,r)=>s+pendingEpCount(r),0);
+  const totalSpent = expenses.reduce((s,e)=>s+Number(e.amount||0),0);
+  const upcoming = scheduleEntries.filter(e=>e.status!=='opened' && e.date && daysUntil(e.date)>=0).length;
+  document.getElementById('statRow').innerHTML = `
+    <div class="stat-chip"><b>${total}</b> เรื่องประจำ</div>
+    <div class="stat-chip"><b>${doneToday}</b> ทำวันนี้แล้ว</div>
+    ${episodesOverdue ? `<div class="stat-chip" style="background:rgba(224,64,58,.35);"><b>${episodesOverdue}</b> ตอนค้าง (${storiesOverdue} เรื่อง)</div>` : ''}
+    <div class="stat-chip"><b>${newStories.length}</b> เรื่องเปิดใหม่</div>
+    ${upcoming ? `<div class="stat-chip"><b>${upcoming}</b> เรื่องจะเปิดเร็วๆนี้</div>` : ''}
+    <div class="stat-chip"><b>${totalSpent.toLocaleString('th-TH')}</b> บาทที่ใช้ไป</div>
+  `;
+  renderPendingAlert(episodesOverdue, storiesOverdue);
+}
+
+let pendingAlertDismissed = false;
+function renderPendingAlert(episodesOverdue, storiesOverdue){
+  const el = document.getElementById('pendingAlert');
+  if(!el) return;
+  if(!episodesOverdue || pendingAlertDismissed){ el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  el.innerHTML = `
+    <span style="font-size:18px;">⚠️</span>
+    <div><b>มีงานค้างอยู่ ${episodesOverdue} ตอน</b> จาก ${storiesOverdue} เรื่อง — อย่าลืมเคลียร์นะ</div>
+    <button class="pa-btn" onclick="jumpToPending()">ดูงานค้าง</button>
+    <button class="pa-close" onclick="dismissPendingAlert()" title="ปิดการแจ้งเตือน">✕</button>
+  `;
+}
+function dismissPendingAlert(){
+  pendingAlertDismissed = true;
+  document.getElementById('pendingAlert').style.display = 'none';
+}
+// ไปที่งานประจำ แล้วแสดงเฉพาะเรื่องที่มีตอนค้าง
+function jumpToPending(){
+  activeTab = 'recurring';
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab==='recurring'));
+  dayFilter = 'ทั้งหมด';
+  personFilter = 'ทั้งหมด';
+  showDropped = false;
+  showOnlyPending = true;
+  renderRecurring();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function dayPillStyle(day){
+  const map = {
+    'จันทร์':['#fdecec','#c0392b'], 'อังคาร':['#fdf3e3','#b9791b'], 'พุธ':['#eafaf0','#1a9c6b'],
+    'พฤหัสบดี':['#f1eafd','#7b3fd4'], 'ศุกร์':['#eaf2fd','#1c6fd1'], 'เสาร์':['#fdf1e6','#e07a29'],
+    'อาทิตย์':['#fdecec','#c0392b'], 'ไม่ระบุวัน':['#f1f3f6','#8a94a3'], 'จบแล้ว':['#f1f3f6','#5b6472']
+  };
+  const [bg,fg] = map[day] || ['#f1f3f6','#5b6472'];
+  return `background:${bg};color:${fg}`;
+}
+
+function matchesFilters(item){
+  // เรื่องที่ดรอปจริง (ทำเครื่องหมาย + ไม่มีตอนค้าง) จะซ่อนไว้ ยกเว้นเปิดโหมดดูเรื่องดรอป
+  const effDropped = isEffectivelyDropped(item);
+  if(effDropped && !showDropped) return false;
+  if(showDropped && !effDropped) return false;
+  if(showOnlyPending && pendingEpCount(item)===0) return false; // โหมดดูเฉพาะงานค้าง
+  if(dayFilter!=='ทั้งหมด' && item.day!==dayFilter) return false;
+  if(personFilter!=='ทั้งหมด' && item.person!==personFilter) return false;
+  if(searchText){
+    const s = searchText.toLowerCase();
+    if(!(item.code||'').toLowerCase().includes(s) && !(item.name||'').toLowerCase().includes(s)) return false;
+  }
+  return true;
+}
+
+function renderRecurring(){
+  const container = document.getElementById('mainContent');
+  const activeEl = document.activeElement;
+  const searchWasFocused = activeEl && activeEl.id === 'searchBox';
+  const dayChips = ['ทั้งหมด', ...DAY_ORDER];
+  const personChips = ['ทั้งหมด', ...PEOPLE];
+
+  let html = `
+    <div class="toolbar">
+      <input type="text" id="searchBox" placeholder="ค้นหารหัสหรือชื่อเรื่อง..." value="${searchText}">
+      <button class="btn btn-primary" onclick="openRecurringModal()">+ เพิ่มเรื่อง</button>
+      <button class="btn btn-ghost" onclick="resetDailyDone()">รีเซ็ตสถานะที่ทำ/งด/เลื่อนแล้ว</button>
+    </div>
+    ${workloadPanelHtml()}
+    ${dayLinksBarHtml()}
+    <div class="chip-scroll" style="margin-bottom:6px;">
+      <div class="filter-chip ${personFilter===myPerson && myPerson?'active':''}" style="${myPerson?'':'opacity:.5'}"
+           onclick="${myPerson?`setPersonFilter('${esc(myPerson)}')`:'promptSetMe()'}">⭐ งานของฉัน${myPerson?' ('+esc(myPerson)+')':''}</div>
+      <div class="filter-chip" onclick="promptSetMe()" title="ตั้งว่าฉันคือใคร">⚙️</div>
+      <div class="filter-chip ${showDropped?'active':''}" onclick="toggleShowDropped()">${showDropped?'⬅ กลับงานปกติ':'📥 ดูเรื่องดรอป/จบ'}</div>
+      ${showOnlyPending?`<div class="filter-chip active" style="background:#c0392b;color:#fff;border-color:#c0392b;" onclick="setDayFilter('ทั้งหมด')">⚠️ เฉพาะงานค้าง (กดเพื่อออก)</div>`:''}
+    </div>
+    <div class="chip-scroll" style="margin-bottom:6px;">
+      <div class="filter-chip" style="background:${autoTodayFilter?'var(--green-bg)':'transparent'};color:${autoTodayFilter?'var(--green)':'var(--ink-soft)'};border-color:${autoTodayFilter?'var(--green)':'var(--line)'};" onclick="toggleAutoToday()" title="เปิดเว็บแล้วกรองมาที่วันนี้อัตโนมัติ">${autoTodayFilter?'📍 วันนี้อัตโนมัติ: เปิด':'📍 วันนี้อัตโนมัติ: ปิด'}</div>
+      ${dayChips.map(d=>`<div class="filter-chip ${dayFilter===d?'active':''}" onclick="setDayFilter('${d}')">${d===todayThaiDay()?'📍 ':''}${d}</div>`).join('')}
+    </div>
+    <div class="chip-scroll" style="margin-bottom:14px;">
+      ${personChips.map(p=>`<div class="filter-chip ${personFilter===p?'active':''}" onclick="setPersonFilter('${p}')">${p}</div>`).join('')}
+    </div>
+  `;
+
+  const groups = {};
+  PEOPLE.concat(['']).forEach(p=>groups[p]=[]);
+  recurring.forEach(item=>{
+    if(!matchesFilters(item)) return;
+    const key = PEOPLE.includes(item.person) ? item.person : '';
+    groups[key].push(item);
+  });
+
+  const order = [...PEOPLE, ''];
+  let any = false;
+  order.forEach(person=>{
+    const items = groups[person];
+    if(!items.length) return;
+    any = true;
+    items.sort((a,b)=> DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day));
+    const color = person ? PERSON_COLOR[person] : 'gray';
+    const label = person || 'ยังไม่ระบุคนทำ';
+    html += `<div class="person-section">
+      <div class="person-head" style="background:var(--${color})">
+        <span>${label}</span><small>${items.length} เรื่อง</small>
+      </div>`;
+    items.forEach(item=>{
+      const effDropped = isEffectivelyDropped(item);
+      const dropBadge = item.dropped
+        ? (effDropped
+            ? ` <span class="drop-badge" style="background:${DROP_META[item.dropped].bg};color:${DROP_META[item.dropped].fg};">${DROP_META[item.dropped].label}</span>`
+            : ` <span class="drop-badge" style="background:#fdf3e3;color:#b9791b;">⏳ รอดรอป (${DROP_META[item.dropped].label}) · เคลียร์ตอนค้างก่อน</span>`)
+        : '';
+      html += `<div class="item-row">
+        <div class="item-main">
+          <div class="item-code">${item.code ? esc(item.code)+' · ' : ''}${esc(item.name)||'(ไม่มีชื่อ)'}${dropBadge}</div>
+          ${overdueBadgeHtml(item)}
+        </div>
+        <span class="day-pill" style="${dayPillStyle(item.day)}">${item.day}</span>
+        ${effDropped ? `
+          <button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px;" onclick="undropStory('${item.id}')">↩ เอากลับ</button>
+          <button class="icon-btn" onclick="openRecurringModal('${item.id}')" title="แก้ไข" style="color:#6b7480;">✎</button>
+          <button class="icon-btn" onclick="deleteRecurring('${item.id}')">✕</button>
+        ` : `
+          <button class="btn-ep" onclick="openEpisodeManager('${item.id}')" title="จัดการตอนที่ค้าง">＋ ตอน</button>
+          <a class="link-btn ${item.link?'':'empty'}" href="${esc(item.link)||'#'}" target="_blank" title="ลิงก์ต้นทาง"
+             onclick="${item.link?'':'event.preventDefault(); promptLink(\''+item.id+'\')'}">🔗</a>
+          <a class="link-btn ${item.gdrive?'':'empty'}" href="${esc(item.gdrive)||'#'}" target="_blank" title="ลิงก์ Google Drive"
+             onclick="${item.gdrive?'':'event.preventDefault(); promptDriveLink(\''+item.id+'\')'}">📁</a>
+          <select class="status-select" style="background:${STATUS_META[item.status||'pending'].bg};color:${STATUS_META[item.status||'pending'].fg};"
+            onchange="updateStatus('${item.id}', this.value)">
+            ${Object.keys(STATUS_META).map(k=>`<option value="${k}" ${((item.status||'pending')===k)?'selected':''}>${STATUS_META[k].label}</option>`).join('')}
+          </select>
+          ${item.dropped
+            ? `<button class="icon-btn" onclick="undropStory('${item.id}')" title="ยกเลิกการรอดรอป" style="color:#1a9c6b;">↩</button>`
+            : `<button class="icon-btn" onclick="openDropMenu('${item.id}')" title="ดรอปเรื่อง (จบซีซั่น/LC)" style="color:#b9791b;">⏏</button>`}
+          <button class="icon-btn" onclick="openRecurringModal('${item.id}')" title="แก้ไข" style="color:#6b7480;">✎</button>
+          <button class="icon-btn" onclick="deleteRecurring('${item.id}')">✕</button>
+        `}
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  if(!any){
+    html += `<div class="empty-state">${showDropped ? 'ยังไม่มีเรื่องที่ดรอป/จบซีซั่น' : 'ไม่พบเรื่องที่ตรงกับตัวกรอง'}</div>`;
+  }
+  container.innerHTML = html;
+  const sb = document.getElementById('searchBox');
+  sb.addEventListener('input', e=>{
+    searchText = e.target.value; renderRecurring();
+  });
+  // โฟกัสช่องค้นหาเฉพาะตอนที่กำลังพิมพ์ค้นหาอยู่ ไม่ใช่ทุกครั้งที่วาดใหม่ (กันหน้าเด้งขึ้นบน)
+  if(searchWasFocused){
+    sb.focus({preventScroll:true});
+    sb.selectionStart = sb.selectionEnd = sb.value.length;
+  }
+}
+
+function setDayFilter(d){ dayFilter=d; showOnlyPending=false; renderRecurring(); }
+// วันนี้เป็นภาษาไทย (จันทร์..อาทิตย์)
+// เวลาที่ถือว่า "เปลี่ยนวัน" (2 ทุ่ม) — ก่อนเวลานี้ยังแสดงงานของวันก่อนหน้า, ถึง 2 ทุ่มค่อยเปลี่ยนเป็นวันปัจจุบัน
+const DAY_ROLLOVER_HOUR = 20;
+function effectiveTodayIndex(){
+  let idx = todayWeekdayIndex();
+  if(new Date().getHours() < DAY_ROLLOVER_HOUR) idx = (idx + 6) % 7; // ก่อน 2 ทุ่ม = ยังเป็นวันก่อนหน้า
+  return idx;
+}
+// วันนี้เป็นภาษาไทย (จันทร์..อาทิตย์) — นับวันเปลี่ยนตอน 2 ทุ่ม
+function todayThaiDay(){ return WEEKDAY_ONLY[effectiveTodayIndex()]; }
+// ตั้งตัวกรองเป็น "วันนี้" อัตโนมัติตอนเปิดเว็บ (ปิด/เปิดได้ต่อเครื่อง)
+function applyTodayFilter(){
+  if(autoTodayFilter){ dayFilter = todayThaiDay(); lastAutoDay = dayFilter; }
+}
+async function toggleAutoToday(){
+  autoTodayFilter = !autoTodayFilter;
+  try{ await window.storage.set('auto_today', autoTodayFilter?'1':'0', false); }catch(e){}
+  if(autoTodayFilter){ dayFilter = todayThaiDay(); lastAutoDay = dayFilter; }  // เปิด = เด้งไปวันนี้เลย
+  renderRecurring();
+  showToast(autoTodayFilter ? 'เปิดเว็บแล้วจะกรองมาที่วันนี้อัตโนมัติ (เปลี่ยนวันตอน 2 ทุ่ม)' : 'ปิดการกรองวันนี้อัตโนมัติแล้ว');
+}
+function setPersonFilter(p){ personFilter=p; showOnlyPending=false; renderRecurring(); }
+function toggleShowDropped(){ showDropped=!showDropped; showOnlyPending=false; renderRecurring(); }
+
+// ===== "ฉันคือใคร" + งานของฉัน =====
+async function promptSetMe(){
+  const choice = await uiPrompt('พิมพ์ชื่อของคุณ (เหนือ / บิ๊ก / ยูตะ / น๊อต):', myPerson || 'เช่น บิ๊ก');
+  if(choice === null) return;
+  const name = choice.trim();
+  if(name && !PEOPLE.includes(name)){ showToast('ชื่อต้องเป็น เหนือ / บิ๊ก / ยูตะ / น๊อต'); return; }
+  myPerson = name;
+  try{ await window.storage.set('me', myPerson, false); }catch(e){}
+  if(myPerson) personFilter = myPerson;
+  renderRecurring();
+}
+
+// ===== ภาระแต่ละคน (นับเฉพาะเรื่องที่ยังไม่ดรอป) =====
+function workloadPanelHtml(){
+  const stat = {};
+  PEOPLE.forEach(p=>stat[p]={stories:0, eps:0});
+  recurring.forEach(r=>{
+    if(r.dropped) return;
+    if(!PEOPLE.includes(r.person)) return;
+    stat[r.person].stories++;
+    stat[r.person].eps += pendingEpCount(r);
+  });
+  const cards = PEOPLE.map(p=>{
+    const s = stat[p];
+    const mine = p===myPerson;
+    return `<div class="wl-card ${mine?'wl-mine':''}" style="border-color:var(--${PERSON_COLOR[p]});" onclick="setPersonFilter('${p}')">
+      <div class="wl-name" style="color:var(--${PERSON_COLOR[p]})">${p}${mine?' ⭐':''}</div>
+      <div class="wl-nums"><b>${s.stories}</b> เรื่อง · <b style="color:${s.eps?'#c0392b':'inherit'}">${s.eps}</b> ตอนค้าง</div>
+    </div>`;
+  }).join('');
+  return `<div class="wl-wrap">${cards}</div>`;
+}
+
+// ===== ลิงก์ดาวน์โหลดรายวัน (แชร์ทั้งทีม) =====
+async function persistDayLinks(toast=false){
+  await persistData(toast);
+}
+// ===== ประวัติกิจกรรม =====
+async function persistActivity(){
+  await persistData(false);
+}
+// บันทึกกิจกรรมแบบรวมกลุ่ม (debounce) — สะสมไว้แล้วเขียนทีเดียว ลดจำนวนคำสั่ง storage
+let activityFlushTimer = null;
+let activityDirty = false;
+function flushActivity(){
+  activityFlushTimer = null;
+  if(!activityDirty) return;
+  activityDirty = false;
+  persistActivity();
+}
+// บันทึกกิจกรรม (ใครทำอะไร) — เก็บล่าสุด 150 รายการ, เขียนจริงหน่วงไว้ ~8 วิ
+function logActivity(text){
+  const entry = { id: uid('a'), who: myPerson || 'ไม่ระบุ', text, at: new Date().toISOString() };
+  activity.push(entry);
+  if(activity.length > 150) activity = activity.slice(-150);
+  activityDirty = true;
+  if(!activityFlushTimer) activityFlushTimer = setTimeout(flushActivity, 8000);
+}
+// เขียนประวัติที่ค้างทันที (ตอนเปิดหน้าประวัติ หรือก่อนออก) เพื่อไม่ให้ตกหล่น
+function flushActivityNow(){
+  if(activityFlushTimer){ clearTimeout(activityFlushTimer); activityFlushTimer = null; }
+  if(activityDirty){ activityDirty = false; persistActivity(); }
+}
+function dayLinksOf(day){
+  return dayLinks.filter(x=>x.day===day);
+}
+let dayLinksExpanded = false;
+function toggleDayLinks(){ dayLinksExpanded=!dayLinksExpanded; renderRecurring(); }
+function dayLinksBarHtml(){
+  const days = ['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์'];
+  const daysWithLinks = days.filter(d=>dayLinksOf(d).length).length;
+  const totalLinks = dayLinks.length;
+  if(!dayLinksExpanded){
+    return `<div class="daylinks-bar">
+      <button class="btn btn-ghost" style="font-size:12.5px;padding:7px 12px;" onclick="toggleDayLinks()">📥 ลิงก์โหลดรายวัน${totalLinks?` (${totalLinks} ลิงก์)`:''} ▾</button>
+    </div>`;
+  }
+  const rows = days.map(d=>{
+    const links = dayLinksOf(d);
+    const linkItems = links.map(l=>`
+      <div class="daylink-item">
+        <a class="btn btn-ghost" style="font-size:12px;padding:6px 10px;flex:1;justify-content:flex-start;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" href="${esc(l.url)}" target="_blank">📥 ${esc(l.label || 'เปิดโฟลเดอร์โหลด')}</a>
+        <button class="icon-btn" onclick="editDayLink('${l.id}')" title="แก้ลิงก์" style="color:#6b7480;">✎</button>
+        <button class="icon-btn" onclick="removeDayLink('${l.id}')" title="ลบลิงก์นี้">✕</button>
+      </div>`).join('');
+    return `<div class="daylink-day">
+      <div class="daylink-day-head">
+        <span class="day-pill" style="${dayPillStyle(d)}">${d}</span>
+        ${links.length ? `<span style="font-size:11px;color:var(--ink-soft);">${links.length} ลิงก์</span>` : `<span style="font-size:12px;color:var(--ink-soft);">— ยังไม่มีลิงก์ —</span>`}
+        <button class="btn-ep" style="margin-left:auto;padding:4px 9px;" onclick="addDayLink('${d}')" title="เพิ่มลิงก์ของวันนี้">＋ ลิงก์</button>
+      </div>
+      ${linkItems}
+    </div>`;
+  }).join('');
+  return `<div class="daylinks-bar expanded">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <b style="font-size:13px;">📥 ลิงก์โหลดรายวัน</b>
+      <button class="btn btn-ghost" style="font-size:12px;padding:5px 10px;" onclick="toggleDayLinks()">ย่อ ▴</button>
+    </div>
+    ${rows}
+    <div style="display:flex; gap:8px; margin-top:8px;">
+      ${totalLinks ? `<button class="btn btn-danger-ghost" style="flex:1;justify-content:center;font-size:12.5px;" onclick="clearAllDayLinks()">🧹 ล้าง+เก็บเข้าคลัง (${totalLinks})</button>` : ''}
+      ${dayLinksArchive.length ? `<button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:12.5px;" onclick="openDayLinksArchive()">📚 คลังย้อนหลัง (${dayLinksArchive.length})</button>` : ''}
+    </div>
+  </div>`;
+}
+async function persistDayLinksArchive(toast=false){
+  await persistData(toast);
+}
+async function clearAllDayLinks(){
+  const n = dayLinks.length;
+  if(!n) return;
+  if(!await uiConfirm('เก็บลิงก์ชุดนี้ ('+n+' ลิงก์) เข้าคลังย้อนหลัง แล้วล้างเพื่อตั้งชุดใหม่?', 'ล้าง + เก็บเข้าคลัง')) return;
+  // เก็บชุดปัจจุบันเข้าคลังก่อนล้าง
+  dayLinksArchive.push({
+    id: uid('dla'),
+    savedAt: new Date().toISOString(),
+    by: myPerson || 'ไม่ระบุ',
+    links: dayLinks.map(x=>({day:x.day, url:x.url, label:x.label||''}))
+  });
+  if(dayLinksArchive.length > 52) dayLinksArchive = dayLinksArchive.slice(-52); // เก็บไม่เกิน ~1 ปี
+  await persistDayLinksArchive();
+  dayLinks = [];
+  logActivity('เก็บลิงก์โหลดรายวันเข้าคลัง แล้วล้างชุดปัจจุบัน');
+  renderRecurring();
+  await persistDayLinks();
+  showToast('เก็บเข้าคลังแล้ว ล้างลิงก์เรียบร้อย');
+}
+function fmtDateTime(iso){
+  const d = new Date(iso);
+  return d.getDate()+'/'+(d.getMonth()+1)+'/'+d.getFullYear()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+let archiveExpanded = {};   // เก็บว่าชุดไหนถูกกางอยู่
+function toggleArchiveBlock(id){ archiveExpanded[id] = !archiveExpanded[id]; renderDayLinksArchive(); }
+function monthKeyOf(iso){
+  const d = new Date(iso);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+function monthLabelOf(key){
+  const TH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const [y,m] = key.split('-');
+  return TH[parseInt(m,10)-1] + ' ' + y;
+}
+function openDayLinksArchive(){ archiveExpanded = {}; renderDayLinksArchive(); openModal('modalDayArchive'); }
+function renderDayLinksArchive(){
+  const el = document.getElementById('dayArchiveList');
+  const monthSel = document.getElementById('archMonth');
+  if(!dayLinksArchive.length){
+    if(monthSel) monthSel.innerHTML = '<option value="">ทุกเดือน</option>';
+    el.innerHTML = '<div class="empty-state" style="padding:24px 10px;">ยังไม่มีลิงก์ในคลัง</div>';
+    return;
+  }
+  const DAYS = ['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์'];
+  const sorted = [...dayLinksArchive].sort((a,b)=> (b.savedAt||'').localeCompare(a.savedAt||''));
+
+  // เติมตัวเลือกเดือน (ทำครั้งเดียว / อัปเดตให้ตรงเสมอ)
+  const months = [...new Set(sorted.map(s=>monthKeyOf(s.savedAt)))];
+  const curMonth = monthSel ? monthSel.value : '';
+  if(monthSel){
+    monthSel.innerHTML = '<option value="">ทุกเดือน</option>' + months.map(mk=>`<option value="${mk}" ${curMonth===mk?'selected':''}>${monthLabelOf(mk)}</option>`).join('');
+  }
+
+  const q = (document.getElementById('archSearch')?.value || '').toLowerCase().trim();
+  let list = sorted;
+  if(curMonth) list = list.filter(s=>monthKeyOf(s.savedAt)===curMonth);
+  if(q) list = list.filter(s=>{
+    if(fmtDateTime(s.savedAt).toLowerCase().includes(q)) return true;
+    if((s.by||'').toLowerCase().includes(q)) return true;
+    return s.links.some(l=>((l.url||'')+' '+(l.label||'')).toLowerCase().includes(q));
+  });
+
+  if(!list.length){
+    el.innerHTML = '<div class="empty-state" style="padding:24px 10px;">ไม่พบชุดที่ตรงกับตัวกรอง</div>';
+    return;
+  }
+
+  el.innerHTML = list.map(snap=>{
+    const open = !!archiveExpanded[snap.id];
+    return `<div class="arch-block">
+      <div class="arch-head" style="cursor:pointer;" onclick="toggleArchiveBlock('${snap.id}')">
+        <span style="font-size:13px;">${open?'▾':'▸'}</span>
+        <b>${fmtDateTime(snap.savedAt)}</b>
+        <span style="font-size:11.5px;color:var(--ink-soft);">${esc(snap.by||'ไม่ระบุ')} · ${snap.links.length} ลิงก์</span>
+        <button class="icon-btn" onclick="event.stopPropagation(); deleteArchiveSnapshot('${snap.id}')" title="ลบชุดนี้จากคลัง" style="margin-left:auto;">✕</button>
+      </div>
+      ${open ? DAYS.map(d=>{
+        const dayLinksList = snap.links.filter(x=>x.day===d);
+        if(!dayLinksList.length) return '';
+        return dayLinksList.map((l,i)=>`<div class="arch-link">
+          <span class="day-pill" style="${dayPillStyle(d)}">${i===0?d:''}</span>
+          <a href="${esc(l.url)}" target="_blank" style="font-size:12px;color:var(--blue);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📥 ${esc(l.label || l.url)}</a>
+        </div>`).join('');
+      }).join('') : ''}
+    </div>`;
+  }).join('');
+}
+async function deleteArchiveSnapshot(id){
+  if(!await uiConfirm('ลบลิงก์ชุดนี้ออกจากคลัง?', 'ลบจากคลัง')) return;
+  dayLinksArchive = dayLinksArchive.filter(s=>s.id!==id);
+  await persistDayLinksArchive();
+  renderDayLinksArchive();
+}
+async function addDayLink(day){
+  const url = await uiPrompt('เพิ่มลิงก์โฟลเดอร์ดาวน์โหลดของวัน'+day+':', 'https://drive.google.com/...');
+  if(url === null || url.trim()==='') return;
+  const label = await uiPrompt('ตั้งชื่อลิงก์นี้ (ไม่บังคับ เช่น "ตอนหลัก", "ตอนพิเศษ"):', 'เว้นว่างได้');
+  if(label === null) return; // กดยกเลิก
+  dayLinks.push({ id: uid('dl'), day, url: url.trim(), label: label.trim() });
+  renderRecurring();
+  await persistDayLinks();
+  showToast('เพิ่มลิงก์แล้ว');
+}
+async function editDayLink(id){
+  const l = dayLinks.find(x=>x.id===id);
+  if(!l) return;
+  const url = await uiPrompt('แก้ลิงก์ (เว้นว่างเพื่อลบ):', l.url);
+  if(url === null) return;
+  if(url.trim()===''){ dayLinks = dayLinks.filter(x=>x.id!==id); renderRecurring(); await persistDayLinks(); return; }
+  const label = await uiPrompt('ชื่อลิงก์ (ไม่บังคับ):', l.label || '');
+  if(label === null) return;
+  l.url = url.trim();
+  l.label = label.trim();
+  renderRecurring();
+  await persistDayLinks();
+}
+async function removeDayLink(id){
+  const l = dayLinks.find(x=>x.id===id);
+  if(!l) return;
+  if(!await uiConfirm('ลบลิงก์นี้?', 'ลบลิงก์')) return;
+  dayLinks = dayLinks.filter(x=>x.id!==id);
+  renderRecurring();
+  await persistDayLinks();
+}
+
+// ===== ดรอปเรื่อง (จบซีซั่น / LC) =====
+async function openDropMenu(id){
+  const item = recurring.find(r=>r.id===id);
+  const reason = await uiPrompt('ดรอปเรื่อง "'+(item.name||item.code)+'"\nพิมพ์ "จบ" = จบซีซั่น, "lc" = โดน LC (ถูกลิขสิทธิ์):', 'จบ หรือ lc');
+  if(reason === null) return;
+  const r = reason.trim().toLowerCase();
+  let val = null;
+  if(r==='จบ' || r==='จบซีซั่น' || r==='ended' || r==='จบซีชั่น') val='ended';
+  else if(r==='lc' || r==='แอลซี' || r==='ลิขสิทธิ์') val='lc';
+  else { showToast('พิมพ์ "จบ" หรือ "lc" เท่านั้น'); return; }
+  item.dropped = val;
+  logActivity(`ดรอปเรื่อง "${item.name||item.code}" (${DROP_META[val].label})`);
+  renderRecurring(); renderStats();
+  await persistRecurring();
+  const eps = pendingEpCount(item);
+  if(eps > 0){
+    showToast(`ทำเครื่องหมายดรอปแล้ว — ยังมีตอนค้าง ${eps} ตอน จะอยู่ในงานปกติจนเคลียร์หมด แล้วย้ายเข้าดรอปเอง`);
+  } else {
+    showToast('ดรอปเรื่องแล้ว: ' + DROP_META[val].label);
+  }
+}
+async function undropStory(id){
+  const item = recurring.find(r=>r.id===id);
+  item.dropped = null;
+  delete item.dropped;
+  logActivity(`เอาเรื่อง "${item.name||item.code}" กลับมางานปกติ`);
+  renderRecurring(); renderStats();
+  await persistRecurring();
+  showToast('เอาเรื่องกลับมางานปกติแล้ว');
+}
+
+async function updateStatus(id, value){
+  const item = recurring.find(r=>r.id===id);
+  item.status = value;
+  if(value === 'pending' && dayHasPassedThisWeek(item)){
+    item.pendingSinceDate = todayDateStr(); // เริ่มนับค้างใหม่
+  } else {
+    item.pendingSinceDate = null;
+  }
+  logActivity(`เปลี่ยนสถานะ "${item.name||item.code}" เป็น ${STATUS_META[value].label}`);
+  renderRecurring(); renderStats();
+  await persistRecurring(false);
+}
+async function updateChapter(id, val){
+  const item = recurring.find(r=>r.id===id);
+  item.chapter = val;
+  await persistRecurring();
+}
+
+// ===== ตัวจัดการตอนที่ค้าง =====
+let epManagerId = null;
+function renderEpChips(){
+  const item = recurring.find(r=>r.id===epManagerId);
+  const wrap = document.getElementById('epChips');
+  const clearWrap = document.getElementById('epClearWrap');
+  if(!item || !item.pendingEpisodes || !item.pendingEpisodes.length){
+    wrap.innerHTML = '<span style="font-size:13px;color:var(--ink-soft);">ไม่มีตอนค้าง 🎉</span>';
+    if(clearWrap) clearWrap.style.display = 'none';
+    return;
+  }
+  if(clearWrap) clearWrap.style.display = '';
+  const eps = item.pendingEpisodes.slice().sort((a,b)=>a-b);
+  wrap.innerHTML = eps.map(ep=>`<span class="ep-chip">ตอน ${ep}<button onclick="removeEpisode(${ep})" title="ทำเสร็จแล้ว">✕</button></span>`).join('');
+}
+function openEpisodeManager(id){
+  epManagerId = id;
+  const item = recurring.find(r=>r.id===id);
+  document.getElementById('epModalTitle').textContent = 'ตอนที่ค้าง — ' + (item.name || item.code || '');
+  document.getElementById('epAddInput').value = '';
+  renderEpChips();
+  openModal('modalEpisodes');
+  setTimeout(()=>document.getElementById('epAddInput').focus(), 50);
+}
+async function removeEpisode(ep){
+  const item = recurring.find(r=>r.id===epManagerId);
+  item.pendingEpisodes = (item.pendingEpisodes||[]).filter(x=>x!==ep);
+  renderEpChips();
+  renderRecurring(); renderStats();
+  await persistRecurring(false);
+  if(item.dropped && pendingEpCount(item)===0){
+    closeModal('modalEpisodes');
+    showToast(`เคลียร์ตอนค้างหมดแล้ว — ย้าย "${item.name||item.code}" เข้าดรอป/จบให้เรียบร้อย`);
+  }
+}
+async function addEpisodes(){
+  const item = recurring.find(r=>r.id===epManagerId);
+  const raw = document.getElementById('epAddInput').value;
+  const nums = raw.split(/[\s,]+/).map(s=>parseInt(s,10)).filter(n=>!isNaN(n) && n>0);
+  if(!nums.length){ showToast('ใส่เลขตอนที่ต้องการเพิ่ม'); return; }
+  const set = new Set(item.pendingEpisodes || []);
+  nums.forEach(n=>set.add(n));
+  item.pendingEpisodes = [...set].sort((a,b)=>a-b);
+  document.getElementById('epAddInput').value = '';
+  renderEpChips();
+  renderRecurring(); renderStats();
+  await persistRecurring(false);
+}
+async function clearAllEpisodes(){
+  const item = recurring.find(r=>r.id===epManagerId);
+  if(!item || !(item.pendingEpisodes||[]).length) return;
+  if(!await uiConfirm('ทำครบทุกตอนแล้ว เอาตอนที่ค้างออกทั้งหมด?', 'เคลียร์ทุกตอน')) return;
+  item.pendingEpisodes = [];
+  renderEpChips();
+  renderRecurring(); renderStats();
+  await persistRecurring();
+  if(item.dropped){
+    closeModal('modalEpisodes');
+    showToast(`เคลียร์ตอนค้างหมดแล้ว — ย้าย "${item.name||item.code}" เข้าดรอป/จบให้เรียบร้อย`);
+  }
+}
+
+async function promptLink(id){
+  const url = await uiPrompt('ใส่ลิงก์ต้นทางของเรื่องนี้:', 'https://');
+  if(!url) return;
+  const item = recurring.find(r=>r.id===id);
+  item.link = url;
+  renderRecurring();
+  await persistRecurring();
+}
+async function promptDriveLink(id){
+  const url = await uiPrompt('ใส่ลิงก์ Google Drive ของเรื่องนี้:', 'https://drive.google.com/...');
+  if(!url) return;
+  const item = recurring.find(r=>r.id===id);
+  item.gdrive = url;
+  renderRecurring();
+  await persistRecurring();
+}
+async function deleteRecurring(id){
+  if(!await uiConfirm('ลบเรื่องนี้? (ย้ายไปถังขยะ กู้คืนได้)', 'ลบเรื่อง')) return;
+  const item = recurring.find(r=>r.id===id);
+  if(item){ await moveToTrash('recurring', item); logActivity(`ลบเรื่อง "${item.name||item.code}"`); }
+  recurring = recurring.filter(r=>r.id!==id);
+  renderRecurring(); renderStats();
+  await persistRecurring();
+}
+async function resetDailyDone(){
+  if(!await uiConfirm('รีเซ็ตสถานะเรื่องที่ "ทำแล้ว/งด/เลื่อน" กลับเป็น "ยังไม่ทำ"?\nเรื่องที่ยังค้างอยู่จะไม่ถูกแตะ ตัวนับสัปดาห์ค้างจะยังเดินต่อตามเดิม', 'รีเซ็ตสถานะ')) return;
+  resetNonPendingToPending(recurring);
+  renderRecurring(); renderStats();
+  await persistRecurring();
+}
+let editingRecurringId = null;
+function openRecurringModal(id){
+  editingRecurringId = id || null;
+  const item = id ? recurring.find(r=>r.id===id) : null;
+  document.getElementById('recurringModalTitle').textContent = item ? 'แก้ไขเรื่องประจำ' : 'เพิ่มเรื่องประจำ';
+  document.getElementById('rCode').value = item ? (item.code||'') : '';
+  document.getElementById('rName').value = item ? (item.name||'') : '';
+  document.getElementById('rPerson').value = item ? (item.person||'') : '';
+  document.getElementById('rDay').value = item ? (item.day||'จันทร์') : 'จันทร์';
+  document.getElementById('rLink').value = item ? (item.link||'') : '';
+  document.getElementById('rDrive').value = item ? (item.gdrive||'') : '';
+  openModal('modalRecurring');
+}
+async function saveNewRecurring(){
+  const name = document.getElementById('rName').value.trim();
+  if(!name){ showToast('กรุณาใส่ชื่อเรื่อง'); return; }
+  const data = {
+    code: document.getElementById('rCode').value.trim(),
+    name,
+    day: document.getElementById('rDay').value,
+    person: document.getElementById('rPerson').value,
+    link: document.getElementById('rLink').value.trim(),
+    gdrive: document.getElementById('rDrive').value.trim(),
+  };
+  if(editingRecurringId){
+    const item = recurring.find(r=>r.id===editingRecurringId);
+    Object.assign(item, data); // เก็บ status, ตอนค้าง, ฯลฯ ไว้เหมือนเดิม
+  } else {
+    recurring.push({ id: uid('r'), ...data, chapter:'', status:'pending', pendingSinceDate:null, pendingEpisodes:[] });
+    logActivity(`เพิ่มเรื่องประจำ "${data.name||data.code}"`);
+  }
+  editingRecurringId = null;
+  closeModal('modalRecurring');
+  renderRecurring(); renderStats();
+  await persistRecurring();
+}
+
+function renderNewStories(){
+  const container = document.getElementById('mainContent');
+  const activeEl = document.activeElement;
+  const searchWasFocused = activeEl && activeEl.id === 'searchBox2';
+  let html = `
+    <div class="toolbar">
+      <input type="text" id="searchBox2" placeholder="ค้นหา..." value="${searchText}">
+      <button class="btn btn-primary" onclick="openNewModal()">+ เพิ่มเรื่องเปิดใหม่</button>
+    </div>
+  `;
+  const filtered = newStories.filter(item=>{
+    if(!searchText) return true;
+    const s = searchText.toLowerCase();
+    return (item.code||'').toLowerCase().includes(s) || (item.name||'').toLowerCase().includes(s);
+  });
+  if(!filtered.length){
+    html += `<div class="empty-state">ยังไม่มีเรื่องเปิดใหม่ — กดปุ่ม "+ เพิ่มเรื่องเปิดใหม่"</div>`;
+  }
+  filtered.forEach(item=>{
+    const doneCount = PEOPLE.filter(p=>item.contrib[p]).length;
+    let statusClass='status-none', statusLabel='ยังไม่เริ่ม';
+    if(doneCount===PEOPLE.length){statusClass='status-done'; statusLabel='เสร็จแล้ว';}
+    else if(doneCount>0){statusClass='status-progress'; statusLabel='กำลังทำ';}
+    html += `<div class="new-card">
+      <div class="new-card-top">
+        <div>
+          <div class="new-code">${esc(item.code)}</div>
+          ${item.link?`<a href="${esc(item.link)}" target="_blank" style="font-size:12px;color:#1c6fd1;margin-right:8px;">🔗 ลิงก์</a>`:''}
+          ${item.gdrive?`<a href="${esc(item.gdrive)}" target="_blank" style="font-size:12px;color:#1a9c6b;">📁 Drive</a>`:''}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="status-badge ${statusClass}">${statusLabel}</span>
+          <button class="icon-btn" onclick="openNewModal('${item.id}')" title="แก้ไข" style="color:#6b7480;">✎</button>
+          <button class="icon-btn" onclick="deleteNewStory('${item.id}')">✕</button>
+        </div>
+      </div>
+      <div class="contrib-grid">
+        ${PEOPLE.map(p=>`
+          <label class="contrib-item ${item.contrib[p]?'on':''}">
+            <input type="checkbox" ${item.contrib[p]?'checked':''} onchange="toggleContrib('${item.id}','${p}')">
+            ${p}
+          </label>`).join('')}
+      </div>
+    </div>`;
+  });
+  container.innerHTML = html;
+  const sb2 = document.getElementById('searchBox2');
+  sb2.addEventListener('input', e=>{ searchText=e.target.value; renderNewStories(); });
+  if(searchWasFocused){
+    sb2.focus({preventScroll:true});
+    sb2.selectionStart = sb2.selectionEnd = sb2.value.length;
+  }
+}
+
+async function toggleContrib(id, person){
+  const item = newStories.find(n=>n.id===id);
+  item.contrib[person] = !item.contrib[person];
+  renderNewStories(); renderStats();
+  await persistNew(false);
+}
+async function deleteNewStory(id){
+  if(!await uiConfirm('ลบเรื่องนี้? (ย้ายไปถังขยะ กู้คืนได้)', 'ลบเรื่อง')) return;
+  const item = newStories.find(n=>n.id===id);
+  if(item){ await moveToTrash('newstories', item); logActivity(`ลบเรื่องเปิดใหม่ "${item.name||item.code}"`); }
+  newStories = newStories.filter(n=>n.id!==id);
+  renderNewStories(); renderStats();
+  await persistNew();
+}
+let editingNewId = null;
+function openNewModal(id){
+  editingNewId = id || null;
+  const item = id ? newStories.find(n=>n.id===id) : null;
+  document.getElementById('newModalTitle').textContent = item ? 'แก้ไขเรื่องเปิดใหม่' : 'เพิ่มเรื่องเปิดใหม่';
+  document.getElementById('nCode').value = item ? (item.code||'') : '';
+  document.getElementById('nLink').value = item ? (item.link||'') : '';
+  document.getElementById('nDrive').value = item ? (item.gdrive||'') : '';
+  openModal('modalNew');
+}
+async function saveNewStory(){
+  const code = document.getElementById('nCode').value.trim();
+  if(!code){ showToast('กรุณาใส่รหัสหรือชื่อเรื่อง'); return; }
+  const data = {
+    code,
+    link: document.getElementById('nLink').value.trim(),
+    gdrive: document.getElementById('nDrive').value.trim(),
+  };
+  if(editingNewId){
+    const item = newStories.find(n=>n.id===editingNewId);
+    Object.assign(item, data); // เก็บ contrib (ใครทำแล้วบ้าง) ไว้เหมือนเดิม
+  } else {
+    newStories.push({ id: uid('n'), ...data, name:'', contrib:{'เหนือ':false,'บิ๊ก':false,'ยูตะ':false,'น๊อต':false} });
+    logActivity(`เพิ่มเรื่องเปิดใหม่ "${data.code}"`);
+  }
+  editingNewId = null;
+  closeModal('modalNew');
+  renderNewStories(); renderStats();
+  await persistNew();
+}
+
+function fmtBaht(n){ return Number(n||0).toLocaleString('th-TH'); }
+
+function renderExpenses(){
+  const container = document.getElementById('mainContent');
+  const totalsByPlatform = {};
+  let grandTotal = 0;
+  expenses.forEach(e=>{
+    totalsByPlatform[e.platform] = (totalsByPlatform[e.platform]||0) + Number(e.amount||0);
+    grandTotal += Number(e.amount||0);
+  });
+
+  let html = `
+    <div class="toolbar">
+      <button class="btn btn-primary" onclick="openExpenseModal()">+ เพิ่มค่าใช้จ่าย</button>
+    </div>
+    <div class="chip-scroll" style="margin-bottom:14px; flex-wrap:wrap;">
+      ${Object.keys(totalsByPlatform).sort().map(p=>`
+        <div class="stat-chip" style="background:#eef1f6; color:#1f2430;">
+          <b>${fmtBaht(totalsByPlatform[p])}</b> ${esc(p)}
+        </div>`).join('')}
+      <div class="stat-chip" style="background:var(--blue); color:#fff;"><b>${fmtBaht(grandTotal)}</b> รวมทั้งหมด</div>
+    </div>
+  `;
+
+  if(!expenses.length){
+    html += `<div class="empty-state">ยังไม่มีรายการค่าใช้จ่าย — กดปุ่ม "+ เพิ่มค่าใช้จ่าย"</div>`;
+  } else {
+    const sorted = [...expenses].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+    html += `<div class="table-wrap"><table class="data-table">
+      <thead><tr>
+        <th>วันที่</th><th>แพลตฟอร์ม</th><th style="text-align:right;">จำนวนเงิน</th><th>หมายเหตุ</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${sorted.map(e=>`<tr>
+          <td>${e.date?esc(e.date):'—'}</td>
+          <td><b>${esc(e.platform)}</b></td>
+          <td style="text-align:right;">${fmtBaht(e.amount)}</td>
+          <td>${e.note?esc(e.note):'—'}</td>
+          <td style="white-space:nowrap;">
+            <button class="icon-btn" onclick="openExpenseModal('${e.id}')" title="แก้ไข" style="color:#6b7480;">✎</button>
+            <button class="icon-btn" onclick="deleteExpense('${e.id}')">✕</button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+let editingExpenseId = null;
+function openExpenseModal(id){
+  editingExpenseId = id || null;
+  const e = id ? expenses.find(x=>x.id===id) : null;
+  document.getElementById('expenseModalTitle').textContent = e ? 'แก้ไขค่าใช้จ่าย' : 'เพิ่มค่าใช้จ่าย';
+  document.getElementById('xPlatform').value = e ? (e.platform||'') : '';
+  document.getElementById('xAmount').value = e ? (e.amount||'') : '';
+  document.getElementById('xDate').value = e ? (e.date||'') : '';
+  document.getElementById('xNote').value = e ? (e.note||'') : '';
+  openModal('modalExpense');
+}
+async function saveExpense(){
+  const platform = document.getElementById('xPlatform').value.trim();
+  const amount = parseFloat(document.getElementById('xAmount').value);
+  if(!platform){ showToast('กรุณาใส่ชื่อแพลตฟอร์ม'); return; }
+  if(!amount || amount <= 0){ showToast('กรุณาใส่จำนวนเงินที่ถูกต้อง'); return; }
+  const data = {
+    platform,
+    amount,
+    date: document.getElementById('xDate').value || '',
+    note: document.getElementById('xNote').value.trim()
+  };
+  if(editingExpenseId){
+    const e = expenses.find(x=>x.id===editingExpenseId);
+    Object.assign(e, data);
+  } else {
+    expenses.push({ id: uid('e'), ...data });
+    logActivity(`เพิ่มค่าใช้จ่าย ${data.platform} ${fmtBaht(data.amount)} บาท`);
+  }
+  editingExpenseId = null;
+  closeModal('modalExpense');
+  renderExpenses(); renderStats();
+  await persistExpenses();
+}
+async function deleteExpense(id){
+  if(!await uiConfirm('ลบรายการนี้? (ย้ายไปถังขยะ กู้คืนได้)', 'ลบค่าใช้จ่าย')) return;
+  const item = expenses.find(e=>e.id===id);
+  if(item){ await moveToTrash('expenses', item); logActivity(`ลบค่าใช้จ่าย ${item.platform} ${fmtBaht(item.amount)} บาท`); }
+  expenses = expenses.filter(e=>e.id!==id);
+  renderExpenses(); renderStats();
+  await persistExpenses();
+}
+
+const SCHEDULE_STATUS = {
+  planned:   {label:'วางแผนไว้',   bg:'#eaf2fd', fg:'#1c6fd1'},
+  preparing: {label:'กำลังเตรียม', bg:'#fdf3e3', fg:'#b9791b'},
+  opened:    {label:'เปิดแล้ว',    bg:'#e6f7ee', fg:'#1a9c6b'},
+};
+let editingScheduleId = null;
+
+function daysUntil(dateStr){
+  if(!dateStr) return null;
+  const target = new Date(dateStr + 'T00:00:00');
+  const now = new Date(todayDateStr() + 'T00:00:00');
+  return Math.round((target - now) / (24*60*60*1000));
+}
+function countdownLabel(entry){
+  if(entry.status === 'opened') return '';
+  const d = daysUntil(entry.date);
+  if(d === null) return '';
+  if(d < 0) return `<span class="overdue-badge" style="background:#e0403a">เลยมา ${-d} วัน</span>`;
+  if(d === 0) return `<span class="overdue-badge" style="background:#e07a29">วันนี้</span>`;
+  if(d <= 3) return `<span class="overdue-badge" style="background:#b9791b">อีก ${d} วัน</span>`;
+  return `<span style="font-size:12px;color:var(--ink-soft);">อีก ${d} วัน</span>`;
+}
+
+function renderSchedule(){
+  const container = document.getElementById('mainContent');
+  let html = `
+    <div class="toolbar">
+      <button class="btn btn-primary" onclick="openScheduleModal()">+ เพิ่มกำหนดการ</button>
+    </div>
+  `;
+  if(!scheduleEntries.length){
+    html += `<div class="empty-state">ยังไม่มีกำหนดการเปิดเรื่อง — กดปุ่ม "+ เพิ่มกำหนดการ" เพื่อวางแผนล่วงหน้า</div>`;
+  } else {
+    // เรียงตามวันที่ใกล้ที่สุดก่อน (เรื่องที่ยังไม่มีวันที่ไปอยู่ท้ายสุด)
+    const sorted = [...scheduleEntries].sort((a,b)=>{
+      if(!a.date) return 1;
+      if(!b.date) return -1;
+      return a.date.localeCompare(b.date);
+    });
+    html += `<div class="table-wrap"><table class="data-table">
+      <thead><tr>
+        <th>วันที่เปิด</th><th>นับถอยหลัง</th><th>เรื่อง</th><th>คนทำ</th><th>สถานะ</th><th>หมายเหตุ</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${sorted.map(e=>{
+          const st = SCHEDULE_STATUS[e.status] || SCHEDULE_STATUS.planned;
+          return `<tr>
+            <td>${e.date?esc(e.date):'—'}</td>
+            <td>${countdownLabel(e)}</td>
+            <td><b>${esc(e.title)}</b>${e.link?` <a href="${esc(e.link)}" target="_blank" style="font-size:12px;color:#1c6fd1;">🔗</a>`:''}</td>
+            <td>${e.person?esc(e.person):'—'}</td>
+            <td><span class="status-badge" style="background:${st.bg};color:${st.fg};">${st.label}</span></td>
+            <td>${e.note?esc(e.note):'—'}</td>
+            <td style="white-space:nowrap;">
+              <button class="icon-btn" onclick="openScheduleModal('${e.id}')" title="แก้ไข" style="color:#6b7480;">✎</button>
+              <button class="icon-btn" onclick="deleteSchedule('${e.id}')">✕</button>
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table></div>`;
+  }
+  container.innerHTML = html;
+}
+
+function openScheduleModal(id){
+  editingScheduleId = id || null;
+  const entry = id ? scheduleEntries.find(e=>e.id===id) : null;
+  document.getElementById('scheduleModalTitle').textContent = entry ? 'แก้ไขกำหนดการ' : 'เพิ่มกำหนดการเปิดเรื่อง';
+  document.getElementById('sDate').value = entry ? (entry.date||'') : '';
+  document.getElementById('sTitle').value = entry ? (entry.title||'') : '';
+  document.getElementById('sPerson').value = entry ? (entry.person||'') : '';
+  document.getElementById('sStatus').value = entry ? (entry.status||'planned') : 'planned';
+  document.getElementById('sLink').value = entry ? (entry.link||'') : '';
+  document.getElementById('sNote').value = entry ? (entry.note||'') : '';
+  openModal('modalSchedule');
+}
+
+async function saveSchedule(){
+  const title = document.getElementById('sTitle').value.trim();
+  if(!title){ showToast('กรุณาใส่รหัสหรือชื่อเรื่อง'); return; }
+  const data = {
+    date: document.getElementById('sDate').value || '',
+    title,
+    person: document.getElementById('sPerson').value,
+    status: document.getElementById('sStatus').value,
+    link: document.getElementById('sLink').value.trim(),
+    note: document.getElementById('sNote').value.trim()
+  };
+  if(editingScheduleId){
+    const entry = scheduleEntries.find(e=>e.id===editingScheduleId);
+    Object.assign(entry, data);
+  } else {
+    scheduleEntries.push({ id: uid('s'), ...data });
+    logActivity(`เพิ่มกำหนดการ "${data.title}"`);
+  }
+  editingScheduleId = null;
+  closeModal('modalSchedule');
+  renderSchedule(); renderStats();
+  await persistSchedule();
+}
+async function deleteSchedule(id){
+  if(!await uiConfirm('ลบกำหนดการนี้? (ย้ายไปถังขยะ กู้คืนได้)', 'ลบกำหนดการ')) return;
+  const item = scheduleEntries.find(e=>e.id===id);
+  if(item){ await moveToTrash('schedule', item); logActivity(`ลบกำหนดการ "${item.title}"`); }
+  scheduleEntries = scheduleEntries.filter(e=>e.id!==id);
+  renderSchedule(); renderStats();
+  await persistSchedule();
+}
+
+function render(){
+  renderStats();
+  searchText = '';
+  if(activeTab==='recurring') renderRecurring();
+  else if(activeTab==='calendar') renderCalendar();
+  else if(activeTab==='newstories') renderNewStories();
+  else if(activeTab==='expenses') renderExpenses();
+  else renderSchedule();
+}
+
+// ===== ตารางปฏิทิน: ภาพรวมงานประจำ จัดกลุ่มตามคน แยกรายวัน (สร้างจากข้อมูลจริง) =====
+function renderCalendar(){
+  const container = document.getElementById('mainContent');
+  const days = ['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์','ไม่ระบุวัน','จบแล้ว'];
+  const dayLabel = { 'จันทร์':'วันจันทร์','อังคาร':'วันอังคาร','พุธ':'วันพุธ','พฤหัสบดี':'วันพฤหัสบดี','ศุกร์':'วันศุกร์','เสาร์':'วันเสาร์','อาทิตย์':'วันอาทิตย์','ไม่ระบุวัน':'ไม่ระบุวัน/จีน','จบแล้ว':'จบแล้ว' };
+
+  // เฉพาะเรื่องที่ยังไม่ดรอป
+  const active = recurring.filter(r=>!isEffectivelyDropped(r));
+
+  let html = `<div class="cal-grid">`;
+  PEOPLE.forEach(person=>{
+    const mine = active.filter(r=>r.person===person);
+    const color = PERSON_COLOR[person];
+    // สร้างแถวเฉพาะวันที่มีเรื่อง (ให้ตารางกระชับ) — ถ้าอยากเห็นครบทุกวันเปลี่ยน filter ด้านล่าง
+    const rows = days.map(d=>{
+      const items = mine.filter(r=>r.day===d);
+      if(!items.length) return { day:d, text:'-' , empty:true };
+      const text = items.map(r=>{
+        const eps = pendingEpCount(r);
+        const badge = eps ? ` <span style="color:#c0392b;font-weight:700;">(ค้าง ${eps})</span>` : '';
+        return esc((r.code?r.code+'-':'') + (r.name||'')) + badge;
+      }).join(', ');
+      return { day:d, text, empty:false };
+    });
+
+    html += `<div class="cal-card cal-${color}">
+      <div class="cal-head cal-head-${color}">${esc(person)} <span style="opacity:.85;font-weight:700;">(${mine.length} เรื่อง)</span></div>
+      <table class="cal-table"><tbody>
+        ${rows.map(row=>`<tr>
+          <td class="cal-day">${dayLabel[row.day]}</td>
+          <td class="cal-items ${row.empty?'cal-empty':''}">${row.empty?'-':row.text}</td>
+        </tr>`).join('')}
+      </tbody></table>
+    </div>`;
+  });
+  html += `</div>`;
+
+  // ปุ่มบันทึกเป็นรูป
+  html = `<div class="toolbar" style="justify-content:space-between;">
+      <span style="font-size:13px;color:var(--ink-soft);">ภาพรวมงานประจำทั้งหมด — อัปเดตอัตโนมัติตามข้อมูลจริง (ไม่รวมเรื่องที่ดรอป)</span>
+      <button class="btn btn-primary" onclick="exportCalendarImage()">📷 บันทึกเป็นรูป</button>
+    </div>
+    <div id="calCapture">${html}</div>`;
+  container.innerHTML = html;
+}
+
+// บันทึกตารางเป็นรูป PNG (โหลด html2canvas จาก CDN แบบ lazy)
+async function exportCalendarImage(){
+  showToast('กำลังสร้างรูป...');
+  function doCapture(){
+    const el = document.getElementById('calCapture');
+    window.html2canvas(el, {backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg')||'#fff', scale:2}).then(canvas=>{
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png');
+      a.download = 'ตารางปฏิทิน-คัดเรื่อง.png';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      showToast('บันทึกรูปแล้ว');
+    }).catch(()=>showToast('สร้างรูปไม่สำเร็จ'));
+  }
+  if(window.html2canvas){ doCapture(); return; }
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+  s.onload = doCapture;
+  s.onerror = ()=>showToast('โหลดตัวสร้างรูปไม่สำเร็จ (ต้องต่อเน็ต)');
+  document.head.appendChild(s);
+}
+
+loadAll();
+</script>
+</body>
+</html>

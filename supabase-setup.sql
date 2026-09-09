@@ -1,0 +1,48 @@
+-- ============================================================
+-- ระบบจัดการงานคัดเรื่อง — Supabase setup
+-- รันทั้งไฟล์นี้ใน Supabase Dashboard -> SQL Editor -> New query -> Run
+-- ============================================================
+
+-- 1) ตารางเก็บข้อมูล (key-value เดียวกับ API เดิมของแอป)
+--    scope = 'global'        -> ข้อมูลรวมของทีม (appdata, last_reset_week)
+--    scope = 'u:<user uuid>' -> ค่าส่วนตัวของแต่ละคน (theme, me, auto_today)
+create table if not exists public.app_kv (
+  scope      text        not null,
+  key        text        not null,
+  value      text,
+  updated_at timestamptz not null default now(),
+  primary key (scope, key)
+);
+
+-- 2) เปิด RLS: ถ้าไม่มี policy ตรงเงื่อนไข = เข้าถึงไม่ได้เลย
+alter table public.app_kv enable row level security;
+
+-- 3) ตัด role anon ออกทั้งหมด — ไม่ล็อกอิน = แตะข้อมูลไม่ได้
+revoke all on public.app_kv from anon;
+grant select, insert, update on public.app_kv to authenticated;
+
+-- 4) ขอบเขตที่ผู้ใช้แต่ละคนแตะได้: แถวรวมของทีม + แถวส่วนตัวของตัวเองเท่านั้น
+create or replace function public.kv_allowed(s text)
+returns boolean
+language sql
+stable
+as $$
+  select s = 'global' or s = 'u:' || auth.uid()::text;
+$$;
+
+-- 5) Policies (ไม่มี policy สำหรับ delete = ลบแถวไม่ได้ กันข้อมูลหายถาวร)
+drop policy if exists app_kv_select on public.app_kv;
+create policy app_kv_select on public.app_kv
+  for select to authenticated
+  using (public.kv_allowed(scope));
+
+drop policy if exists app_kv_insert on public.app_kv;
+create policy app_kv_insert on public.app_kv
+  for insert to authenticated
+  with check (public.kv_allowed(scope));
+
+drop policy if exists app_kv_update on public.app_kv;
+create policy app_kv_update on public.app_kv
+  for update to authenticated
+  using (public.kv_allowed(scope))
+  with check (public.kv_allowed(scope));

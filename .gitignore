@@ -1,0 +1,4 @@
+# ต้นฉบับเดิม — มี SEED data จริง ห้าม push
+ระบบจัดการงานคัดเรื่อง.html
+*.backup.html
+seed-*.json
