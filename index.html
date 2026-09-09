@@ -1609,9 +1609,9 @@ function renderRecurring(){
           <button class="icon-btn" onclick="deleteRecurring('${item.id}')">✕</button>
         ` : `
           <button class="btn-ep" onclick="openEpisodeManager('${item.id}')" title="จัดการตอนที่ค้าง">＋ ตอน</button>
-          <a class="link-btn ${item.link?'':'empty'}" href="${esc(item.link)||'#'}" target="_blank" title="ลิงก์ต้นทาง"
+          <a class="link-btn ${item.link?'':'empty'}" href="${safeUrl(item.link)}" target="_blank" title="ลิงก์ต้นทาง"
              onclick="${item.link?'':'event.preventDefault(); promptLink(\''+item.id+'\')'}">🔗</a>
-          <a class="link-btn ${item.gdrive?'':'empty'}" href="${esc(item.gdrive)||'#'}" target="_blank" title="ลิงก์ Google Drive"
+          <a class="link-btn ${item.gdrive?'':'empty'}" href="${safeUrl(item.gdrive)}" target="_blank" title="ลิงก์ Google Drive"
              onclick="${item.gdrive?'':'event.preventDefault(); promptDriveLink(\''+item.id+'\')'}">📁</a>
           <select class="status-select" style="background:${STATUS_META[item.status||'pending'].bg};color:${STATUS_META[item.status||'pending'].fg};"
             onchange="updateStatus('${item.id}', this.value)">
