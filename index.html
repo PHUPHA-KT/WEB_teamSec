@@ -777,26 +777,75 @@
   };
 
   // ---------- realtime ----------
-  // แจ้งเตือนเมื่อมีคนอื่นเขียนแถวนี้ ใช้แทนการ poll ทุก 12 วิ
-  // คืน object ที่บอกสถานะ ให้แอปเลือกได้ว่าจะ poll ถี่หรือห่าง
+  // ส่ง token ใหม่ให้ socket ทุกครั้งที่ refresh — ไม่งั้นพอ token หมดอายุ RLS จะปฏิเสธ
+  // แล้ว event เงียบไปเฉยๆ โดยไม่มี error
+  try{
+    sb.auth.onAuthStateChange((event, session)=>{
+      if(session && session.access_token){
+        try{ sb.realtime.setAuth(session.access_token); }catch(e){}
+      }
+    });
+  }catch(e){}
+
+  // แจ้งเมื่อมีคนเขียนแถวนี้ — ใช้เร่งให้เห็นไวขึ้น ไม่ใช่ตัวหลัก
+  // "เข้าห้องได้" ไม่เท่ากับ "มี event ส่งมาจริง" จึงนับ event ที่ได้รับด้วย
   window.storage.subscribe = function(key, shared, onChange){
-    const state = { connected: false, channel: null };
-    if(!sb) return state;
+    const state = {
+      status: 'connecting',
+      eventsSeen: 0,
+      lastEventAt: 0,
+      channel: null,
+      alive(){ return this.eventsSeen > 0 && (Date.now() - this.lastEventAt) < 120000; }
+    };
+    if(!sb) { state.status = 'no-client'; return state; }
+
     const scope = scopeOf(shared);
-    state.channel = sb
-      .channel('kv-' + scope + '-' + key)
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: TABLE, filter: 'key=eq.' + key },
-        (payload) => {
-          const row = payload.new || payload.old;
-          if(row && row.scope !== scope) return;   // filter ได้ทีละคอลัมน์ กรอง scope เองอีกชั้น
-          try{ onChange(); }catch(e){}
-        })
-      .subscribe((status) => {
-        state.connected = (status === 'SUBSCRIBED');
-      });
+    let retryMs = 2000;
+    let closed = false;
+
+    function join(){
+      if(closed) return;
+      if(state.channel){ try{ sb.removeChannel(state.channel); }catch(e){} state.channel = null; }
+      state.channel = sb
+        .channel('kv-' + scope + '-' + key + '-' + Date.now())
+        .on('postgres_changes',
+          { event: '*', schema: 'public', table: TABLE, filter: 'key=eq.' + key },
+          (payload) => {
+            const row = payload.new || payload.old;
+            if(row && row.scope && row.scope !== scope) return;  // filter ได้ทีละคอลัมน์ กรอง scope เอง
+            state.eventsSeen++;
+            state.lastEventAt = Date.now();
+            try{ onChange(); }catch(e){}
+          })
+        .subscribe((status) => {
+          state.status = status;
+          if(status === 'SUBSCRIBED'){ retryMs = 2000; return; }
+          // CHANNEL_ERROR / TIMED_OUT / CLOSED -> ต่อใหม่แบบถอยเวลาเพิ่มขึ้น
+          if(status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED'){
+            setTimeout(join, retryMs);
+            retryMs = Math.min(retryMs * 2, 60000);
+          }
+        });
+    }
+    join();
+
+    state.reconnect = function(){ retryMs = 2000; join(); };
+    state.stop = function(){ closed = true; if(state.channel){ try{ sb.removeChannel(state.channel); }catch(e){} } };
     return state;
   };
+
+  // ไว้เช็คตอนมีปัญหา: เปิด console แล้วพิมพ์ storage.realtimeInfo()
+  window.storage.realtimeInfo = function(){
+    const st = window.__rtState;
+    if(!st) return 'realtime ยังไม่ได้เริ่ม';
+    return {
+      status: st.status,
+      eventsSeen: st.eventsSeen,
+      lastEventAgoSec: st.lastEventAt ? Math.round((Date.now()-st.lastEventAt)/1000) : null,
+      ใช้งานได้จริง: st.alive()
+    };
+  };
+
 })();
 </script>
 <script>
@@ -1444,8 +1493,10 @@ let currentPollMs = 0;
 function startRealtimeSync(){
   if(pollTimer) return;
   if(window.storage && window.storage.subscribe){
-    try{ rtState = window.storage.subscribe('appdata', true, ()=>{ pollOnce(); }); }
-    catch(e){ rtState = null; }
+    try{
+      rtState = window.storage.subscribe('appdata', true, ()=>{ pollOnce(); });
+      window.__rtState = rtState;   // ให้ storage.realtimeInfo() อ่านได้
+    }catch(e){ rtState = null; }
   }
   startPollTimer();
   // พักการซิงก์เมื่อสลับไปแท็บอื่น (และเขียนของค้างให้จบก่อน)
@@ -1457,23 +1508,21 @@ function startRealtimeSync(){
     } else {
       pollOnce();       // ดึงข้อมูลล่าสุดทันทีที่กลับมา
       startPollTimer(); // เริ่มซิงก์ต่อ
+      // มือถือมักตัด websocket ตอนหน้าจอดับ — ต่อใหม่เมื่อกลับมา
+      if(rtState && rtState.reconnect && rtState.status !== 'SUBSCRIBED') rtState.reconnect();
     }
   });
   // เขียนของที่ค้างก่อนปิดหน้า
   window.addEventListener('beforeunload', ()=>{ flushActivityNow(); flushSaveNow(); });
 }
 
-function pollIntervalMs(){
-  return (rtState && rtState.connected) ? 45000 : 12000;
-}
+// poll คงที่ 12 วิ ตลอด — ตอนนี้มันถามแค่ updated_at (~200 bytes) ถูกมาก
+// realtime เป็นแค่ตัวเร่งให้เห็นไวขึ้น ถ้ามันเงียบก็ยังได้ 12 วิเหมือนเดิม ไม่แย่ลง
+const POLL_MS = 12000;
 function startPollTimer(){
   if(pollTimer) return;
-  currentPollMs = pollIntervalMs();
-  pollTimer = setInterval(()=>{
-    pollOnce();
-    // realtime เพิ่งต่อติด/เพิ่งหลุด -> ปรับจังหวะ poll ตาม
-    if(currentPollMs !== pollIntervalMs()){ stopPollTimer(); startPollTimer(); }
-  }, currentPollMs);
+  currentPollMs = POLL_MS;
+  pollTimer = setInterval(pollOnce, POLL_MS);
 }
 function stopPollTimer(){
   if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
