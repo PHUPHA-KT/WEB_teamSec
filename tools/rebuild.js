@@ -529,6 +529,59 @@ step('กำหนดการ: เรียง/ซ่อนเก่า/กา�
 </style>`, 'schedule css');
 });
 
+// ================= 16) เรื่องเปิดใหม่ =================
+step('เรื่องเปิดใหม่: แบ่งกลุ่ม/2-4/ใครยังไม่ติ๊ก/งานของฉัน/วันที่/ย้ายเข้างานประจำ', 'function promoteNewToRecurring', () => {
+  const a = s.indexOf('function renderNewStories(){');
+  if (a < 0) throw new Error('ไม่เจอ renderNewStories');
+  const b = s.indexOf('\n}\n', a);
+  if (b < 0) throw new Error('ไม่เจอจุดจบ renderNewStories');
+  const js = fs.readFileSync(path.join(__dirname, 'newstories.js'), 'utf8').replace(/\n$/, '');
+  s = s.slice(0, a) + js + s.slice(b + 2);
+
+  // เก็บวันที่เพิ่ม
+  rep(
+`    newStories.push({ id: uid('n'), ...data, name:'', contrib:{'เหนือ':false,'บิ๊ก':false,'ยูตะ':false,'น๊อต':false} });`,
+`    newStories.push({ id: uid('n'), ...data, name:'', createdAt: new Date().toISOString(), contrib:{'เหนือ':false,'บิ๊ก':false,'ยูตะ':false,'น๊อต':false} });`, 'saveNewStory createdAt');
+
+  // เปิด modal งานประจำแบบปกติ = ไม่ใช่การย้าย
+  rep(
+`function openRecurringModal(id){
+  editingRecurringId = id || null;`,
+`function openRecurringModal(id){
+  editingRecurringId = id || null;
+  promoteFromNewId = null;   // เปิดปกติ = ไม่ได้ย้ายมาจากเรื่องเปิดใหม่`, 'openRecurringModal reset promote');
+
+  // บันทึกงานประจำที่ย้ายมา -> เรื่องเปิดใหม่ตัวเดิมลงถังขยะ
+  rep(
+`    recurring.push({ id: uid('r'), ...data, chapter:'', status:'pending', pendingSinceDate:null, pendingEpisodes:[] });
+    logActivity(\`เพิ่มเรื่องประจำ "\${data.name||data.code}"\`);
+  }
+  editingRecurringId = null;
+  closeModal('modalRecurring');
+  renderRecurring(); renderStats();
+  await persistRecurring();`,
+`    recurring.push({ id: uid('r'), ...data, chapter:'', status:'pending', pendingSinceDate:null, pendingEpisodes:[] });
+    logActivity(\`เพิ่มเรื่องประจำ "\${data.name||data.code}"\`);
+    // ย้ายมาจากเรื่องเปิดใหม่: เอาตัวเดิมออก (ลงถังขยะ กู้ได้) จะได้ไม่มี 2 ที่
+    if(promoteFromNewId){
+      const src = newStories.find(n=>n.id===promoteFromNewId);
+      if(src){
+        await moveToTrash('newstories', src);
+        newStories = newStories.filter(n=>n.id!==promoteFromNewId);
+        logActivity(\`ย้าย "\${src.code}" จากเรื่องเปิดใหม่เข้างานประจำ\`);
+        showToast('ย้ายเข้างานประจำแล้ว — เรื่องเปิดใหม่ตัวเดิมอยู่ในถังขยะ');
+      }
+    }
+  }
+  promoteFromNewId = null;
+  editingRecurringId = null;
+  closeModal('modalRecurring');
+  // ย้ายมาจากแท็บอื่น -> พาไปดูที่งานประจำ (แท็บเดิมไม่ต้องสลับ จะได้ไม่ล้างคำค้น)
+  if(activeTab !== 'recurring') switchTab('recurring'); else renderRecurring();
+  renderStats();
+  await persistRecurring();`, 'saveNewRecurring promote');
+});
+
 // ================= ตรวจก่อนเขียน =================
 group = 'ตรวจท้าย';
 if (s.includes('drive.google.com/drive/folders/')) throw new Error('ยังมีลิงก์ Drive จริงในไฟล์ — SEED ไม่ถูกตัด?');
