@@ -339,6 +339,15 @@
   .sched-note{ font-size:12.5px; color:var(--ink-soft); margin-bottom:8px; }
   .sched-actions{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
   @media(max-width:720px){ .sched-table{ display:none; } .sched-cards{ display:block; } }
+  /* ช่องค้นหา + ปุ่มล้าง */
+  .search-wrap{ position:relative; flex:1; min-width:160px; display:flex; }
+  .search-wrap input[type=text]{ flex:1; min-width:0; padding-right:36px; }
+  .search-clear{
+    position:absolute; right:6px; top:50%; transform:translateY(-50%);
+    border:0; background:transparent; color:var(--ink-soft); font-size:15px; line-height:1;
+    padding:6px 8px; border-radius:6px; cursor:pointer;
+  }
+  .search-clear:hover{ background:var(--gray-bg); color:var(--ink); }
 </style>
 </head>
 <body>
@@ -1880,6 +1889,20 @@ function filterToggleHtml(){
   return '<button class="btn btn-ghost filter-toggle" onclick="toggleFilters()" style="margin-bottom:10px;">' + label + '</button>';
 }
 
+// ช่องค้นหา + ปุ่ม ✕ (โผล่เฉพาะตอนมีข้อความ) — ใช้ร่วมกันทั้งแท็บงานประจำและเรื่องเปิดใหม่
+function searchBoxHtml(id, placeholder){
+  return '<div class="search-wrap">'
+    + '<input type="text" id="' + id + '" placeholder="' + placeholder + '" value="' + esc(searchText) + '">'
+    + (searchText ? '<button type="button" class="search-clear" onclick="clearSearch(\'' + id + '\')" title="ล้างคำค้น">✕</button>' : '')
+    + '</div>';
+}
+function clearSearch(id){
+  searchText = '';
+  if(activeTab === 'newstories') renderNewStories(); else renderRecurring();
+  const box = document.getElementById(id);
+  if(box) box.focus({preventScroll:true});
+}
+
 function renderRecurring(){
   const container = document.getElementById('mainContent');
   const activeEl = document.activeElement;
@@ -1889,7 +1912,7 @@ function renderRecurring(){
 
   let html = `
     <div class="toolbar">
-      <input type="text" id="searchBox" placeholder="ค้นหารหัสหรือชื่อเรื่อง..." value="${esc(searchText)}">
+      ${searchBoxHtml('searchBox', 'ค้นหารหัสหรือชื่อเรื่อง...')}
       <button class="btn btn-primary" onclick="openRecurringModal()">+ เพิ่มเรื่อง</button>
       <button class="btn btn-ghost" onclick="resetDailyDone()">รีเซ็ตสถานะที่ทำ/งด/เลื่อนแล้ว</button>
     </div>
@@ -2491,7 +2514,7 @@ function renderNewStories(){
     : `<div class="filter-chip" style="opacity:.6" onclick="promptSetMe()">⭐ ที่ฉันยังไม่ติ๊ก — ตั้งชื่อก่อน</div>`;
   let html = `
     <div class="toolbar">
-      <input type="text" id="searchBox2" placeholder="ค้นหา..." value="${esc(searchText)}">
+      ${searchBoxHtml('searchBox2', 'ค้นหา...')}
       <button class="btn btn-primary" onclick="openNewModal()">+ เพิ่มเรื่องเปิดใหม่</button>
     </div>
     <div class="chip-scroll" style="margin-bottom:10px;">${mineChip}</div>

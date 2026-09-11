@@ -582,6 +582,43 @@ step('เรื่องเปิดใหม่: แบ่งกลุ่ม/2-
   await persistRecurring();`, 'saveNewRecurring promote');
 });
 
+// ================= 17) ปุ่ม ✕ ล้างช่องค้นหา =================
+step('ปุ่มล้างช่องค้นหา', 'function clearSearch', () => {
+  rep('function renderRecurring(){',
+`// ช่องค้นหา + ปุ่ม ✕ (โผล่เฉพาะตอนมีข้อความ) — ใช้ร่วมกันทั้งแท็บงานประจำและเรื่องเปิดใหม่
+function searchBoxHtml(id, placeholder){
+  return '<div class="search-wrap">'
+    + '<input type="text" id="' + id + '" placeholder="' + placeholder + '" value="' + esc(searchText) + '">'
+    + (searchText ? '<button type="button" class="search-clear" onclick="clearSearch(\\'' + id + '\\')" title="ล้างคำค้น">✕</button>' : '')
+    + '</div>';
+}
+function clearSearch(id){
+  searchText = '';
+  if(activeTab === 'newstories') renderNewStories(); else renderRecurring();
+  const box = document.getElementById(id);
+  if(box) box.focus({preventScroll:true});
+}
+
+function renderRecurring(){`, 'helpers');
+  rep(
+`      <input type="text" id="searchBox" placeholder="ค้นหารหัสหรือชื่อเรื่อง..." value="\${esc(searchText)}">`,
+`      \${searchBoxHtml('searchBox', 'ค้นหารหัสหรือชื่อเรื่อง...')}`, 'recurring search box');
+  rep(
+`      <input type="text" id="searchBox2" placeholder="ค้นหา..." value="\${esc(searchText)}">`,
+`      \${searchBoxHtml('searchBox2', 'ค้นหา...')}`, 'newstories search box');
+  rep('</style>',
+`  /* ช่องค้นหา + ปุ่มล้าง */
+  .search-wrap{ position:relative; flex:1; min-width:160px; display:flex; }
+  .search-wrap input[type=text]{ flex:1; min-width:0; padding-right:36px; }
+  .search-clear{
+    position:absolute; right:6px; top:50%; transform:translateY(-50%);
+    border:0; background:transparent; color:var(--ink-soft); font-size:15px; line-height:1;
+    padding:6px 8px; border-radius:6px; cursor:pointer;
+  }
+  .search-clear:hover{ background:var(--gray-bg); color:var(--ink); }
+</style>`, 'search css');
+});
+
 // ================= ตรวจก่อนเขียน =================
 group = 'ตรวจท้าย';
 if (s.includes('drive.google.com/drive/folders/')) throw new Error('ยังมีลิงก์ Drive จริงในไฟล์ — SEED ไม่ถูกตัด?');
