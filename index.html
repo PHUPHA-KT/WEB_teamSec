@@ -21,7 +21,23 @@
     --bg:#12151c; --card:#1a1f28;
     --fill:#232a35; --surface-2:#20262f; --hover:#222834;
     --gray-bg:#2a313c;
+    --blue-bg:#1b2a44; --green-bg:#153126; --purple-bg:#2a1f44; --orange-bg:#3a2616;
   }
+  /* โหมดมืด: สีที่เคย hardcode ไว้แบบสว่าง */
+  body.dark .status-done{ background:#153126; color:#3fc48f; }
+  body.dark .status-progress{ background:#3a2d14; color:#e3b463; }
+  body.dark .status-none{ background:#2a313c; color:#a2abba; }
+  body.dark .contrib-item.on{ background:#153126; border-color:#1a9c6b; color:#3fc48f; }
+  body.dark .ep-chip{ background:#3a1f1d; border-color:#5c2b26; color:#f08a80; }
+  body.dark .ep-chip button, body.dark .ep-list{ color:#f08a80; }
+  body.dark .icon-btn{ color:#6b7480; }
+  body.dark .icon-btn:hover{ background:#3a1f1d; color:#f08a80; }
+  body.dark .btn-danger-ghost{ color:#f08a80; border-color:#5c2b26; }
+  body.dark .link-btn.empty{ color:#4a525e; }
+  body.dark .toast{ background:#e7ebf2; color:#12151c; }
+  body.dark .stat-chip.plain{ background:#20262f; color:#e7ebf2; }
+  body.dark .exp-card.outstanding{ background:#2a2113; border-color:#5a4520; }
+  body.dark .day-pill, body.dark .status-select, body.dark .status-badge, body.dark .drop-badge{ filter:brightness(.85) saturate(1.1); }
   *{box-sizing:border-box;}
   body{
     margin:0; font-family:"Segoe UI","Sarabun","Tahoma",sans-serif;
@@ -79,6 +95,30 @@
   .pending-alert .pa-close{ border:none; background:transparent; color:inherit; cursor:pointer; font-size:16px; padding:0 2px; }
   /* ตารางปฏิทิน */
   .cal-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:14px; }
+  /* Dashboard ค่าใช้จ่าย */
+  .exp-dash{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:14px; }
+  @media(max-width:640px){ .exp-dash{ grid-template-columns:repeat(2,1fr); } }
+  .exp-card{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; }
+  .exp-card.outstanding{ border-color:#e0a53a; background:#fdf6e8; }
+  .exp-card-label{ font-size:12px; color:var(--ink-soft); margin-bottom:4px; }
+  .exp-card-val{ font-size:22px; font-weight:800; color:var(--ink); }
+  .exp-chart-wrap{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px 8px; margin-bottom:6px; }
+  .exp-chart-title{ font-size:12.5px; color:var(--ink-soft); margin-bottom:12px; }
+  .exp-chart{ display:flex; align-items:flex-end; gap:8px; height:160px; overflow-x:auto; padding-bottom:4px; }
+  .exp-bar-col{ flex:1; min-width:42px; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; cursor:pointer; }
+  .exp-bar-val{ font-size:10.5px; color:var(--ink-soft); margin-bottom:3px; white-space:nowrap; }
+  .exp-bar{ width:70%; max-width:34px; background:var(--blue); border-radius:6px 6px 0 0; transition:.15s; min-height:3px; }
+  .exp-bar-col:hover .exp-bar{ opacity:.8; }
+  .exp-bar-active{ background:var(--orange); }
+  .exp-bar-cleared{ background:var(--green); }
+  .exp-bar-outstanding{ background:#e0a53a; }
+  .exp-bar-label{ font-size:10.5px; color:var(--ink-soft); margin-top:5px; white-space:nowrap; }
+  .exp-month-banner{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    border-radius:10px; padding:10px 14px; margin-bottom:10px; font-size:13.5px; }
+  .exp-month-banner.cleared{ background:#e6f7ee; border:1px solid #b6e6cf; color:#1a7c53; }
+  .exp-month-banner.outstanding{ background:#fdf6e8; border:1px solid #ecd6a3; color:#b9791b; }
+  body.dark .exp-month-banner.cleared{ background:#12261d; }
+  body.dark .exp-month-banner.outstanding{ background:#2a2113; }
   @media(max-width:720px){ .cal-grid{ grid-template-columns:1fr; } }
   .cal-card{ border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--card); }
   .cal-head{ padding:12px 16px; font-size:18px; font-weight:800; color:#fff; text-align:center; }
@@ -472,8 +512,8 @@
       <h4>🆕 เรื่องเปิดใหม่</h4>
       <p>ติดตามเรื่องที่กำลังจะเปิด ติ๊กว่าใครทำเสร็จบ้าง (4 คน) สถานะรวมคิดให้อัตโนมัติ · ✎ แก้ได้ (ที่ติ๊กไว้ไม่หาย)</p>
 
-      <h4>💰 ค่าใช้จ่าย</h4>
-      <p>ลงค่าใช้จ่ายแยกแพลตฟอร์ม เห็นยอดรวมแต่ละเจ้า + รวมทั้งหมดในตาราง · ✎ แก้แต่ละรายการได้</p>
+      <h4>💰 ค่าใช้จ่าย (เงินสำรองจ่าย)</h4>
+      <p>ค่าใช้จ่ายคือเงินที่ออกก่อน บริษัทเคลียร์คืนทีหลัง · <b>Dashboard</b> โชว์ ยอดสำรองจ่ายรวม, <b>⏳ ค้างเบิก</b> (บริษัทยังไม่คืน), ✅ เบิกคืนแล้ว, เฉลี่ย/เดือน · <b>กราฟรายเดือน</b> เขียว=เคลียร์แล้ว ส้ม=ค้างเบิก · <b>ติ๊กเบิกคืนได้ 2 แบบ</b>: ติ๊กช่องหน้าแต่ละรายการ หรือกด "✅ ติ๊กเคลียร์ทั้งเดือน" ทีเดียว · เดือนจะขึ้น ✅ เองเมื่อทุกรายการถูกเบิกครบ · เลือกเดือนย้อนหลังดูได้ · วันที่ตั้งเป็นวันนี้ให้อัตโนมัติ</p>
 
       <h4>🗓️ กำหนดการเปิดเรื่อง</h4>
       <p>วางแผนล่วงหน้าว่าเรื่องไหนเปิดวันไหน มีนับถอยหลัง ("อีก 3 วัน") ใกล้ถึง/เลยกำหนดขึ้นป้ายเตือน</p>
@@ -980,6 +1020,7 @@ function safeUrl(u){
   if(/^[A-Za-z0-9][A-Za-z0-9.-]*\.[A-Za-z]{2,}([/?#]|$)/.test(s)) return esc('https://' + s);
   return '#';   // javascript:, data:, อย่างอื่น -> ตัดทิ้ง
 }
+
 // ===== โหมดมืด/สว่าง (บันทึกเฉพาะเครื่องผู้ใช้ ไม่แชร์) =====
 function applyTheme(mode){
   const dark = mode === 'dark';
@@ -1031,13 +1072,15 @@ function uiConfirm(message, title){
 }
 
 // กล่องกรอกข้อความที่สร้างเอง (แทน prompt ของเบราว์เซอร์)
-function uiPrompt(message, placeholder){
+// คืน string (อาจว่าง '') เมื่อกดตกลง, null เมื่อยกเลิก — opts:{value, placeholder}
+function uiPrompt(message, opts){
+  opts = opts || {};
   return new Promise(resolve=>{
     const back = document.getElementById('modalPrompt');
     document.getElementById('promptTitle').textContent = message || 'กรอกข้อมูล';
     const input = document.getElementById('promptInput');
-    input.value = '';
-    input.placeholder = placeholder || '';
+    input.value = opts.value || '';
+    input.placeholder = opts.placeholder || '';
     const okBtn = document.getElementById('promptOk');
     const cancelBtn = document.getElementById('promptCancel');
     function cleanup(result){
@@ -1047,14 +1090,14 @@ function uiPrompt(message, placeholder){
       input.removeEventListener('keydown', onKey);
       resolve(result);
     }
-    function onOk(){ cleanup(input.value.trim() || null); }
+    function onOk(){ cleanup(input.value.trim()); }
     function onCancel(){ cleanup(null); }
     function onKey(e){ if(e.key==='Enter') onOk(); if(e.key==='Escape') onCancel(); }
     okBtn.addEventListener('click', onOk);
     cancelBtn.addEventListener('click', onCancel);
     input.addEventListener('keydown', onKey);
     back.classList.add('show');
-    setTimeout(()=>input.focus(), 50);
+    setTimeout(()=>{ input.focus(); input.select(); }, 50);
   });
 }
 
@@ -1243,13 +1286,13 @@ async function getAppData(){
   return null;   // อ่านได้จริง แต่ยังไม่มีข้อมูล = เปิดใช้ครั้งแรก
 }
 // เซฟ: อ่านก้อนล่าสุด → merge ทุก collection เทียบฐาน (กันงานคนอื่นหาย) → เขียนกลับ 1 ครั้ง
-// คิวเซฟ: ให้การเซฟทำทีละครั้ง ไม่ให้ซ้อนกันจนค่าเพี้ยน
+// คิวเซฟ: ให้การเซฟทำทีละครั้ง ไม่ให้ซ้อนกันจนค่าเพี้ยน (เช่นกดเปลี่ยนสถานะรัวๆ)
 let saveChain = Promise.resolve();
+let saveInFlight = 0; // >0 = กำลังเซฟ (poll ต้องไม่เอา remote มาทับข้อมูลในเครื่องช่วงนี้)
 
 // รวบการแก้ที่ติดๆ กันเป็นการเขียนครั้งเดียว (ติ๊ก 4 ช่องรวด = เขียน 1 ครั้ง ไม่ใช่ 4)
 const SAVE_DEBOUNCE_MS = 700;
 let saveTimer = null;
-let saveInFlight = false;
 let saveWaiter = null;   // {promise, resolve} ของรอบที่กำลังรออยู่
 let saveToastWanted = false;
 
@@ -1273,13 +1316,13 @@ function runQueuedSave(){
   saveWaiter = null;
   const toast = saveToastWanted;
   saveToastWanted = false;
-  saveInFlight = true;
-  saveChain = saveChain.then(()=>persistDataNow(toast)).catch(()=>{}).then(()=>{ saveInFlight = false; });
+  saveInFlight++;
+  saveChain = saveChain.then(()=>persistDataNow(toast)).catch(()=>{}).finally(()=>{ saveInFlight--; });
   saveChain.then(()=>waiter.resolve(), ()=>waiter.resolve());
   return saveChain;
 }
 
-// เขียนทันทีไม่ต้องรอ debounce — ใช้ตอนปิดหน้า/สลับแท็บ/ก่อนส่งออกข้อมูล
+// เขียนทันทีไม่ต้องรอ debounce — ใช้ตอนปิดหน้า/สลับแท็บ/ก่อนกู้คืนข้อมูล
 function flushSaveNow(){
   return saveWaiter ? runQueuedSave() : saveChain;
 }
@@ -1290,7 +1333,13 @@ function scheduleSaveRetry(){
   if(saveRetryTimer) return;
   saveRetryTimer = setTimeout(()=>{ saveRetryTimer = null; persistData(false); }, 5000);
 }
-
+function renderTab(){
+  if(activeTab==='recurring') renderRecurring();
+  else if(activeTab==='calendar') renderCalendar();
+  else if(activeTab==='newstories') renderNewStories();
+  else if(activeTab==='expenses') renderExpenses();
+  else renderSchedule();
+}
 async function persistDataNow(toast){
   try{
     let remote = null;
@@ -1307,7 +1356,6 @@ async function persistDataNow(toast){
     }
     let pulledExternal = false;
     const full = {};
-    const pendingSeen = {};
     for(const k of DATA_KEYS){
       const ours = getColl(k) || [];
       const theirs = remote && Array.isArray(remote[k]) ? remote[k] : null;
@@ -1319,7 +1367,6 @@ async function persistDataNow(toast){
       }
       setColl(k, merged);
       full[k] = merged;
-      pendingSeen[k] = JSON.stringify(merged);   // ยังไม่เลื่อนฐานเทียบ จนกว่าจะเขียนสำเร็จ
     }
     // เขียน 1 ครั้ง — ล้มเหลวลองซ้ำเอง 1 ที (กัน rate limit ชั่วคราว)
     const s = JSON.stringify(full);
@@ -1329,16 +1376,11 @@ async function persistDataNow(toast){
       await new Promise(r=>setTimeout(r, 900));
       await window.storage.set('appdata', s, true);
     }
-    // เขียนสำเร็จแล้วค่อยเลื่อนฐานเทียบ — ถ้าล้มเหลว ฐานเดิมยังอยู่
-    // การ merge รอบหน้าจะยังเห็นว่างานนี้ "เราแก้" ไม่ใช่ "คนอื่นแก้" จึงไม่ถูกทิ้ง
-    Object.assign(lastSeen, pendingSeen);
+    // อัปเดตฐานหลังเขียนสำเร็จเท่านั้น — ถ้าเขียนล้มเหลว ฐานยังเป็นค่าเก่า poll รอบหน้าจะ merge ใหม่ไม่ทับงานเรา
+    for(const k of DATA_KEYS) lastSeen[k] = JSON.stringify(full[k]);
     if(toast) showToast('บันทึกแล้ว');
     if(pulledExternal && !isBusyEditing()){
-      renderStats();
-      if(activeTab==='recurring') renderRecurring();
-      else if(activeTab==='newstories') renderNewStories();
-      else if(activeTab==='expenses') renderExpenses();
-      else renderSchedule();
+      renderStats(); renderTab();
     }
   }catch(e){
     showToast('บันทึกไม่สำเร็จ — จะลองใหม่ให้เอง');
@@ -1489,7 +1531,8 @@ function isBusyEditing(){
   const ae = document.activeElement;
   if(ae && (ae.id==='searchBox' || ae.id==='searchBox2')) return true;
   // เปิดหน้าต่างแก้ไขที่มีฟอร์มค้างอยู่ (เว้น modalHelp/modalBackup ที่ไม่กระทบข้อมูล)
-  const editingModals = ['modalRecurring','modalNew','modalExpense','modalSchedule','modalEpisodes','modalConfirm','modalPrompt','modalTrash','modalHistory','modalDayArchive'];
+  // (modalTrash/History/DayArchive เป็นหน้าดูอย่างเดียว วาดใหม่ได้เลย — pollOnce วาดให้)
+  const editingModals = ['modalRecurring','modalNew','modalExpense','modalSchedule','modalEpisodes','modalConfirm','modalPrompt'];
   return editingModals.some(id=>{
     const el = document.getElementById(id);
     return el && el.classList.contains('show');
@@ -1497,9 +1540,7 @@ function isBusyEditing(){
 }
 
 async function pollOnce(){
-  // มีงานรอเซฟ/กำลังเซฟอยู่ -> ข้ามรอบนี้
-  // ไม่งั้น setColl() ด้านล่างจะเขียนทับตัวแปรในหน่วยความจำ กลืนการแก้ที่ยังไม่ได้บันทึก
-  // (persistDataNow merge ให้อยู่แล้ว และดึงของคนอื่นมาด้วย)
+  // มีงานรอเซฟ (debounce) หรือกำลังเซฟ -> ข้ามรอบนี้ กัน setColl() ทับการแก้ที่ยังไม่ได้ส่ง
   if(saveWaiter || saveTimer || saveInFlight) return;
   let changed = false;
   // ถ้าเปิดเว็บค้างไว้แล้วข้ามเวลา 2 ทุ่ม (หรือข้ามวัน) ให้เลื่อนตัวกรองไปวันใหม่อัตโนมัติ
@@ -1512,11 +1553,14 @@ async function pollOnce(){
     }
   }
   let remote = null;
-  try{
-    const res = await window.storage.get('appdata', true); // อ่านก้อนเดียว
-    if(res && res.value) remote = JSON.parse(res.value);
-  }catch(e){ remote = null; }
-  if(remote && typeof remote==='object'){
+  // กำลังเซฟอยู่ → ข้ามรอบนี้ (persistDataNow จะ merge กับ remote ให้เองอยู่แล้ว) กันเอา remote มาทับงานที่ยังเซฟไม่เสร็จ
+  if(!saveInFlight){
+    try{
+      const res = await window.storage.get('appdata', true); // อ่านก้อนเดียว
+      if(res && res.value) remote = JSON.parse(res.value);
+    }catch(e){ remote = null; }
+  }
+  if(remote && typeof remote==='object' && !saveInFlight){
     for(const k of DATA_KEYS){
       if(!Array.isArray(remote[k])) continue;
       const val = JSON.stringify(remote[k]);
@@ -1532,12 +1576,11 @@ async function pollOnce(){
   // วาดใหม่เฉพาะตอนที่ปลอดภัย (ไม่ได้พิมพ์/แก้อะไรค้างอยู่)
   if(pendingExternalRender && !isBusyEditing()){
     pendingExternalRender = false;
-    renderStats();
-    if(activeTab==='recurring') renderRecurring();
-    else if(activeTab==='newstories') renderNewStories();
-    else if(activeTab==='expenses') renderExpenses();
-    else renderSchedule();
-    showToast('🔄 อัปเดตข้อมูลจากทีมแล้ว');
+    renderStats(); renderTab();
+    if(document.getElementById('modalTrash').classList.contains('show')) renderTrash();
+    if(document.getElementById('modalHistory').classList.contains('show')) renderHistory();
+    if(document.getElementById('modalDayArchive').classList.contains('show')) renderDayLinksArchive();
+    if(changed) showToast('🔄 อัปเดตข้อมูลจากทีมแล้ว');
   }
 }
 
@@ -1683,7 +1726,11 @@ document.getElementById('epAddInput').addEventListener('keydown', e=>{ if(e.key=
 document.getElementById('epClearBtn').addEventListener('click', clearAllEpisodes);
 
 function openModal(id){ document.getElementById(id).classList.add('show'); }
-function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+function closeModal(id){
+  document.getElementById(id).classList.remove('show');
+  // ถ้ามีข้อมูลจากทีมรอวาดอยู่ระหว่างเปิด modal ให้วาดทันทีที่ปิด
+  if(pendingExternalRender && !isBusyEditing()){ pendingExternalRender = false; renderStats(); renderTab(); }
+}
 
 function renderStats(){
   const active = recurring.filter(r=>!isEffectivelyDropped(r));
@@ -1695,7 +1742,7 @@ function renderStats(){
   const upcoming = scheduleEntries.filter(e=>e.status!=='opened' && e.date && daysUntil(e.date)>=0).length;
   document.getElementById('statRow').innerHTML = `
     <div class="stat-chip stat-min"><b>${total}</b> เรื่องประจำ</div>
-    <div class="stat-chip"><b>${doneToday}</b> ทำวันนี้แล้ว</div>
+    <div class="stat-chip"><b>${doneToday}</b> ทำแล้วสัปดาห์นี้</div>
     ${episodesOverdue ? `<div class="stat-chip" style="background:rgba(224,64,58,.35);"><b>${episodesOverdue}</b> ตอนค้าง (${storiesOverdue} เรื่อง)</div>` : ''}
     <div class="stat-chip stat-min"><b>${newStories.length}</b> เรื่องเปิดใหม่</div>
     ${upcoming ? `<div class="stat-chip stat-min"><b>${upcoming}</b> เรื่องจะเปิดเร็วๆนี้</div>` : ''}
@@ -1908,11 +1955,10 @@ function toggleShowDropped(){ showDropped=!showDropped; showOnlyPending=false; r
 
 // ===== "ฉันคือใคร" + งานของฉัน =====
 async function promptSetMe(){
-  const choice = await uiPrompt('พิมพ์ชื่อของคุณ (เหนือ / บิ๊ก / ยูตะ / น๊อต):', myPerson || 'เช่น บิ๊ก');
+  const choice = await uiPrompt('พิมพ์ชื่อของคุณ (เหนือ / บิ๊ก / ยูตะ / น๊อต) · เว้นว่างเพื่อล้าง', {value: myPerson, placeholder:'เช่น บิ๊ก'});
   if(choice === null) return;
-  const name = choice.trim();
-  if(name && !PEOPLE.includes(name)){ showToast('ชื่อต้องเป็น เหนือ / บิ๊ก / ยูตะ / น๊อต'); return; }
-  myPerson = name;
+  if(choice && !PEOPLE.includes(choice)){ showToast('ชื่อต้องเป็น เหนือ / บิ๊ก / ยูตะ / น๊อต'); return; }
+  myPerson = choice;
   try{ await window.storage.set('me', myPerson, false); }catch(e){}
   if(myPerson) personFilter = myPerson;
   renderRecurring();
@@ -2109,11 +2155,11 @@ async function deleteArchiveSnapshot(id){
   renderDayLinksArchive();
 }
 async function addDayLink(day){
-  const url = await uiPrompt('เพิ่มลิงก์โฟลเดอร์ดาวน์โหลดของวัน'+day+':', 'https://drive.google.com/...');
-  if(url === null || url.trim()==='') return;
-  const label = await uiPrompt('ตั้งชื่อลิงก์นี้ (ไม่บังคับ เช่น "ตอนหลัก", "ตอนพิเศษ"):', 'เว้นว่างได้');
+  const url = await uiPrompt('เพิ่มลิงก์โฟลเดอร์ดาวน์โหลดของวัน'+day, {placeholder:'https://drive.google.com/...'});
+  if(url === null || url==='') return;
+  const label = await uiPrompt('ตั้งชื่อลิงก์นี้ (ไม่บังคับ เช่น "ตอนหลัก", "ตอนพิเศษ")', {placeholder:'เว้นว่างได้'});
   if(label === null) return; // กดยกเลิก
-  dayLinks.push({ id: uid('dl'), day, url: url.trim(), label: label.trim() });
+  dayLinks.push({ id: uid('dl'), day, url, label });
   renderRecurring();
   await persistDayLinks();
   showToast('เพิ่มลิงก์แล้ว');
@@ -2121,13 +2167,13 @@ async function addDayLink(day){
 async function editDayLink(id){
   const l = dayLinks.find(x=>x.id===id);
   if(!l) return;
-  const url = await uiPrompt('แก้ลิงก์ (เว้นว่างเพื่อลบ):', l.url);
+  const url = await uiPrompt('แก้ลิงก์ (เว้นว่างเพื่อลบ)', {value: l.url});
   if(url === null) return;
-  if(url.trim()===''){ dayLinks = dayLinks.filter(x=>x.id!==id); renderRecurring(); await persistDayLinks(); return; }
-  const label = await uiPrompt('ชื่อลิงก์ (ไม่บังคับ):', l.label || '');
+  if(url===''){ dayLinks = dayLinks.filter(x=>x.id!==id); renderRecurring(); await persistDayLinks(); return; }
+  const label = await uiPrompt('ชื่อลิงก์ (ไม่บังคับ)', {value: l.label || ''});
   if(label === null) return;
-  l.url = url.trim();
-  l.label = label.trim();
+  l.url = url;
+  l.label = label;
   renderRecurring();
   await persistDayLinks();
 }
@@ -2143,9 +2189,10 @@ async function removeDayLink(id){
 // ===== ดรอปเรื่อง (จบซีซั่น / LC) =====
 async function openDropMenu(id){
   const item = recurring.find(r=>r.id===id);
-  const reason = await uiPrompt('ดรอปเรื่อง "'+(item.name||item.code)+'"\nพิมพ์ "จบ" = จบซีซั่น, "lc" = โดน LC (ถูกลิขสิทธิ์):', 'จบ หรือ lc');
+  if(!item) return;
+  const reason = await uiPrompt('ดรอปเรื่อง "'+(item.name||item.code)+'" — พิมพ์ "จบ" = จบซีซั่น, "lc" = โดน LC (ถูกลิขสิทธิ์)', {placeholder:'จบ หรือ lc'});
   if(reason === null) return;
-  const r = reason.trim().toLowerCase();
+  const r = reason.toLowerCase();
   let val = null;
   if(r==='จบ' || r==='จบซีซั่น' || r==='ended' || r==='จบซีชั่น') val='ended';
   else if(r==='lc' || r==='แอลซี' || r==='ลิขสิทธิ์') val='lc';
@@ -2163,6 +2210,7 @@ async function openDropMenu(id){
 }
 async function undropStory(id){
   const item = recurring.find(r=>r.id===id);
+  if(!item) return;
   item.dropped = null;
   delete item.dropped;
   logActivity(`เอาเรื่อง "${item.name||item.code}" กลับมางานปกติ`);
@@ -2173,6 +2221,7 @@ async function undropStory(id){
 
 async function updateStatus(id, value){
   const item = recurring.find(r=>r.id===id);
+  if(!item || !STATUS_META[value]) return;
   item.status = value;
   if(value === 'pending' && dayHasPassedThisWeek(item)){
     item.pendingSinceDate = todayDateStr(); // เริ่มนับค้างใหม่
@@ -2195,7 +2244,12 @@ function renderEpChips(){
   const item = recurring.find(r=>r.id===epManagerId);
   const wrap = document.getElementById('epChips');
   const clearWrap = document.getElementById('epClearWrap');
-  if(!item || !item.pendingEpisodes || !item.pendingEpisodes.length){
+  if(!item){
+    wrap.innerHTML = '<span style="font-size:13px;color:#c0392b;">เรื่องนี้ถูกลบไปแล้ว (จากเครื่องอื่น)</span>';
+    if(clearWrap) clearWrap.style.display = 'none';
+    return;
+  }
+  if(!item.pendingEpisodes || !item.pendingEpisodes.length){
     wrap.innerHTML = '<span style="font-size:13px;color:var(--ink-soft);">ไม่มีตอนค้าง 🎉</span>';
     if(clearWrap) clearWrap.style.display = 'none';
     return;
@@ -2215,6 +2269,7 @@ function openEpisodeManager(id){
 }
 async function removeEpisode(ep){
   const item = recurring.find(r=>r.id===epManagerId);
+  if(!item){ renderEpChips(); return; }
   item.pendingEpisodes = (item.pendingEpisodes||[]).filter(x=>x!==ep);
   renderEpChips();
   renderRecurring(); renderStats();
@@ -2226,6 +2281,7 @@ async function removeEpisode(ep){
 }
 async function addEpisodes(){
   const item = recurring.find(r=>r.id===epManagerId);
+  if(!item){ renderEpChips(); return; }
   const raw = document.getElementById('epAddInput').value;
   const nums = raw.split(/[\s,]+/).map(s=>parseInt(s,10)).filter(n=>!isNaN(n) && n>0);
   if(!nums.length){ showToast('ใส่เลขตอนที่ต้องการเพิ่ม'); return; }
@@ -2252,17 +2308,19 @@ async function clearAllEpisodes(){
 }
 
 async function promptLink(id){
-  const url = await uiPrompt('ใส่ลิงก์ต้นทางของเรื่องนี้:', 'https://');
+  const url = await uiPrompt('ใส่ลิงก์ต้นทางของเรื่องนี้', {placeholder:'https://'});
   if(!url) return;
   const item = recurring.find(r=>r.id===id);
+  if(!item) return;
   item.link = url;
   renderRecurring();
   await persistRecurring();
 }
 async function promptDriveLink(id){
-  const url = await uiPrompt('ใส่ลิงก์ Google Drive ของเรื่องนี้:', 'https://drive.google.com/...');
+  const url = await uiPrompt('ใส่ลิงก์ Google Drive ของเรื่องนี้', {placeholder:'https://drive.google.com/...'});
   if(!url) return;
   const item = recurring.find(r=>r.id===id);
+  if(!item) return;
   item.gdrive = url;
   renderRecurring();
   await persistRecurring();
@@ -2307,6 +2365,7 @@ async function saveNewRecurring(){
   };
   if(editingRecurringId){
     const item = recurring.find(r=>r.id===editingRecurringId);
+    if(!item){ showToast('เรื่องนี้ถูกลบไปแล้ว'); closeModal('modalRecurring'); return; }
     Object.assign(item, data); // เก็บ status, ตอนค้าง, ฯลฯ ไว้เหมือนเดิม
   } else {
     recurring.push({ id: uid('r'), ...data, chapter:'', status:'pending', pendingSinceDate:null, pendingEpisodes:[] });
@@ -2374,6 +2433,8 @@ function renderNewStories(){
 
 async function toggleContrib(id, person){
   const item = newStories.find(n=>n.id===id);
+  if(!item) return;
+  item.contrib = item.contrib || {};
   item.contrib[person] = !item.contrib[person];
   renderNewStories(); renderStats();
   await persistNew(false);
@@ -2406,6 +2467,7 @@ async function saveNewStory(){
   };
   if(editingNewId){
     const item = newStories.find(n=>n.id===editingNewId);
+    if(!item){ showToast('เรื่องนี้ถูกลบไปแล้ว'); closeModal('modalNew'); return; }
     Object.assign(item, data); // เก็บ contrib (ใครทำแล้วบ้าง) ไว้เหมือนเดิม
   } else {
     newStories.push({ id: uid('n'), ...data, name:'', contrib:{'เหนือ':false,'บิ๊ก':false,'ยูตะ':false,'น๊อต':false} });
@@ -2419,38 +2481,115 @@ async function saveNewStory(){
 
 function fmtBaht(n){ return Number(n||0).toLocaleString('th-TH'); }
 
+// เดือนของรายการ (YYYY-MM) — ถ้าไม่มีวันที่ = "ไม่ระบุเดือน"
+function expenseMonthKey(e){ return e.date ? e.date.slice(0,7) : 'ไม่ระบุ'; }
+function monthThaiLabel(key){
+  if(key==='ไม่ระบุ') return 'ไม่ระบุเดือน';
+  const TH=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const [y,m]=key.split('-'); return TH[parseInt(m,10)-1]+' '+(parseInt(y,10)+543).toString().slice(2);
+}
+let expenseMonthFilter = 'all';   // 'all' หรือ YYYY-MM
+
 function renderExpenses(){
   const container = document.getElementById('mainContent');
-  const totalsByPlatform = {};
-  let grandTotal = 0;
+
+  // ----- คำนวณสรุป -----
+  let grandTotal = 0, reimbursedTotal = 0;
+  const byMonth = {};            // month -> total
+  const byMonthReimb = {};       // month -> reimbursed total
+  const byPlatform = {};
   expenses.forEach(e=>{
-    totalsByPlatform[e.platform] = (totalsByPlatform[e.platform]||0) + Number(e.amount||0);
-    grandTotal += Number(e.amount||0);
+    const amt = Number(e.amount||0);
+    grandTotal += amt;
+    const mk = expenseMonthKey(e);
+    byMonth[mk] = (byMonth[mk]||0) + amt;
+    byMonthReimb[mk] = (byMonthReimb[mk]||0) + (e.reimbursed ? amt : 0);
+    byPlatform[e.platform] = (byPlatform[e.platform]||0) + amt;
+    if(e.reimbursed) reimbursedTotal += amt;
   });
+  const outstandingTotal = grandTotal - reimbursedTotal;   // ค้างเบิก (บริษัทยังไม่คืน)
+  const monthKeys = Object.keys(byMonth).filter(k=>k!=='ไม่ระบุ').sort();
+  const realMonths = monthKeys.length;
+  const thisMonthKey = todayDateStr().slice(0,7);
+  const thisMonthTotal = byMonth[thisMonthKey] || 0;
+  const avgPerMonth = realMonths ? Math.round(monthKeys.reduce((s,k)=>s+byMonth[k],0)/realMonths) : 0;
+  // เดือนที่ "เคลียร์แล้ว" = มีรายการ และทุกรายการถูกเบิกคืนครบ
+  const monthCleared = {};
+  Object.keys(byMonth).forEach(mk=>{ monthCleared[mk] = byMonth[mk]>0 && byMonthReimb[mk]>=byMonth[mk]; });
+  const outstandingMonths = Object.keys(byMonth).filter(mk=>!monthCleared[mk]).length;
 
-  let html = `
-    <div class="toolbar">
+  // ----- Dashboard cards -----
+  let html = `<div class="exp-dash">
+    <div class="exp-card"><div class="exp-card-label">รวมที่สำรองจ่าย</div><div class="exp-card-val">฿${fmtBaht(grandTotal)}</div></div>
+    <div class="exp-card ${outstandingTotal>0?'outstanding':''}">
+      <div class="exp-card-label">⏳ ค้างเบิก (บริษัทยังไม่คืน)</div>
+      <div class="exp-card-val" style="color:${outstandingTotal>0?'#b9791b':'#1a9c6b'};">฿${fmtBaht(outstandingTotal)}</div>
+      <div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">${outstandingTotal>0?`ค้าง ${outstandingMonths} เดือน`:'เคลียร์ครบแล้ว 🎉'}</div>
+    </div>
+    <div class="exp-card"><div class="exp-card-label">✅ เบิกคืนแล้ว</div><div class="exp-card-val" style="color:#1a9c6b;">฿${fmtBaht(reimbursedTotal)}</div></div>
+    <div class="exp-card"><div class="exp-card-label">เฉลี่ย/เดือน</div><div class="exp-card-val">฿${fmtBaht(avgPerMonth)}</div></div>
+  </div>`;
+
+  // ----- กราฟแท่งรายเดือน (เขียว=เคลียร์แล้ว, ส้ม=ยังค้างเบิก) -----
+  if(monthKeys.length){
+    const maxM = Math.max(...monthKeys.map(k=>byMonth[k]));
+    const bars = monthKeys.slice(-12).map(k=>{
+      const h = maxM ? Math.round(byMonth[k]/maxM*100) : 0;
+      const cleared = monthCleared[k];
+      const active = (expenseMonthFilter===k);
+      return `<div class="exp-bar-col" onclick="setExpenseMonth('${k}')" title="${monthThaiLabel(k)}: ฿${fmtBaht(byMonth[k])} · ${cleared?'เคลียร์แล้ว':'ค้างเบิก'}">
+        <div class="exp-bar-val">${byMonth[k]>=1000?(byMonth[k]/1000).toFixed(1)+'k':byMonth[k]}</div>
+        <div class="exp-bar ${cleared?'exp-bar-cleared':'exp-bar-outstanding'} ${active?'exp-bar-active':''}" style="height:${Math.max(h,3)}%;"></div>
+        <div class="exp-bar-label">${cleared?'✅':'⏳'} ${monthThaiLabel(k)}</div>
+      </div>`;
+    }).join('');
+    html += `<div class="exp-chart-wrap"><div class="exp-chart-title">แนวโน้มรายเดือน · <span style="color:#1a9c6b;">■</span> เคลียร์แล้ว <span style="color:#e0a53a;">■</span> ค้างเบิก (กดแท่งเพื่อดูเฉพาะเดือน)</div><div class="exp-chart">${bars}</div></div>`;
+  }
+
+  // ----- แถบเครื่องมือ + ตัวกรองเดือน -----
+  const monthOpts = ['<option value="all">ทุกเดือน</option>']
+    .concat([...monthKeys].reverse().map(k=>`<option value="${k}" ${expenseMonthFilter===k?'selected':''}>${monthCleared[k]?'✅':'⏳'} ${monthThaiLabel(k)} · ฿${fmtBaht(byMonth[k])}</option>`))
+    .concat(byMonth['ไม่ระบุ']?[`<option value="ไม่ระบุ" ${expenseMonthFilter==='ไม่ระบุ'?'selected':''}>${monthCleared['ไม่ระบุ']?'✅':'⏳'} ไม่ระบุเดือน · ฿${fmtBaht(byMonth['ไม่ระบุ'])}</option>`]:[]);
+  html += `<div class="toolbar" style="margin-top:14px;">
       <button class="btn btn-primary" onclick="openExpenseModal()">+ เพิ่มค่าใช้จ่าย</button>
-    </div>
-    <div class="chip-scroll" style="margin-bottom:14px; flex-wrap:wrap;">
-      ${Object.keys(totalsByPlatform).sort().map(p=>`
-        <div class="stat-chip" style="background:#eef1f6; color:#1f2430;">
-          <b>${fmtBaht(totalsByPlatform[p])}</b> ${esc(p)}
-        </div>`).join('')}
-      <div class="stat-chip" style="background:var(--blue); color:#fff;"><b>${fmtBaht(grandTotal)}</b> รวมทั้งหมด</div>
-    </div>
-  `;
+      <select onchange="setExpenseMonth(this.value)" style="padding:9px 10px;border-radius:9px;border:1px solid var(--line);background:var(--fill);color:var(--ink);font-size:13.5px;">${monthOpts.join('')}</select>
+      ${expenseMonthFilter!=='all'?`<button class="btn btn-ghost" onclick="setExpenseMonth('all')">✕ ดูทุกเดือน</button>`:''}
+    </div>`;
 
-  if(!expenses.length){
-    html += `<div class="empty-state">ยังไม่มีรายการค่าใช้จ่าย — กดปุ่ม "+ เพิ่มค่าใช้จ่าย"</div>`;
+  // ----- ถ้าเลือกดูเดือนเดียว: แถบสถานะเคลียร์ + ปุ่มติ๊กทั้งเดือน -----
+  if(expenseMonthFilter!=='all'){
+    const mk = expenseMonthFilter;
+    const cleared = monthCleared[mk];
+    html += `<div class="exp-month-banner ${cleared?'cleared':'outstanding'}">
+      <div>
+        <b>${monthThaiLabel(mk)}</b> — ${cleared?'✅ บริษัทเคลียร์คืนครบแล้ว':`⏳ ค้างเบิก ฿${fmtBaht(byMonth[mk]-byMonthReimb[mk])} (จาก ฿${fmtBaht(byMonth[mk])})`}
+      </div>
+      <button class="btn ${cleared?'btn-ghost':'btn-primary'}" style="font-size:12.5px;padding:6px 12px;" onclick="setMonthReimbursed('${mk}', ${cleared?'false':'true'})">
+        ${cleared?'↩ ยกเลิกเคลียร์ทั้งเดือน':'✅ ติ๊กเคลียร์ทั้งเดือน'}
+      </button>
+    </div>`;
+  }
+
+  // ----- รายการ -----
+  let list = expenses;
+  if(expenseMonthFilter!=='all') list = expenses.filter(e=>expenseMonthKey(e)===expenseMonthFilter);
+  const viewByPlatform = {}; let viewTotal = 0, viewReimb = 0;
+  list.forEach(e=>{ viewByPlatform[e.platform]=(viewByPlatform[e.platform]||0)+Number(e.amount||0); viewTotal+=Number(e.amount||0); if(e.reimbursed) viewReimb+=Number(e.amount||0); });
+  html += `<div class="chip-scroll" style="margin:4px 0 12px; flex-wrap:wrap;">
+      ${Object.keys(viewByPlatform).sort().map(p=>`<div class="stat-chip plain"><b>${fmtBaht(viewByPlatform[p])}</b> ${esc(p)}</div>`).join('')}
+      <div class="stat-chip" style="background:var(--blue);color:#fff;"><b>${fmtBaht(viewTotal)}</b> ${expenseMonthFilter==='all'?'รวมทั้งหมด':'รวมเดือนนี้'}</div>
+      ${viewTotal>viewReimb?`<div class="stat-chip" style="background:#fdf6e8;color:#b9791b;"><b>${fmtBaht(viewTotal-viewReimb)}</b> ค้างเบิก</div>`:''}
+    </div>`;
+
+  if(!list.length){
+    html += `<div class="empty-state">${expenses.length?'ไม่มีรายการในเดือนที่เลือก':'ยังไม่มีรายการค่าใช้จ่าย — กดปุ่ม "+ เพิ่มค่าใช้จ่าย"'}</div>`;
   } else {
-    const sorted = [...expenses].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+    const sorted = [...list].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
     html += `<div class="table-wrap"><table class="data-table">
-      <thead><tr>
-        <th>วันที่</th><th>แพลตฟอร์ม</th><th style="text-align:right;">จำนวนเงิน</th><th>หมายเหตุ</th><th></th>
-      </tr></thead>
+      <thead><tr><th>เบิกคืน</th><th>วันที่</th><th>แพลตฟอร์ม</th><th style="text-align:right;">จำนวนเงิน</th><th>หมายเหตุ</th><th></th></tr></thead>
       <tbody>
-        ${sorted.map(e=>`<tr>
+        ${sorted.map(e=>`<tr style="${e.reimbursed?'opacity:.65;':''}">
+          <td style="text-align:center;"><input type="checkbox" ${e.reimbursed?'checked':''} onchange="toggleReimbursed('${e.id}')" title="บริษัทเคลียร์คืนแล้ว" style="width:18px;height:18px;cursor:pointer;"></td>
           <td>${e.date?esc(e.date):'—'}</td>
           <td><b>${esc(e.platform)}</b></td>
           <td style="text-align:right;">${fmtBaht(e.amount)}</td>
@@ -2466,6 +2605,22 @@ function renderExpenses(){
 
   container.innerHTML = html;
 }
+function setExpenseMonth(m){ expenseMonthFilter = m; renderExpenses(); }
+// ติ๊กเบิกคืนรายรายการ
+async function toggleReimbursed(id){
+  const e = expenses.find(x=>x.id===id);
+  if(!e) return;
+  e.reimbursed = !e.reimbursed;
+  renderExpenses();
+  await persistExpenses(false);
+}
+// ติ๊กเบิกคืนทั้งเดือน (ก้อนเดียว)
+async function setMonthReimbursed(mk, val){
+  expenses.forEach(e=>{ if(expenseMonthKey(e)===mk) e.reimbursed = val; });
+  renderExpenses();
+  await persistExpenses();
+  showToast(val ? 'ติ๊กเคลียร์ทั้งเดือนแล้ว' : 'ยกเลิกเคลียร์ทั้งเดือนแล้ว');
+}
 
 let editingExpenseId = null;
 function openExpenseModal(id){
@@ -2474,7 +2629,7 @@ function openExpenseModal(id){
   document.getElementById('expenseModalTitle').textContent = e ? 'แก้ไขค่าใช้จ่าย' : 'เพิ่มค่าใช้จ่าย';
   document.getElementById('xPlatform').value = e ? (e.platform||'') : '';
   document.getElementById('xAmount').value = e ? (e.amount||'') : '';
-  document.getElementById('xDate').value = e ? (e.date||'') : '';
+  document.getElementById('xDate').value = e ? (e.date||'') : todayDateStr();
   document.getElementById('xNote').value = e ? (e.note||'') : '';
   openModal('modalExpense');
 }
@@ -2491,6 +2646,7 @@ async function saveExpense(){
   };
   if(editingExpenseId){
     const e = expenses.find(x=>x.id===editingExpenseId);
+    if(!e){ showToast('รายการนี้ถูกลบไปแล้ว'); closeModal('modalExpense'); return; }
     Object.assign(e, data);
   } else {
     expenses.push({ id: uid('e'), ...data });
@@ -2601,6 +2757,7 @@ async function saveSchedule(){
   };
   if(editingScheduleId){
     const entry = scheduleEntries.find(e=>e.id===editingScheduleId);
+    if(!entry){ showToast('รายการนี้ถูกลบไปแล้ว'); closeModal('modalSchedule'); return; }
     Object.assign(entry, data);
   } else {
     scheduleEntries.push({ id: uid('s'), ...data });
