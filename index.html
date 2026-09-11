@@ -582,7 +582,7 @@
     <div class="field">
       <label>เพิ่มตอนที่ค้าง</label>
       <div style="display:flex; gap:8px;">
-        <input id="epAddInput" type="text" placeholder="เช่น 12, 13, 14" style="flex:1;">
+        <input id="epAddInput" type="text" placeholder="เช่น 12, 13, 9.5, พิเศษ" style="flex:1;">
         <button class="btn btn-primary" id="epAddBtn" style="white-space:nowrap;">เพิ่ม</button>
       </div>
     </div>
@@ -949,6 +949,36 @@ function weeksOverdueCount(item){
 }
 const OVERDUE_COLORS = ['#e0403a','#c0392b','#922b21','#641e16'];
 // จำนวนตอนที่ค้างของเรื่องนี้
+// ตอนค้างเก็บได้ทั้งตัวเลข (12, 9.5) และข้อความ (พิเศษ, ตอนพิเศษ 2)
+// เลขเรียงก่อนจากน้อยไปมาก ข้อความต่อท้ายเรียงตามตัวอักษร
+function epKey(ep){ return typeof ep === 'number' ? 'n:' + ep : 's:' + String(ep).trim().toLowerCase(); }
+function epLabel(ep){ return typeof ep === 'number' ? 'ตอน ' + ep : String(ep); }
+function sortEpisodes(arr){
+  return (arr || []).slice().sort((a, b)=>{
+    const an = typeof a === 'number', bn = typeof b === 'number';
+    if(an && bn) return a - b;
+    if(an) return -1;
+    if(bn) return 1;
+    return String(a).localeCompare(String(b), 'th');
+  });
+}
+// แปลงข้อความที่พิมพ์เป็นรายการตอน: คั่นด้วย , หรือขึ้นบรรทัดใหม่
+// ก้อนที่เป็นเลขล้วนคั่นด้วยช่องว่าง ("12 13 14") แยกให้อีกชั้น ก้อนที่มีตัวอักษรเก็บทั้งก้อน ("ตอนพิเศษ 2")
+function parseEpisodeInput(raw){
+  const out = [];
+  String(raw || '').split(/[,\n]+/).forEach(chunk=>{
+    chunk = chunk.trim();
+    if(!chunk) return;
+    const parts = /^[\d.\s]+$/.test(chunk) ? chunk.split(/\s+/) : [chunk];
+    parts.forEach(t=>{
+      t = t.trim();
+      if(!t) return;
+      if(/^-?\d+(\.\d+)?$/.test(t)){ const n = parseFloat(t); if(n > 0) out.push(n); }   // เลข <= 0 ทิ้ง
+      else if(t.length <= 30) out.push(t);
+    });
+  });
+  return out;
+}
 function pendingEpCount(item){
   return (item.pendingEpisodes && item.pendingEpisodes.length) || 0;
 }
@@ -966,10 +996,10 @@ function pendingEpColor(n){
 }
 // ป้ายค้าง: โชว์จำนวน + เลขตอนที่ค้างจริง แทนการนับสัปดาห์
 function overdueBadgeHtml(item){
-  const eps = (item.pendingEpisodes || []).slice().sort((a,b)=>a-b);
+  const eps = sortEpisodes(item.pendingEpisodes);
   if(!eps.length) return '';
   const bg = pendingEpColor(eps.length);
-  const list = eps.join(', ');
+  const list = eps.map(e=>typeof e==='number' ? e : e).join(', ');
   return `<div class="ep-line">`
     + `<span class="overdue-badge" style="background:${bg}">ค้าง ${eps.length} ตอน</span>`
     + ` <span class="ep-list">ตอน ${esc(list)}</span></div>`;
@@ -2270,8 +2300,8 @@ function renderEpChips(){
     return;
   }
   if(clearWrap) clearWrap.style.display = '';
-  const eps = item.pendingEpisodes.slice().sort((a,b)=>a-b);
-  wrap.innerHTML = eps.map(ep=>`<span class="ep-chip">ตอน ${ep}<button onclick="removeEpisode(${ep})" title="ทำเสร็จแล้ว">✕</button></span>`).join('');
+  item.pendingEpisodes = sortEpisodes(item.pendingEpisodes);   // เก็บแบบเรียงแล้ว ให้ index ตรงกับที่โชว์
+  wrap.innerHTML = item.pendingEpisodes.map((ep, i)=>`<span class="ep-chip">${esc(epLabel(ep))}<button onclick="removeEpisodeAt(${i})" title="ทำเสร็จแล้ว">✕</button></span>`).join('');
 }
 function openEpisodeManager(id){
   epManagerId = id;
@@ -2282,10 +2312,13 @@ function openEpisodeManager(id){
   openModal('modalEpisodes');
   setTimeout(()=>document.getElementById('epAddInput').focus(), 50);
 }
-async function removeEpisode(ep){
+async function removeEpisodeAt(i){
   const item = recurring.find(r=>r.id===epManagerId);
   if(!item){ renderEpChips(); return; }
-  item.pendingEpisodes = (item.pendingEpisodes||[]).filter(x=>x!==ep);
+  const eps = sortEpisodes(item.pendingEpisodes);
+  if(i < 0 || i >= eps.length) return;
+  eps.splice(i, 1);
+  item.pendingEpisodes = eps;
   renderEpChips();
   renderRecurring(); renderStats();
   await persistRecurring(false);
@@ -2298,11 +2331,11 @@ async function addEpisodes(){
   const item = recurring.find(r=>r.id===epManagerId);
   if(!item){ renderEpChips(); return; }
   const raw = document.getElementById('epAddInput').value;
-  const nums = raw.split(/[\s,]+/).map(s=>parseInt(s,10)).filter(n=>!isNaN(n) && n>0);
-  if(!nums.length){ showToast('ใส่เลขตอนที่ต้องการเพิ่ม'); return; }
-  const set = new Set(item.pendingEpisodes || []);
-  nums.forEach(n=>set.add(n));
-  item.pendingEpisodes = [...set].sort((a,b)=>a-b);
+  const eps = parseEpisodeInput(raw);
+  if(!eps.length){ showToast('ใส่เลขตอน หรือชื่อตอน เช่น 12, 9.5, พิเศษ'); return; }
+  const have = new Map((item.pendingEpisodes || []).map(e=>[epKey(e), e]));
+  eps.forEach(e=>{ if(!have.has(epKey(e))) have.set(epKey(e), e); });
+  item.pendingEpisodes = sortEpisodes([...have.values()]);
   document.getElementById('epAddInput').value = '';
   renderEpChips();
   renderRecurring(); renderStats();
