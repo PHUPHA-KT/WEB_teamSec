@@ -911,9 +911,17 @@ const STATUS_META = {
 };
 const WEEKDAY_ONLY = DAY_ORDER.slice(0,7); // days that carry real overdue meaning
 
+// วันทำงานเปลี่ยนตอน 2 ทุ่ม ไม่ใช่เที่ยงคืน — ก่อน 20:00 ยังนับเป็น "เมื่อวาน"
+// ทุกอย่างที่เกี่ยวกับ "วันนี้คือวันอะไร" (ตัวกรอง, เลยกำหนด, รีเซ็ตรายสัปดาห์) ต้องใช้ตัวนี้ตัวเดียว
+const DAY_ROLLOVER_HOUR = 20;
+function effectiveNow(){
+  const d = new Date();
+  d.setHours(d.getHours() - DAY_ROLLOVER_HOUR);   // เลื่อนถอย 20 ชม. -> 19:59 กลายเป็น 23:59 ของเมื่อวาน
+  return d;
+}
 function todayWeekdayIndex(){
   // JS getDay(): 0=Sun..6=Sat -> convert to 0=Mon..6=Sun to match WEEKDAY_ONLY order
-  return (new Date().getDay() + 6) % 7;
+  return (effectiveNow().getDay() + 6) % 7;
 }
 function todayDateStr(){
   const d = new Date();
@@ -967,7 +975,7 @@ function overdueBadgeHtml(item){
     + ` <span class="ep-list">ตอน ${esc(list)}</span></div>`;
 }
 function currentWeekMondayStr(){
-  const now = new Date();
+  const now = effectiveNow();      // สัปดาห์ใหม่เริ่มจันทร์ 2 ทุ่ม ให้ตรงกับนิยาม "วันนี้"
   const idx = (now.getDay()+6)%7; // 0=Mon..6=Sun
   const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate()-idx);
   return monday.getFullYear()+'-'+String(monday.getMonth()+1).padStart(2,'0')+'-'+String(monday.getDate()).padStart(2,'0');
@@ -1633,8 +1641,9 @@ function stopPollTimer(){
 function exportData(auto){
   const payload = {
     app: 'ระบบจัดการงานคัดเรื่อง',
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
+    resetWeek: currentWeekMondayStr(),   // สถานะ ทำแล้ว/งด/เลื่อน เป็นของสัปดาห์นี้
     data: {
       recurring_stories: recurring,
       new_stories: newStories,
@@ -1684,6 +1693,16 @@ async function importData(event){
   try{ exportData(true); }catch(e){}
 
   recurring = d.recurring_stories;
+  // สถานะ ทำแล้ว/งด/เลื่อน ผูกกับสัปดาห์ — ไฟล์จากสัปดาห์อื่นถือว่าสถานะหมดอายุ รีเซ็ตเป็น "ยังไม่ทำ"
+  // ไฟล์รุ่นเก่าไม่มี resetWeek: คงสถานะไว้ตามเดิม แต่บอกผู้ใช้ให้ตรวจเอง
+  const fileWeek = parsed.resetWeek || null;
+  const thisWeek = currentWeekMondayStr();
+  let statusNote = '';
+  if(fileWeek && fileWeek !== thisWeek){
+    if(resetNonPendingToPending(recurring)) statusNote = ' · สถานะรีเซ็ตแล้ว (ไฟล์จากสัปดาห์ ' + fileWeek + ')';
+  }else if(!fileWeek){
+    statusNote = ' · ไฟล์รุ่นเก่า ไม่รู้สัปดาห์ — ตรวจสถานะ ทำแล้ว/งด/เลื่อน เองด้วย';
+  }
   newStories = Array.isArray(d.new_stories) ? d.new_stories : [];
   expenses = Array.isArray(d.expenses) ? d.expenses : [];
   scheduleEntries = Array.isArray(d.schedule_entries) ? d.schedule_entries : [];
@@ -1711,7 +1730,7 @@ async function importData(event){
 
   closeModal('modalBackup');
   render();
-  showToast('กู้คืนข้อมูลเรียบร้อยแล้ว');
+  showToast('กู้คืนข้อมูลเรียบร้อยแล้ว' + statusNote);
 }
 
 function switchTab(tab){
@@ -1931,12 +1950,8 @@ function renderRecurring(){
 function setDayFilter(d){ dayFilter=d; showOnlyPending=false; renderRecurring(); }
 // วันนี้เป็นภาษาไทย (จันทร์..อาทิตย์)
 // เวลาที่ถือว่า "เปลี่ยนวัน" (2 ทุ่ม) — ก่อนเวลานี้ยังแสดงงานของวันก่อนหน้า, ถึง 2 ทุ่มค่อยเปลี่ยนเป็นวันปัจจุบัน
-const DAY_ROLLOVER_HOUR = 20;
-function effectiveTodayIndex(){
-  let idx = todayWeekdayIndex();
-  if(new Date().getHours() < DAY_ROLLOVER_HOUR) idx = (idx + 6) % 7; // ก่อน 2 ทุ่ม = ยังเป็นวันก่อนหน้า
-  return idx;
-}
+// (คงชื่อไว้ให้โค้ดเดิมเรียกได้ — ตอนนี้ todayWeekdayIndex() คิด 2 ทุ่มให้แล้ว)
+function effectiveTodayIndex(){ return todayWeekdayIndex(); }
 // วันนี้เป็นภาษาไทย (จันทร์..อาทิตย์) — นับวันเปลี่ยนตอน 2 ทุ่ม
 function todayThaiDay(){ return WEEKDAY_ONLY[effectiveTodayIndex()]; }
 // ตั้งตัวกรองเป็น "วันนี้" อัตโนมัติตอนเปิดเว็บ (ปิด/เปิดได้ต่อเครื่อง)
