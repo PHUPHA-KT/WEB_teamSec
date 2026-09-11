@@ -619,6 +619,37 @@ function renderRecurring(){`, 'helpers');
 </style>`, 'search css');
 });
 
+// ================= 18) ประวัติแสดงชื่อคนที่ล็อกอิน =================
+step('ประวัติใช้ชื่อจากบัญชีที่ล็อกอิน', 'function currentUserName', () => {
+  rep(`function logActivity(text){
+  const entry = { id: uid('a'), who: myPerson || 'ไม่ระบุ', text, at: new Date().toISOString() };`,
+`// ชื่อสำหรับประวัติ: ชื่อในบัญชี Supabase (user_metadata.name) > ชื่อที่ตั้งเองผ่าน ⭐ > ส่วนหน้าอีเมล
+function currentUserName(){
+  const u = (window.storage && window.storage.currentUser) ? window.storage.currentUser() : null;
+  if(u && u.name) return u.name;
+  if(myPerson) return myPerson;
+  if(u && u.email) return u.email.split('@')[0];
+  return 'ไม่ระบุ';
+}
+function logActivity(text){
+  const entry = { id: uid('a'), who: currentUserName(), text, at: new Date().toISOString() };`, 'logActivity who');
+
+  // ยังไม่เคยตั้ง "ฉันคือใคร" แต่ชื่อในบัญชีตรงกับคนในทีม -> ตั้งให้เลย ⭐ งานของฉัน ใช้ได้ทันที
+  rep(`    const me = await window.storage.get('me', false);
+    myPerson = me && me.value ? me.value : '';
+  }catch(e){ myPerson = ''; }`,
+`    const me = await window.storage.get('me', false);
+    myPerson = me && me.value ? me.value : '';
+  }catch(e){ myPerson = ''; }
+  if(!myPerson){
+    const u = (window.storage && window.storage.currentUser) ? window.storage.currentUser() : null;
+    if(u && u.name && PEOPLE.includes(u.name)){
+      myPerson = u.name;
+      try{ await window.storage.set('me', myPerson, false); }catch(e){}
+    }
+  }`, 'auto myPerson from account');
+});
+
 // ================= ตรวจก่อนเขียน =================
 group = 'ตรวจท้าย';
 if (s.includes('drive.google.com/drive/folders/')) throw new Error('ยังมีลิงก์ Drive จริงในไฟล์ — SEED ไม่ถูกตัด?');

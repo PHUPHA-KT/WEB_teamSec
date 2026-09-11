@@ -697,6 +697,12 @@
   let sb = null;
 
   let uid = null;
+  let currentUser = null;   // {id, email, name} ของคนที่ล็อกอิน
+  function rememberUser(u){
+    if(!u){ currentUser = null; return; }
+    const md = u.user_metadata || {};
+    currentUser = { id: u.id, email: u.email || '', name: md.name || md.full_name || md.display_name || '' };
+  }
   let signalReady;
   const ready = new Promise(function(res){ signalReady = res; });
 
@@ -746,6 +752,7 @@
       return;
     }
     uid = res.data.user.id;
+    rememberUser(res.data.user);
     try{ sb.realtime.setAuth(res.data.session.access_token); }catch(e){}
     $('agPass').value = '';
     hideGate();
@@ -773,6 +780,7 @@
     try{ const r = await sb.auth.getSession(); session = r.data ? r.data.session : null; }catch(e){}
     if(session && session.user){
       uid = session.user.id;
+      rememberUser(session.user);
       try{ sb.realtime.setAuth(session.access_token); }catch(e){}
       hideGate(); signalReady();
     }
@@ -897,6 +905,9 @@
   };
 
   // ไว้เช็คตอนมีปัญหา: เปิด console แล้วพิมพ์ storage.realtimeInfo()
+  // ใครล็อกอินอยู่ — ชื่อมาจาก user_metadata.name ที่ตั้งใน Supabase (ไม่ตั้ง = ว่าง)
+  window.storage.currentUser = function(){ return currentUser ? Object.assign({}, currentUser) : null; };
+
   window.storage.realtimeInfo = function(){
     const st = window.__rtState;
     if(!st) return 'realtime ยังไม่ได้เริ่ม';
@@ -1240,6 +1251,13 @@ async function loadAll(){
     const me = await window.storage.get('me', false);
     myPerson = me && me.value ? me.value : '';
   }catch(e){ myPerson = ''; }
+  if(!myPerson){
+    const u = (window.storage && window.storage.currentUser) ? window.storage.currentUser() : null;
+    if(u && u.name && PEOPLE.includes(u.name)){
+      myPerson = u.name;
+      try{ await window.storage.set('me', myPerson, false); }catch(e){}
+    }
+  }
   try{
     const atf = await window.storage.get('auto_today', false);
     autoTodayFilter = atf ? (atf.value === '1') : true; // ค่าเริ่มต้น: เปิด
@@ -2081,8 +2099,16 @@ function flushActivity(){
   persistActivity();
 }
 // บันทึกกิจกรรม (ใครทำอะไร) — เก็บล่าสุด 150 รายการ, เขียนจริงหน่วงไว้ ~8 วิ
+// ชื่อสำหรับประวัติ: ชื่อในบัญชี Supabase (user_metadata.name) > ชื่อที่ตั้งเองผ่าน ⭐ > ส่วนหน้าอีเมล
+function currentUserName(){
+  const u = (window.storage && window.storage.currentUser) ? window.storage.currentUser() : null;
+  if(u && u.name) return u.name;
+  if(myPerson) return myPerson;
+  if(u && u.email) return u.email.split('@')[0];
+  return 'ไม่ระบุ';
+}
 function logActivity(text){
-  const entry = { id: uid('a'), who: myPerson || 'ไม่ระบุ', text, at: new Date().toISOString() };
+  const entry = { id: uid('a'), who: currentUserName(), text, at: new Date().toISOString() };
   activity.push(entry);
   if(activity.length > 150) activity = activity.slice(-150);
   activityDirty = true;

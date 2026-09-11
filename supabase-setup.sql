@@ -64,3 +64,16 @@ begin
   end if;
 end
 $$;
+
+-- ============================================================
+-- 7) ตั้งชื่อให้แต่ละบัญชี — ใช้แสดงในประวัติแก้ไข และตั้ง "ฉันคือใคร" ให้อัตโนมัติ
+--    แก้อีเมลให้ตรงกับที่สร้างไว้ใน Authentication -> Users แล้วรัน
+--    (ชื่อต้องเป็น เหนือ / บิ๊ก / ยูตะ / น๊อต เป๊ะ ถึงจะจับคู่กับคนในทีมได้)
+-- ============================================================
+update auth.users set raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) || '{"name":"เหนือ"}' where email = 'nuea@example.com';
+update auth.users set raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) || '{"name":"บิ๊ก"}'  where email = 'big@example.com';
+update auth.users set raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) || '{"name":"ยูตะ"}'  where email = 'yuta@example.com';
+update auth.users set raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) || '{"name":"น๊อต"}'  where email = 'not@example.com';
+
+-- เช็คว่าตั้งครบ:
+-- select email, raw_user_meta_data->>'name' as name from auth.users order by email;

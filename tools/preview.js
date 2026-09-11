@@ -30,7 +30,8 @@ function build() {
     async get(k, sh){ const v = M[(sh?'g:':'u:')+k]; return v===undefined ? null : {value:v}; },
     async set(k, v, sh){ M[(sh?'g:':'u:')+k] = String(v); return true; },
     subscribe(){ return { status:'preview', eventsSeen:0, lastEventAt:0, alive(){ return false; } }; },
-    realtimeInfo(){ return 'preview mode — ไม่มี realtime'; }
+    realtimeInfo(){ return 'preview mode — ไม่มี realtime'; },
+    currentUser(){ return { id:'preview', email:'preview@local', name: window.__previewName || 'เหนือ' }; }   // จำลองคนล็อกอิน
   };
 })();
 </script>`;
