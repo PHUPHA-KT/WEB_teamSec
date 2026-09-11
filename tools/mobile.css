@@ -1,0 +1,34 @@
+
+  /* ===== แท็บ: เลื่อนแนวนอน แทนการตัดคำเป็นหลายบรรทัด ===== */
+  .tabs{ overflow-x:auto; flex-wrap:nowrap; scrollbar-width:none; }
+  .tabs::-webkit-scrollbar{ display:none; }
+  .tab-btn{ white-space:nowrap; flex:0 0 auto; }
+
+  /* ปุ่มเปิด/ปิดตัวกรอง — โผล่เฉพาะจอแคบ */
+  .filter-toggle{ display:none; }
+
+  @media (max-width:720px){
+    /* ปุ่มชุดบนเคย position:absolute แล้วลอยทับหัวเรื่อง — ย้ายลงมาอยู่ในแถวของตัวเอง */
+    header{ display:flex; flex-direction:column; padding:16px 14px 14px; }
+    header h1{ font-size:18px; }
+    header p{ display:none; }
+    .header-btns{
+      position:static; order:3; max-width:none; margin:10px 0 0;
+      flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start; scrollbar-width:none;
+    }
+    .header-btns::-webkit-scrollbar{ display:none; }
+    .header-btns .help-btn{ flex:0 0 auto; padding:6px 11px; font-size:12px; }
+
+    /* สถิติ: เหลือเฉพาะตัวที่ต้องดูทุกวัน (ทำวันนี้แล้ว / ตอนค้าง) */
+    .stat-row{ order:4; gap:8px; margin-top:12px; }
+    .stat-chip.stat-min{ display:none; }
+
+    /* ตัวกรองกินพื้นที่ 5 แถว — ยุบไว้ใต้ปุ่ม */
+    .filter-toggle{ display:inline-flex; }
+    .filter-panel{ display:none; }
+    .filter-panel.open{ display:block; }
+
+    .tabs{ padding:8px 10px 0; }
+    .tab-btn{ padding:9px 12px; font-size:13.5px; }
+    main{ padding:12px 10px; }
+  }
