@@ -409,17 +409,17 @@ step('backup บันทึกสัปดาห์ / import รีเซ็ต
 `  recurring = d.recurring_stories;
   newStories = Array.isArray(d.new_stories) ? d.new_stories : [];`,
 `  recurring = d.recurring_stories;
-  // สถานะ ทำแล้ว/งด/เลื่อน ผูกกับสัปดาห์ — ไฟล์จากสัปดาห์อื่นถือว่าสถานะหมดอายุ รีเซ็ตเป็น "ยังไม่ทำ"
-  // ไฟล์รุ่นเก่าไม่มี resetWeek: คงสถานะไว้ตามเดิม แต่บอกผู้ใช้ให้ตรวจเอง
+  // สถานะ ทำแล้ว/ยังไม่ทำ/เลื่อน/งด กลับมาตามไฟล์เสมอ — ไม่รีเซ็ตให้ (ทีมตัดสินใจ)
+  // ถ้าไฟล์มาจากสัปดาห์อื่น แค่บอกไว้ ผู้ใช้กด "รีเซ็ตสถานะ" เองได้ถ้าต้องการ
   const fileWeek = parsed.resetWeek || null;
   const thisWeek = currentWeekMondayStr();
   let statusNote = '';
   if(fileWeek && fileWeek !== thisWeek){
-    if(resetNonPendingToPending(recurring)) statusNote = ' · สถานะรีเซ็ตแล้ว (ไฟล์จากสัปดาห์ ' + fileWeek + ')';
-  }else if(!fileWeek){
-    statusNote = ' · ไฟล์รุ่นเก่า ไม่รู้สัปดาห์ — ตรวจสถานะ ทำแล้ว/งด/เลื่อน เองด้วย';
+    statusNote = ' · สถานะตามไฟล์ (สัปดาห์ ' + fileWeek + ')';
   }
-  newStories = Array.isArray(d.new_stories) ? d.new_stories : [];`, 'importData reset');
+  // กันรีเซ็ตรายสัปดาห์เด้งทับสถานะที่เพิ่งกู้คืน ตอนเปิดหน้าครั้งถัดไป
+  try{ await window.storage.set('last_reset_week', thisWeek, true); }catch(e){}
+  newStories = Array.isArray(d.new_stories) ? d.new_stories : [];`, 'importData keep statuses');
   rep(
 `  closeModal('modalBackup');
   render();
