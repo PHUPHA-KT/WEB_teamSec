@@ -507,6 +507,28 @@ function pendingEpCount(item){`, 'helpers');
   if (s.includes('removeEpisode(')) throw new Error('ยังมี removeEpisode( แบบเก่า');
 });
 
+// ================= 15) กำหนดการเปิดเรื่อง =================
+step('กำหนดการ: เรียง/ซ่อนเก่า/การ์ดมือถือ/ปุ่มเปิดแล้ว/สร้างเรื่องใหม่', 'function markScheduleOpened', () => {
+  const a = s.indexOf('function renderSchedule(){');
+  if (a < 0) throw new Error('ไม่เจอ renderSchedule');
+  const b = s.indexOf('\n}\n', a);
+  if (b < 0) throw new Error('ไม่เจอจุดจบ renderSchedule');
+  const js = fs.readFileSync(path.join(__dirname, 'schedule.js'), 'utf8').replace(/\n$/, '');
+  s = s.slice(0, a) + js + s.slice(b + 2);
+  rep('</style>',
+`  /* กำหนดการเปิดเรื่อง */
+  .sched-section-head{ display:flex; justify-content:space-between; align-items:center; font-weight:800; font-size:14px; margin:14px 0 8px; }
+  .sched-section-head small{ font-weight:600; color:var(--ink-soft); }
+  .sched-act{ font-size:12px; padding:5px 9px; margin-right:4px; }
+  .sched-act-ok{ color:var(--green); border-color:var(--green); }
+  .sched-cards{ display:none; }
+  .sched-meta{ font-size:12.5px; color:var(--ink-soft); margin-top:3px; }
+  .sched-note{ font-size:12.5px; color:var(--ink-soft); margin-bottom:8px; }
+  .sched-actions{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  @media(max-width:720px){ .sched-table{ display:none; } .sched-cards{ display:block; } }
+</style>`, 'schedule css');
+});
+
 // ================= ตรวจก่อนเขียน =================
 group = 'ตรวจท้าย';
 if (s.includes('drive.google.com/drive/folders/')) throw new Error('ยังมีลิงก์ Drive จริงในไฟล์ — SEED ไม่ถูกตัด?');
