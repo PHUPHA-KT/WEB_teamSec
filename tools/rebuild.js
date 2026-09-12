@@ -650,6 +650,17 @@ function logActivity(text){
   }`, 'auto myPerson from account');
 });
 
+// ================= 19) favicon =================
+step('favicon (SVG ฝังในไฟล์)', 'rel="icon"', () => {
+  const svg = fs.readFileSync(path.join(__dirname, 'favicon.svg'), 'utf8')
+    .replace(/\s*\n\s*/g, ' ').trim();           // บีบเป็นบรรทัดเดียว
+  const dataUri = 'data:image/svg+xml,' + encodeURIComponent(svg).replace(/%20/g, ' ');
+  rep('<title>ระบบจัดการงานคัดเรื่อง</title>',
+`<title>ระบบจัดการงานคัดเรื่อง</title>
+<link rel="icon" href="${dataUri}">
+<meta name="theme-color" content="#1c6fd1">`, 'favicon link');
+});
+
 // ================= ตรวจก่อนเขียน =================
 group = 'ตรวจท้าย';
 if (s.includes('drive.google.com/drive/folders/')) throw new Error('ยังมีลิงก์ Drive จริงในไฟล์ — SEED ไม่ถูกตัด?');
