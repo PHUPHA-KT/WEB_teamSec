@@ -1,0 +1,45 @@
+# วางไฟล์นี้ที่ .github/workflows/backup.yml ใน repo private สำหรับ backup
+# รันทุกวัน 03:00 เวลาไทย (20:00 UTC) + กดรันเองได้จากแท็บ Actions
+name: backup
+
+on:
+  schedule:
+    - cron: '0 20 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Pull data from Supabase
+        id: pull
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+          BACKUP_EMAIL: ${{ secrets.BACKUP_EMAIL }}
+          BACKUP_PASSWORD: ${{ secrets.BACKUP_PASSWORD }}
+        run: node backup.mjs
+
+      - name: Commit
+        run: |
+          git config user.name  "backup-bot"
+          git config user.email "backup-bot@users.noreply.github.com"
+          git add backups
+          git commit -m "backup $(date -u +%Y-%m-%d) [${{ steps.pull.outputs.changed == 'true' && 'changed' || 'unchanged' }}] ${{ steps.pull.outputs.summary }}"
+          git push
+
+      - name: Summary
+        run: echo "${{ steps.pull.outputs.changed == 'true' && '✅ เปลี่ยนแปลง — commit แล้ว' || '⏸ ไม่มีอะไรเปลี่ยน' }} ${{ steps.pull.outputs.summary }}" >> "$GITHUB_STEP_SUMMARY"
