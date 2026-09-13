@@ -1949,10 +1949,10 @@ function renderRecurring(){
       <button class="btn btn-primary" onclick="openRecurringModal()">+ เพิ่มเรื่อง</button>
       <button class="btn btn-ghost" onclick="resetDailyDone()">รีเซ็ตสถานะที่ทำ/งด/เลื่อนแล้ว</button>
     </div>
+    ${dayLinksBarHtml()}
     ${filterToggleHtml()}
     <div class="filter-panel${filtersOpen?' open':''}">
     ${workloadPanelHtml()}
-    ${dayLinksBarHtml()}
     <div class="chip-scroll" style="margin-bottom:6px;">
       <div class="filter-chip ${personFilter===myPerson && myPerson?'active':''}" style="${myPerson?'':'opacity:.5'}"
            onclick="${myPerson?`setPersonFilter('${esc(myPerson)}')`:'promptSetMe()'}">⭐ งานของฉัน${myPerson?' ('+esc(myPerson)+')':''}</div>
@@ -2139,6 +2139,10 @@ function dayLinksOf(day){
 }
 let dayLinksExpanded = false;
 function toggleDayLinks(){ dayLinksExpanded=!dayLinksExpanded; renderRecurring(); }
+// ลิงก์ที่ไม่ได้ตั้งชื่อ: โชว์โดเมนแทนข้อความกลางๆ จะได้แยกออกว่าอันไหน (drive.google.com / mega.nz)
+function linkHostLabel(url){
+  try{ return new URL(String(url)).hostname.replace(/^www\./, ''); }catch(e){ return 'เปิดโฟลเดอร์โหลด'; }
+}
 function dayLinksBarHtml(){
   const days = ['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์'];
   const daysWithLinks = days.filter(d=>dayLinksOf(d).length).length;
@@ -2152,7 +2156,7 @@ function dayLinksBarHtml(){
     const links = dayLinksOf(d);
     const linkItems = links.map(l=>`
       <div class="daylink-item">
-        <a class="btn btn-ghost" style="font-size:12px;padding:6px 10px;flex:1;justify-content:flex-start;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" href="${safeUrl(l.url)}" target="_blank">📥 ${esc(l.label || 'เปิดโฟลเดอร์โหลด')}</a>
+        <a class="btn btn-ghost" style="font-size:12px;padding:6px 10px;flex:1;justify-content:flex-start;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" href="${safeUrl(l.url)}" target="_blank">📥 ${esc(l.label || linkHostLabel(l.url))}</a>
         <button class="icon-btn" onclick="editDayLink('${l.id}')" title="แก้ลิงก์" style="color:#6b7480;">✎</button>
         <button class="icon-btn" onclick="removeDayLink('${l.id}')" title="ลบลิงก์นี้">✕</button>
       </div>`).join('');

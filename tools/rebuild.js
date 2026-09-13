@@ -337,7 +337,10 @@ step('filter panel ยุบได้บนมือถือ', 'function filter
   const b = s.indexOf('\n  `;', a);
   if (a < 0 || b < 0) throw new Error('ไม่เจอบล็อกตัวกรองใน renderRecurring');
   const inner = s.slice(a, b);
-  s = s.slice(0, a) + '    ${filterToggleHtml()}\n    <div class="filter-panel${filtersOpen?\' open\':\'\'}">\n' + inner + '\n    </div>' + s.slice(b);
+  // ลิงก์รายวันไม่ใช่ตัวกรอง — เอาออกมาอยู่นอกแผงยุบ ไม่งั้นบนมือถือต้องกด "ตัวกรอง" ก่อนถึงเห็น
+  const innerNoLinks = inner.replace('    ${dayLinksBarHtml()}\n', '');
+  if (innerNoLinks === inner) throw new Error('ไม่เจอ dayLinksBarHtml ในบล็อกตัวกรอง');
+  s = s.slice(0, a) + '    ${dayLinksBarHtml()}\n    ${filterToggleHtml()}\n    <div class="filter-panel${filtersOpen?\' open\':\'\'}">\n' + innerNoLinks + '\n    </div>' + s.slice(b);
   rep('function renderRecurring(){',
 `// ตัวกรองบนมือถือ: ยุบไว้ใต้ปุ่ม (เดสก์ท็อปโชว์ตลอด — CSS จัดการเอง)
 let filtersOpen = false;
@@ -684,6 +687,17 @@ step('ปฏิทินลากย้ายวัน/คนได้', 'functi
   .cal-drop-ok{ background:var(--blue-bg) !important; box-shadow:inset 0 0 0 2px var(--blue); }
   body.dark .cal-chip{ background:#20262f; }
 </style>`, 'calendar css');
+});
+
+// ================= 21) ลิงก์รายวันไม่มีชื่อ -> โชว์โดเมน =================
+step('ลิงก์รายวันไม่มีชื่อโชว์โดเมน', 'function linkHostLabel', () => {
+  rep(`function dayLinksBarHtml(){`,
+`// ลิงก์ที่ไม่ได้ตั้งชื่อ: โชว์โดเมนแทนข้อความกลางๆ จะได้แยกออกว่าอันไหน (drive.google.com / mega.nz)
+function linkHostLabel(url){
+  try{ return new URL(String(url)).hostname.replace(/^www\\./, ''); }catch(e){ return 'เปิดโฟลเดอร์โหลด'; }
+}
+function dayLinksBarHtml(){`, 'helper');
+  rep("📥 ${esc(l.label || 'เปิดโฟลเดอร์โหลด')}</a>", "📥 ${esc(l.label || linkHostLabel(l.url))}</a>", 'label');
 });
 
 // ================= ตรวจก่อนเขียน =================
