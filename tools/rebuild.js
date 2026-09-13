@@ -661,6 +661,31 @@ step('favicon (SVG ฝังในไฟล์)', 'rel="icon"', () => {
 <meta name="theme-color" content="#1c6fd1">`, 'favicon link');
 });
 
+// ================= 20) ปฏิทิน: ลากย้ายเรื่อง =================
+step('ปฏิทินลากย้ายวัน/คนได้', 'function bindCalendarDrag', () => {
+  const a = s.indexOf('function renderCalendar(){');
+  if (a < 0) throw new Error('ไม่เจอ renderCalendar');
+  const b = s.indexOf('\n}\n', a);
+  if (b < 0) throw new Error('ไม่เจอจุดจบ renderCalendar');
+  const js = fs.readFileSync(path.join(__dirname, 'calendar.js'), 'utf8').replace(/\n$/, '');
+  s = s.slice(0, a) + js + s.slice(b + 2);
+  rep('</style>',
+`  /* ปฏิทิน: chip ลากได้ */
+  .cal-chip{
+    display:inline-block; margin:2px 4px 2px 0; padding:2px 8px; border-radius:7px;
+    background:var(--gray-bg); border:1px solid var(--line); font-size:12.5px; line-height:1.5;
+    cursor:grab; user-select:none; -webkit-user-select:none; touch-action:pan-y;
+  }
+  .cal-chip:hover{ border-color:var(--blue); }
+  .cal-chip-eps{ color:#c0392b; font-weight:700; }
+  .cal-chip-dragging{ opacity:.35; }
+  .cal-ghost{ position:fixed; z-index:99999; pointer-events:none; box-shadow:0 8px 24px rgba(0,0,0,.25); background:var(--card); cursor:grabbing; transform:rotate(-2deg); }
+  .cal-items{ min-height:30px; transition:background .12s; }
+  .cal-drop-ok{ background:var(--blue-bg) !important; box-shadow:inset 0 0 0 2px var(--blue); }
+  body.dark .cal-chip{ background:#20262f; }
+</style>`, 'calendar css');
+});
+
 // ================= ตรวจก่อนเขียน =================
 group = 'ตรวจท้าย';
 if (s.includes('drive.google.com/drive/folders/')) throw new Error('ยังมีลิงก์ Drive จริงในไฟล์ — SEED ไม่ถูกตัด?');
