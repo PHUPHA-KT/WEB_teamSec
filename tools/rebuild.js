@@ -790,6 +790,50 @@ step('undrop พาไปดูเรื่องที่กลับมา', '
   showToast(\`"\${item.name||item.code}" กลับมางานปกติแล้ว — อยู่ที่ \${item.person||'ไม่ระบุคน'} · \${item.day||'ไม่ระบุวัน'}\`);`, 'undropStory');
 });
 
+// ================= 25) ย้ายคนแล้วตอนค้างยังเป็นของคนเดิม =================
+step('ตอนค้างตามคนเดิมเมื่อย้ายเรื่อง (pendingOwner)', 'function pendingOwnerOf', () => {
+  const js = fs.readFileSync(path.join(__dirname, 'handover.js'), 'utf8').replace(/\n$/, '');
+  rep(`function pendingEpCount(item){`, js + `\n\nfunction pendingEpCount(item){`, 'helpers');
+
+  // แก้ใน modal: เปลี่ยนคน -> ถาม
+  rep(`    if(!item){ showToast('เรื่องนี้ถูกลบไปแล้ว'); closeModal('modalRecurring'); return; }
+    Object.assign(item, data); // เก็บ status, ตอนค้าง, ฯลฯ ไว้เหมือนเดิม`,
+`    if(!item){ showToast('เรื่องนี้ถูกลบไปแล้ว'); closeModal('modalRecurring'); return; }
+    if(data.person !== item.person && !(await resolveBacklogOnReassign(item, data.person))) return;   // ปิดกล่อง = ไม่บันทึก
+    Object.assign(item, data); // เก็บ status, ตอนค้าง, ฯลฯ ไว้เหมือนเดิม`, 'saveNewRecurring');
+
+  // ตัวกรองคน: เห็นเรื่องที่ตอนค้างเป็นของเราด้วย แม้เรื่องย้ายไปคนอื่นแล้ว
+  rep(`  if(personFilter!=='ทั้งหมด' && item.person!==personFilter) return false;`,
+      `  if(personFilter!=='ทั้งหมด' && item.person!==personFilter && pendingOwnerOf(item)!==personFilter) return false;`, 'matchesFilters');
+
+  // การ์ดยอดค้าง: นับตอนค้างให้คนที่ต้องเคลียร์ ไม่ใช่เจ้าของเรื่อง
+  rep(`    stat[r.person].stories++;
+    stat[r.person].eps += pendingEpCount(r);`,
+`    stat[r.person].stories++;
+    const owner = pendingOwnerOf(r);
+    if(PEOPLE.includes(owner)) stat[owner].eps += pendingEpCount(r);`, 'workloadPanelHtml');
+
+  // ป้ายค้างในรายการ: บอกว่าของใคร
+  rep(`    + \`<span class="overdue-badge" style="background:\${bg}">ค้าง \${eps.length} ตอน</span>\``,
+      `    + \`<span class="overdue-badge" style="background:\${bg}">ค้าง \${eps.length} ตอน\${hasForeignBacklog(item) ? ' · ของ ' + esc(item.pendingOwner) : ''}</span>\``, 'overdueBadgeHtml');
+
+  // เคลียร์ครบ -> เลิกจำเจ้าของหนี้
+  rep(`  eps.splice(i, 1);
+  item.pendingEpisodes = eps;`,
+`  eps.splice(i, 1);
+  item.pendingEpisodes = eps;
+  clearPendingOwnerIfDone(item);`, 'removeEpisodeAt');
+  rep(`  item.pendingEpisodes = [];
+  renderEpChips();`,
+`  item.pendingEpisodes = [];
+  clearPendingOwnerIfDone(item);
+  renderEpChips();`, 'clearAllEpisodes');
+
+  // หัวหน้าต่างจัดการตอน
+  rep(`  document.getElementById('epModalTitle').textContent = 'ตอนที่ค้าง — ' + (item.name || item.code || '');`,
+      `  document.getElementById('epModalTitle').textContent = 'ตอนที่ค้าง — ' + (item.name || item.code || '') + (hasForeignBacklog(item) ? ' · ของ ' + item.pendingOwner : '');`, 'epModalTitle');
+});
+
 // ================= ตรวจก่อนเขียน =================
 group = 'ตรวจท้าย';
 if (s.includes('drive.google.com/drive/folders/')) throw new Error('ยังมีลิงก์ Drive จริงในไฟล์ — SEED ไม่ถูกตัด?');

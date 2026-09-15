@@ -1031,6 +1031,73 @@ function parseEpisodeInput(raw){
   });
   return out;
 }
+// ===== ย้ายคนทั้งที่ยังมีตอนค้าง: หนี้เก่ายังเป็นของคนเดิม (pendingOwner) จนเคลียร์ =====
+// - item.pendingOwner = ชื่อคนที่ต้องเคลียร์ตอนค้าง (ไม่มี field = คนปัจจุบัน)
+// - ถามตอนย้าย (ลากในปฏิทิน / แก้ใน modal) ว่าตอนค้างให้ใครทำ
+// - ป้ายค้าง / การ์ดยอดค้าง / ⭐ งานของฉัน ดูที่ pendingOwner
+// - เคลียร์ครบ -> ลบ field เรื่องเป็นของคนใหม่เต็มตัว
+
+// ใครต้องเคลียร์ตอนค้างของเรื่องนี้
+function pendingOwnerOf(item){
+  return (item.pendingOwner && pendingEpCount(item) > 0) ? item.pendingOwner : item.person;
+}
+// ตอนค้างเป็นของคนอื่นที่ไม่ใช่เจ้าของเรื่องปัจจุบันไหม
+function hasForeignBacklog(item){
+  return !!item.pendingOwner && pendingEpCount(item) > 0 && item.pendingOwner !== item.person;
+}
+function clearPendingOwnerIfDone(item){
+  if(item.pendingOwner && pendingEpCount(item) === 0) delete item.pendingOwner;
+}
+
+// กล่องเลือก 2 ทาง — ใช้ modal ยืนยันเดิม แต่เปลี่ยนข้อความปุ่ม
+// คืน 'ok' / 'alt' / null (ปิด/ยกเลิก)
+function uiChoice(message, title, okLabel, altLabel){
+  return new Promise(resolve=>{
+    const back = document.getElementById('modalConfirm');
+    const okBtn = document.getElementById('confirmOk');
+    const altBtn = document.getElementById('confirmCancel');
+    const okText = okBtn.textContent, altText = altBtn.textContent;
+    document.getElementById('confirmTitle').textContent = title || 'เลือก';
+    document.getElementById('confirmMsg').textContent = message || '';
+    okBtn.textContent = okLabel; altBtn.textContent = altLabel;
+    function cleanup(result){
+      back.classList.remove('show');
+      okBtn.textContent = okText; altBtn.textContent = altText;
+      okBtn.removeEventListener('click', onOk); altBtn.removeEventListener('click', onAlt);
+      back.removeEventListener('click', onBack);
+      resolve(result);
+    }
+    function onOk(){ cleanup('ok'); }
+    function onAlt(){ cleanup('alt'); }
+    function onBack(e){ if(e.target === back) cleanup(null); }
+    okBtn.addEventListener('click', onOk); altBtn.addEventListener('click', onAlt);
+    back.addEventListener('click', onBack);
+    back.classList.add('show');
+  });
+}
+
+// เรียกก่อนเปลี่ยน item.person — ถ้ามีตอนค้างจะถามว่าใครเคลียร์
+// คืน true = ไปต่อได้ (ตั้ง pendingOwner ให้แล้ว), false = ผู้ใช้ปิดกล่อง ยกเลิกการย้าย
+async function resolveBacklogOnReassign(item, newPerson){
+  const eps = pendingEpCount(item);
+  const oldOwner = pendingOwnerOf(item);
+  if(!eps || !oldOwner || oldOwner === newPerson){
+    if(oldOwner === newPerson) delete item.pendingOwner;
+    return true;
+  }
+  const list = sortEpisodes(item.pendingEpisodes).map(epLabel).join(', ');
+  const choice = await uiChoice(
+    `"${item.name||item.code}" ยังค้าง ${eps} ตอน (${list})\nย้ายเรื่องไปให้ ${newPerson} แล้ว ตอนค้างพวกนี้ให้ใครเคลียร์?`,
+    'ตอนค้างให้ใครทำ',
+    `${oldOwner} ทำต่อ (คนเดิม)`,
+    `${newPerson} รับไปด้วย`
+  );
+  if(choice === null) return false;
+  if(choice === 'ok') item.pendingOwner = oldOwner;
+  else delete item.pendingOwner;
+  return true;
+}
+
 function pendingEpCount(item){
   return (item.pendingEpisodes && item.pendingEpisodes.length) || 0;
 }
@@ -1053,7 +1120,7 @@ function overdueBadgeHtml(item){
   const bg = pendingEpColor(eps.length);
   const list = eps.map(e=>typeof e==='number' ? e : e).join(', ');
   return `<div class="ep-line">`
-    + `<span class="overdue-badge" style="background:${bg}">ค้าง ${eps.length} ตอน</span>`
+    + `<span class="overdue-badge" style="background:${bg}">ค้าง ${eps.length} ตอน${hasForeignBacklog(item) ? ' · ของ ' + esc(item.pendingOwner) : ''}</span>`
     + ` <span class="ep-list">ตอน ${esc(list)}</span></div>`;
 }
 function currentWeekMondayStr(){
@@ -1907,7 +1974,7 @@ function matchesFilters(item){
   if(showDropped && !effDropped) return false;
   if(showOnlyPending && pendingEpCount(item)===0) return false; // โหมดดูเฉพาะงานค้าง
   if(dayFilter!=='ทั้งหมด' && item.day!==dayFilter) return false;
-  if(personFilter!=='ทั้งหมด' && item.person!==personFilter) return false;
+  if(personFilter!=='ทั้งหมด' && item.person!==personFilter && pendingOwnerOf(item)!==personFilter) return false;
   if(searchText){
     const s = searchText.toLowerCase();
     if(!(item.code||'').toLowerCase().includes(s) && !(item.name||'').toLowerCase().includes(s)) return false;
@@ -2092,7 +2159,8 @@ function workloadPanelHtml(){
     if(r.dropped) return;
     if(!PEOPLE.includes(r.person)) return;
     stat[r.person].stories++;
-    stat[r.person].eps += pendingEpCount(r);
+    const owner = pendingOwnerOf(r);
+    if(PEOPLE.includes(owner)) stat[owner].eps += pendingEpCount(r);
   });
   const cards = PEOPLE.map(p=>{
     const s = stat[p];
@@ -2401,7 +2469,7 @@ function renderEpChips(){
 function openEpisodeManager(id){
   epManagerId = id;
   const item = recurring.find(r=>r.id===id);
-  document.getElementById('epModalTitle').textContent = 'ตอนที่ค้าง — ' + (item.name || item.code || '');
+  document.getElementById('epModalTitle').textContent = 'ตอนที่ค้าง — ' + (item.name || item.code || '') + (hasForeignBacklog(item) ? ' · ของ ' + item.pendingOwner : '');
   document.getElementById('epAddInput').value = '';
   renderEpChips();
   openModal('modalEpisodes');
@@ -2414,6 +2482,7 @@ async function removeEpisodeAt(i){
   if(i < 0 || i >= eps.length) return;
   eps.splice(i, 1);
   item.pendingEpisodes = eps;
+  clearPendingOwnerIfDone(item);
   renderEpChips();
   renderRecurring(); renderStats();
   await persistRecurring(false);
@@ -2441,6 +2510,7 @@ async function clearAllEpisodes(){
   if(!item || !(item.pendingEpisodes||[]).length) return;
   if(!await uiConfirm('ทำครบทุกตอนแล้ว เอาตอนที่ค้างออกทั้งหมด?', 'เคลียร์ทุกตอน')) return;
   item.pendingEpisodes = [];
+  clearPendingOwnerIfDone(item);
   renderEpChips();
   renderRecurring(); renderStats();
   await persistRecurring();
@@ -2510,6 +2580,7 @@ async function saveNewRecurring(){
   if(editingRecurringId){
     const item = recurring.find(r=>r.id===editingRecurringId);
     if(!item){ showToast('เรื่องนี้ถูกลบไปแล้ว'); closeModal('modalRecurring'); return; }
+    if(data.person !== item.person && !(await resolveBacklogOnReassign(item, data.person))) return;   // ปิดกล่อง = ไม่บันทึก
     Object.assign(item, data); // เก็บ status, ตอนค้าง, ฯลฯ ไว้เหมือนเดิม
   } else {
     recurring.push({ id: uid('r'), ...data, chapter:'', status:'pending', pendingSinceDate:null, pendingEpisodes:[] });
@@ -3179,7 +3250,8 @@ function renderCalendar(){
           const items = mine.filter(r=>r.day===d);
           const chips = items.map(r=>{
             const eps = pendingEpCount(r);
-            const badge = eps ? ` <span class="cal-chip-eps">(ค้าง ${eps})</span>` : '';
+            const owner = hasForeignBacklog(r) ? ' · ' + esc(r.pendingOwner) : '';
+            const badge = eps ? ` <span class="cal-chip-eps">(ค้าง ${eps}${owner})</span>` : '';
             return `<span class="cal-chip" data-id="${r.id}" title="ลากเพื่อย้ายวัน/ย้ายคน">${esc((r.code?r.code+'-':'') + (r.name||''))}${badge}</span>`;
           }).join('');
           return `<tr>
@@ -3206,10 +3278,13 @@ async function moveCalendarItem(id, person, day){
   if(!item) return;
   if(item.person === person && item.day === day) return;
   const from = `${item.person||'ไม่ระบุ'} / ${item.day||'ไม่ระบุวัน'}`;
+  // ย้ายคนทั้งที่มีตอนค้าง -> ถามว่าหนี้เก่าให้ใครเคลียร์ (ปิดกล่อง = ยกเลิกการย้าย)
+  if(person !== item.person && !(await resolveBacklogOnReassign(item, person))){ renderCalendar(); return; }
   item.person = person;
   item.day = day;
   const name = item.name || item.code;
-  logActivity(`ย้าย "${name}" ${from} → ${person} / ${day}`);
+  const note = hasForeignBacklog(item) ? ` (ตอนค้าง ${pendingEpCount(item)} ตอน ${item.pendingOwner} เคลียร์ต่อ)` : '';
+  logActivity(`ย้าย "${name}" ${from} → ${person} / ${day}${note}`);
   renderCalendar(); renderStats();
   showToast(`ย้าย "${name}" → ${person} · ${CAL_DAY_LABEL[day] || day}`);
   await persistRecurring(false);

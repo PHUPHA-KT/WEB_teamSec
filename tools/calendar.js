@@ -20,7 +20,8 @@ function renderCalendar(){
           const items = mine.filter(r=>r.day===d);
           const chips = items.map(r=>{
             const eps = pendingEpCount(r);
-            const badge = eps ? ` <span class="cal-chip-eps">(ค้าง ${eps})</span>` : '';
+            const owner = hasForeignBacklog(r) ? ' · ' + esc(r.pendingOwner) : '';
+            const badge = eps ? ` <span class="cal-chip-eps">(ค้าง ${eps}${owner})</span>` : '';
             return `<span class="cal-chip" data-id="${r.id}" title="ลากเพื่อย้ายวัน/ย้ายคน">${esc((r.code?r.code+'-':'') + (r.name||''))}${badge}</span>`;
           }).join('');
           return `<tr>
@@ -47,10 +48,13 @@ async function moveCalendarItem(id, person, day){
   if(!item) return;
   if(item.person === person && item.day === day) return;
   const from = `${item.person||'ไม่ระบุ'} / ${item.day||'ไม่ระบุวัน'}`;
+  // ย้ายคนทั้งที่มีตอนค้าง -> ถามว่าหนี้เก่าให้ใครเคลียร์ (ปิดกล่อง = ยกเลิกการย้าย)
+  if(person !== item.person && !(await resolveBacklogOnReassign(item, person))){ renderCalendar(); return; }
   item.person = person;
   item.day = day;
   const name = item.name || item.code;
-  logActivity(`ย้าย "${name}" ${from} → ${person} / ${day}`);
+  const note = hasForeignBacklog(item) ? ` (ตอนค้าง ${pendingEpCount(item)} ตอน ${item.pendingOwner} เคลียร์ต่อ)` : '';
+  logActivity(`ย้าย "${name}" ${from} → ${person} / ${day}${note}`);
   renderCalendar(); renderStats();
   showToast(`ย้าย "${name}" → ${person} · ${CAL_DAY_LABEL[day] || day}`);
   await persistRecurring(false);
