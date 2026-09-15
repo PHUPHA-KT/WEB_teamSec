@@ -791,7 +791,7 @@ step('undrop พาไปดูเรื่องที่กลับมา', '
 });
 
 // ================= 25) ย้ายคนแล้วตอนค้างยังเป็นของคนเดิม =================
-step('ตอนค้างตามคนเดิมเมื่อย้ายเรื่อง (pendingOwner)', 'function pendingOwnerOf', () => {
+step('ตอนค้างตามคนเดิมเมื่อย้ายเรื่อง (pendingOwners ต่อตอน)', 'function epOwner(', () => {
   const js = fs.readFileSync(path.join(__dirname, 'handover.js'), 'utf8').replace(/\n$/, '');
   rep(`function pendingEpCount(item){`, js + `\n\nfunction pendingEpCount(item){`, 'helpers');
 
@@ -804,18 +804,18 @@ step('ตอนค้างตามคนเดิมเมื่อย้า�
 
   // ตัวกรองคน: เห็นเรื่องที่ตอนค้างเป็นของเราด้วย แม้เรื่องย้ายไปคนอื่นแล้ว
   rep(`  if(personFilter!=='ทั้งหมด' && item.person!==personFilter) return false;`,
-      `  if(personFilter!=='ทั้งหมด' && item.person!==personFilter && pendingOwnerOf(item)!==personFilter) return false;`, 'matchesFilters');
+      `  if(personFilter!=='ทั้งหมด' && !isPersonInvolved(item, personFilter)) return false;`, 'matchesFilters');
 
   // การ์ดยอดค้าง: นับตอนค้างให้คนที่ต้องเคลียร์ ไม่ใช่เจ้าของเรื่อง
   rep(`    stat[r.person].stories++;
     stat[r.person].eps += pendingEpCount(r);`,
 `    stat[r.person].stories++;
-    const owner = pendingOwnerOf(r);
-    if(PEOPLE.includes(owner)) stat[owner].eps += pendingEpCount(r);`, 'workloadPanelHtml');
+    const by = pendingEpsByPerson(r);
+    for(const p of Object.keys(by)) if(PEOPLE.includes(p)) stat[p].eps += by[p];`, 'workloadPanelHtml');
 
   // ป้ายค้างในรายการ: บอกว่าของใคร
   rep(`    + \`<span class="overdue-badge" style="background:\${bg}">ค้าง \${eps.length} ตอน</span>\``,
-      `    + \`<span class="overdue-badge" style="background:\${bg}">ค้าง \${eps.length} ตอน\${hasForeignBacklog(item) ? ' · ของ ' + esc(item.pendingOwner) : ''}</span>\``, 'overdueBadgeHtml');
+      `    + \`<span class="overdue-badge" style="background:\${bg}">ค้าง \${eps.length} ตอน\${hasForeignBacklog(item) ? ' · ' + esc(foreignBacklogLabel(item)) : ''}</span>\``, 'overdueBadgeHtml');
 
   // เคลียร์ครบ -> เลิกจำเจ้าของหนี้
   rep(`  eps.splice(i, 1);
@@ -831,7 +831,7 @@ step('ตอนค้างตามคนเดิมเมื่อย้า�
 
   // หัวหน้าต่างจัดการตอน
   rep(`  document.getElementById('epModalTitle').textContent = 'ตอนที่ค้าง — ' + (item.name || item.code || '');`,
-      `  document.getElementById('epModalTitle').textContent = 'ตอนที่ค้าง — ' + (item.name || item.code || '') + (hasForeignBacklog(item) ? ' · ของ ' + item.pendingOwner : '');`, 'epModalTitle');
+      `  document.getElementById('epModalTitle').textContent = 'ตอนที่ค้าง — ' + (item.name || item.code || '') + (hasForeignBacklog(item) ? ' · ' + foreignBacklogLabel(item) : '');`, 'epModalTitle');
 });
 
 // ================= ตรวจก่อนเขียน =================

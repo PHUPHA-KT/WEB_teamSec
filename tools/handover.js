@@ -1,19 +1,42 @@
-// ===== ย้ายคนทั้งที่ยังมีตอนค้าง: หนี้เก่ายังเป็นของคนเดิม (pendingOwner) จนเคลียร์ =====
-// - item.pendingOwner = ชื่อคนที่ต้องเคลียร์ตอนค้าง (ไม่มี field = คนปัจจุบัน)
-// - ถามตอนย้าย (ลากในปฏิทิน / แก้ใน modal) ว่าตอนค้างให้ใครทำ
-// - ป้ายค้าง / การ์ดยอดค้าง / ⭐ งานของฉัน ดูที่ pendingOwner
-// - เคลียร์ครบ -> ลบ field เรื่องเป็นของคนใหม่เต็มตัว
+// ===== ย้ายคนทั้งที่ยังมีตอนค้าง: หนี้เก่ายังเป็นของคนเดิมจนเคลียร์ =====
+// item.pendingOwners = { <epKey>: "ชื่อคน" }  เฉพาะตอนที่เป็นของคนอื่นที่ไม่ใช่เจ้าของเรื่องปัจจุบัน
+// - ตอนที่ไม่มีใน map = ของ item.person (รวมตอนที่เพิ่มทีหลัง)
+// - ไม่มี field = ทุกตอนเป็นของคนปัจจุบัน (ข้อมูลเก่าไม่ต้องย้าย)
+// - ตอนไหนเคลียร์แล้วก็ลบออกจาก map, ว่างแล้วลบ field
 
-// ใครต้องเคลียร์ตอนค้างของเรื่องนี้
-function pendingOwnerOf(item){
-  return (item.pendingOwner && pendingEpCount(item) > 0) ? item.pendingOwner : item.person;
+function epOwner(item, ep){
+  const m = item.pendingOwners || {};
+  return m[epKey(ep)] || item.person;
 }
-// ตอนค้างเป็นของคนอื่นที่ไม่ใช่เจ้าของเรื่องปัจจุบันไหม
-function hasForeignBacklog(item){
-  return !!item.pendingOwner && pendingEpCount(item) > 0 && item.pendingOwner !== item.person;
+// ตอนค้างที่เป็นของคนอื่น
+function foreignPendingEps(item){
+  return (item.pendingEpisodes || []).filter(e=>epOwner(item, e) !== item.person);
 }
+function hasForeignBacklog(item){ return foreignPendingEps(item).length > 0; }
+// {person: จำนวนตอนค้าง}
+function pendingEpsByPerson(item){
+  const out = {};
+  (item.pendingEpisodes || []).forEach(e=>{ const p = epOwner(item, e) || ''; out[p] = (out[p] || 0) + 1; });
+  return out;
+}
+// คนที่ควรเห็นเรื่องนี้ในตัวกรองคน / งานของฉัน
+function isPersonInvolved(item, person){
+  return item.person === person || foreignPendingEps(item).some(e=>epOwner(item, e) === person);
+}
+// เอาตอนที่ไม่ค้างแล้วออกจาก map
 function clearPendingOwnerIfDone(item){
-  if(item.pendingOwner && pendingEpCount(item) === 0) delete item.pendingOwner;
+  if(!item.pendingOwners) return;
+  const pending = new Set((item.pendingEpisodes || []).map(epKey));
+  for(const k of Object.keys(item.pendingOwners)){
+    if(!pending.has(k) || item.pendingOwners[k] === item.person) delete item.pendingOwners[k];
+  }
+  if(!Object.keys(item.pendingOwners).length) delete item.pendingOwners;
+}
+// "ตอน 14, 15 ของ ยูตะ · ตอน 9 ของ เหนือ"
+function foreignBacklogLabel(item){
+  const by = {};
+  foreignPendingEps(item).forEach(e=>{ const p = epOwner(item, e); (by[p] = by[p] || []).push(e); });
+  return Object.keys(by).map(p=>sortEpisodes(by[p]).map(epLabel).join(', ') + ' ของ ' + p).join(' · ');
 }
 
 // กล่องเลือก 2 ทาง — ใช้ modal ยืนยันเดิม แต่เปลี่ยนข้อความปุ่ม
@@ -43,24 +66,29 @@ function uiChoice(message, title, okLabel, altLabel){
   });
 }
 
-// เรียกก่อนเปลี่ยน item.person — ถ้ามีตอนค้างจะถามว่าใครเคลียร์
-// คืน true = ไปต่อได้ (ตั้ง pendingOwner ให้แล้ว), false = ผู้ใช้ปิดกล่อง ยกเลิกการย้าย
+// เรียกก่อนเปลี่ยน item.person — ถ้าคนที่กำลังจะพ้นไปยังมีตอนค้างของตัวเอง จะถามว่าใครเคลียร์
+// คืน true = ไปต่อได้ (ตั้ง map ให้แล้ว), false = ผู้ใช้ปิดกล่อง ยกเลิกการย้าย
 async function resolveBacklogOnReassign(item, newPerson){
-  const eps = pendingEpCount(item);
-  const oldOwner = pendingOwnerOf(item);
-  if(!eps || !oldOwner || oldOwner === newPerson){
-    if(oldOwner === newPerson) delete item.pendingOwner;
-    return true;
+  const oldOwner = item.person;
+  // ตอนของคนเดิม (ไม่ใช่หนี้ที่ติดชื่อคนอื่นไว้แล้ว) — ต้องคำนวณก่อนแตะ map
+  const own = (item.pendingEpisodes || []).filter(e=>epOwner(item, e) === oldOwner);
+  // ตอนที่ newPerson ถือหนี้อยู่ -> พอเรื่องกลับมาเป็นของเขา หนี้นั้นก็เป็น "ของตัวเอง" ไม่ต้องจำ
+  if(item.pendingOwners){
+    for(const k of Object.keys(item.pendingOwners)) if(item.pendingOwners[k] === newPerson) delete item.pendingOwners[k];
+    if(!Object.keys(item.pendingOwners).length) delete item.pendingOwners;
   }
-  const list = sortEpisodes(item.pendingEpisodes).map(epLabel).join(', ');
+  if(!own.length || !oldOwner) return true;
+  const list = sortEpisodes(own).map(epLabel).join(', ');
   const choice = await uiChoice(
-    `"${item.name||item.code}" ยังค้าง ${eps} ตอน (${list})\nย้ายเรื่องไปให้ ${newPerson} แล้ว ตอนค้างพวกนี้ให้ใครเคลียร์?`,
+    `"${item.name||item.code}" ยังค้าง ${own.length} ตอน (${list})\nย้ายเรื่องไปให้ ${newPerson} แล้ว ตอนค้างพวกนี้ให้ใครเคลียร์?`,
     'ตอนค้างให้ใครทำ',
     `${oldOwner} ทำต่อ (คนเดิม)`,
     `${newPerson} รับไปด้วย`
   );
   if(choice === null) return false;
-  if(choice === 'ok') item.pendingOwner = oldOwner;
-  else delete item.pendingOwner;
+  if(choice === 'ok'){
+    item.pendingOwners = item.pendingOwners || {};
+    own.forEach(e=>{ item.pendingOwners[epKey(e)] = oldOwner; });
+  }
   return true;
 }

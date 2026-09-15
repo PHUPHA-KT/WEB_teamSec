@@ -20,7 +20,8 @@ function renderCalendar(){
           const items = mine.filter(r=>r.day===d);
           const chips = items.map(r=>{
             const eps = pendingEpCount(r);
-            const owner = hasForeignBacklog(r) ? ' · ' + esc(r.pendingOwner) : '';
+            const by = pendingEpsByPerson(r);
+            const owner = hasForeignBacklog(r) ? ' · ' + esc(Object.keys(by).filter(p=>p!==r.person).map(p=>p+' '+by[p]).join(', ')) : '';
             const badge = eps ? ` <span class="cal-chip-eps">(ค้าง ${eps}${owner})</span>` : '';
             return `<span class="cal-chip" data-id="${r.id}" title="ลากเพื่อย้ายวัน/ย้ายคน">${esc((r.code?r.code+'-':'') + (r.name||''))}${badge}</span>`;
           }).join('');
@@ -53,7 +54,7 @@ async function moveCalendarItem(id, person, day){
   item.person = person;
   item.day = day;
   const name = item.name || item.code;
-  const note = hasForeignBacklog(item) ? ` (ตอนค้าง ${pendingEpCount(item)} ตอน ${item.pendingOwner} เคลียร์ต่อ)` : '';
+  const note = hasForeignBacklog(item) ? ` (${foreignBacklogLabel(item)} เคลียร์ต่อ)` : '';
   logActivity(`ย้าย "${name}" ${from} → ${person} / ${day}${note}`);
   renderCalendar(); renderStats();
   showToast(`ย้าย "${name}" → ${person} · ${CAL_DAY_LABEL[day] || day}`);
