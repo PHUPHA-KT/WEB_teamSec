@@ -767,6 +767,29 @@ step('ดรอป: เพิ่ม "งดไม่มีกำหนด"', "hi
   rep(`กด ⏏ พิมพ์ "จบ" หรือ "lc"`, `กด ⏏ พิมพ์ "จบ", "lc" หรือ "งด"`, 'help text');
 });
 
+// ================= 24) เอากลับจากดรอป -> พาไปดูที่เรื่องอยู่ =================
+step('undrop พาไปดูเรื่องที่กลับมา', 'กลับมางานปกติแล้ว — อยู่ที่', () => {
+  rep(`  item.dropped = null;
+  delete item.dropped;
+  logActivity(\`เอาเรื่อง "\${item.name||item.code}" กลับมางานปกติ\`);
+  renderRecurring(); renderStats();
+  await persistRecurring();
+  showToast('เอาเรื่องกลับมางานปกติแล้ว');`,
+`  item.dropped = null;
+  delete item.dropped;
+  logActivity(\`เอาเรื่อง "\${item.name||item.code}" กลับมางานปกติ\`);
+  // เดิม: ยังอยู่โหมดดูดรอป + ตัวกรองเป็น "วันนี้" -> เรื่องหายจากจอทั้ง 2 ชั้น เหมือนถูกลบ
+  // พาไปดูที่เรื่องอยู่จริงเลย
+  showDropped = false;
+  showOnlyPending = false;
+  dayFilter = WEEKDAY_ONLY.includes(item.day) ? item.day : 'ทั้งหมด';
+  lastAutoDay = null;   // ผู้ใช้เลือกวันเองแล้ว poll ไม่ต้องดึงกลับ "วันนี้"
+  personFilter = 'ทั้งหมด';
+  renderRecurring(); renderStats();
+  await persistRecurring();
+  showToast(\`"\${item.name||item.code}" กลับมางานปกติแล้ว — อยู่ที่ \${item.person||'ไม่ระบุคน'} · \${item.day||'ไม่ระบุวัน'}\`);`, 'undropStory');
+});
+
 // ================= ตรวจก่อนเขียน =================
 group = 'ตรวจท้าย';
 if (s.includes('drive.google.com/drive/folders/')) throw new Error('ยังมีลิงก์ Drive จริงในไฟล์ — SEED ไม่ถูกตัด?');

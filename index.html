@@ -2347,9 +2347,16 @@ async function undropStory(id){
   item.dropped = null;
   delete item.dropped;
   logActivity(`เอาเรื่อง "${item.name||item.code}" กลับมางานปกติ`);
+  // เดิม: ยังอยู่โหมดดูดรอป + ตัวกรองเป็น "วันนี้" -> เรื่องหายจากจอทั้ง 2 ชั้น เหมือนถูกลบ
+  // พาไปดูที่เรื่องอยู่จริงเลย
+  showDropped = false;
+  showOnlyPending = false;
+  dayFilter = WEEKDAY_ONLY.includes(item.day) ? item.day : 'ทั้งหมด';
+  lastAutoDay = null;   // ผู้ใช้เลือกวันเองแล้ว poll ไม่ต้องดึงกลับ "วันนี้"
+  personFilter = 'ทั้งหมด';
   renderRecurring(); renderStats();
   await persistRecurring();
-  showToast('เอาเรื่องกลับมางานปกติแล้ว');
+  showToast(`"${item.name||item.code}" กลับมางานปกติแล้ว — อยู่ที่ ${item.person||'ไม่ระบุคน'} · ${item.day||'ไม่ระบุวัน'}`);
 }
 
 async function updateStatus(id, value){
