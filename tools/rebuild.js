@@ -700,6 +700,53 @@ function dayLinksBarHtml(){`, 'helper');
   rep("📥 ${esc(l.label || 'เปิดโฟลเดอร์โหลด')}</a>", "📥 ${esc(l.label || linkHostLabel(l.url))}</a>", 'label');
 });
 
+// ================= 22) แท็บ "ทุกเรื่อง" =================
+step('แท็บทุกเรื่อง (รวมดรอป) รหัส/ชื่อ/ลิงก์', 'function renderAllStories', () => {
+  rep(`  <button class="tab-btn" data-tab="schedule">กำหนดการเปิดเรื่อง</button>`,
+      `  <button class="tab-btn" data-tab="schedule">กำหนดการเปิดเรื่อง</button>
+  <button class="tab-btn" data-tab="all">ทุกเรื่อง</button>`, 'tab button');
+  // render() กับ renderTab() ใช้ else = schedule เป็นตัวสุดท้าย -> แทรกก่อน else
+  rep(`  searchText = '';
+  if(activeTab==='recurring') renderRecurring();
+  else if(activeTab==='calendar') renderCalendar();
+  else if(activeTab==='newstories') renderNewStories();
+  else if(activeTab==='expenses') renderExpenses();
+  else renderSchedule();`,
+`  searchText = '';
+  if(activeTab==='recurring') renderRecurring();
+  else if(activeTab==='calendar') renderCalendar();
+  else if(activeTab==='newstories') renderNewStories();
+  else if(activeTab==='expenses') renderExpenses();
+  else if(activeTab==='all') renderAllStories();
+  else renderSchedule();`, 'render() dispatch');
+  rep(`function renderTab(){
+  if(activeTab==='recurring') renderRecurring();
+  else if(activeTab==='calendar') renderCalendar();
+  else if(activeTab==='newstories') renderNewStories();
+  else if(activeTab==='expenses') renderExpenses();
+  else renderSchedule();
+}`,
+`function renderTab(){
+  if(activeTab==='recurring') renderRecurring();
+  else if(activeTab==='calendar') renderCalendar();
+  else if(activeTab==='newstories') renderNewStories();
+  else if(activeTab==='expenses') renderExpenses();
+  else if(activeTab==='all') renderAllStories();
+  else renderSchedule();
+}`, 'renderTab() dispatch');
+  // วางฟังก์ชันไว้ก่อน renderSchedule
+  const js = fs.readFileSync(path.join(__dirname, 'allstories.js'), 'utf8').replace(/\n$/, '');
+  rep(`function scheduleActionsHtml(e){`, js + `\n\nfunction scheduleActionsHtml(e){`, 'insert renderAllStories');
+  rep('</style>',
+`  /* แท็บทุกเรื่อง */
+  .all-table td{ vertical-align:middle; }
+  .all-code{ font-weight:800; white-space:nowrap; }
+  .all-link{ color:var(--blue); font-size:13px; white-space:nowrap; }
+  .all-dropped td{ color:var(--ink-soft); }
+  .all-dropped .all-code{ text-decoration:line-through; text-decoration-color:rgba(0,0,0,.35); }
+</style>`, 'all css');
+});
+
 // ================= ตรวจก่อนเขียน =================
 group = 'ตรวจท้าย';
 if (s.includes('drive.google.com/drive/folders/')) throw new Error('ยังมีลิงก์ Drive จริงในไฟล์ — SEED ไม่ถูกตัด?');
