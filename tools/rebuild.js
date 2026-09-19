@@ -896,6 +896,38 @@ step('ดรอปเป็นปุ่มเลือก + เพิ่ม "จ
 </style>`, 'pick css');
 });
 
+// ================= 28) แก้เหตุผลดรอปได้จากหน้าดรอป =================
+step('เปลี่ยนเหตุผลดรอปได้จากป้าย', 'function changeDropReason', () => {
+  // ป้ายดรอปกดได้ (ทั้งตอนดรอปแล้วและตอนรอดรอป)
+  rep(`            ? \` <span class="drop-badge" style="background:\${DROP_META[item.dropped].bg};color:\${DROP_META[item.dropped].fg};">\${DROP_META[item.dropped].label}</span>\`
+            : \` <span class="drop-badge" style="background:#fdf3e3;color:#b9791b;">⏳ รอดรอป (\${DROP_META[item.dropped].label}) · เคลียร์ตอนค้างก่อน</span>\`)`,
+`            ? \` <span class="drop-badge drop-badge-edit" title="กดเพื่อเปลี่ยนเหตุผล" onclick="changeDropReason('\${item.id}')" style="background:\${DROP_META[item.dropped].bg};color:\${DROP_META[item.dropped].fg};">\${DROP_META[item.dropped].label} ▾</span>\`
+            : \` <span class="drop-badge drop-badge-edit" title="กดเพื่อเปลี่ยนเหตุผล" onclick="changeDropReason('\${item.id}')" style="background:#fdf3e3;color:#b9791b;">⏳ รอดรอป (\${DROP_META[item.dropped].label}) · เคลียร์ตอนค้างก่อน ▾</span>\`)`, 'badge clickable');
+  rep(`async function undropStory(id){`,
+`// เปลี่ยนเหตุผลดรอป (จบซีซั่น <-> จบแล้ว <-> LC <-> งด) โดยไม่ต้องเอากลับก่อน
+async function changeDropReason(id){
+  const item = recurring.find(r=>r.id===id);
+  if(!item || !item.dropped) return;
+  const cur = item.dropped;
+  const val = await uiPick(
+    'เปลี่ยนเหตุผลดรอป',
+    \`"\${item.name||item.code}" ตอนนี้: \${DROP_META[cur] ? DROP_META[cur].label : cur}\`,
+    Object.keys(DROP_META).map(k=>({ value:k, label: DROP_META[k].label + (k===cur ? ' (ปัจจุบัน)' : ''), bg: DROP_META[k].bg, fg: DROP_META[k].fg }))
+  );
+  if(!val || val === cur) return;
+  item.dropped = val;
+  logActivity(\`เปลี่ยนเหตุผลดรอป "\${item.name||item.code}" \${DROP_META[cur].label} → \${DROP_META[val].label}\`);
+  renderRecurring(); renderStats();
+  showToast(\`"\${item.name||item.code}" → \${DROP_META[val].label}\`);
+  await persistRecurring(false);
+}
+
+async function undropStory(id){`, 'changeDropReason');
+  rep('</style>', `  .drop-badge-edit{ cursor:pointer; }
+  .drop-badge-edit:hover{ filter:brightness(.93); }
+</style>`, 'css');
+});
+
 // ================= ตรวจก่อนเขียน =================
 group = 'ตรวจท้าย';
 if (s.includes('drive.google.com/drive/folders/')) throw new Error('ยังมีลิงก์ Drive จริงในไฟล์ — SEED ไม่ถูกตัด?');

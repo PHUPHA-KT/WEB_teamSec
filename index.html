@@ -383,6 +383,8 @@
   .pick-btn small{ font-size:11.5px; opacity:.85; }
   .pick-btn:hover{ filter:brightness(.96); }
   @media(max-width:480px){ .pick-grid{ grid-template-columns:1fr; } }
+  .drop-badge-edit{ cursor:pointer; }
+  .drop-badge-edit:hover{ filter:brightness(.93); }
 </style>
 </head>
 <body>
@@ -2126,8 +2128,8 @@ function renderRecurring(){
       const effDropped = isEffectivelyDropped(item);
       const dropBadge = item.dropped
         ? (effDropped
-            ? ` <span class="drop-badge" style="background:${DROP_META[item.dropped].bg};color:${DROP_META[item.dropped].fg};">${DROP_META[item.dropped].label}</span>`
-            : ` <span class="drop-badge" style="background:#fdf3e3;color:#b9791b;">⏳ รอดรอป (${DROP_META[item.dropped].label}) · เคลียร์ตอนค้างก่อน</span>`)
+            ? ` <span class="drop-badge drop-badge-edit" title="กดเพื่อเปลี่ยนเหตุผล" onclick="changeDropReason('${item.id}')" style="background:${DROP_META[item.dropped].bg};color:${DROP_META[item.dropped].fg};">${DROP_META[item.dropped].label} ▾</span>`
+            : ` <span class="drop-badge drop-badge-edit" title="กดเพื่อเปลี่ยนเหตุผล" onclick="changeDropReason('${item.id}')" style="background:#fdf3e3;color:#b9791b;">⏳ รอดรอป (${DROP_META[item.dropped].label}) · เคลียร์ตอนค้างก่อน ▾</span>`)
         : '';
       html += `<div class="item-row">
         <div class="item-main">
@@ -2496,6 +2498,24 @@ async function openDropMenu(id){
     showToast('ดรอปเรื่องแล้ว: ' + DROP_META[val].label);
   }
 }
+// เปลี่ยนเหตุผลดรอป (จบซีซั่น <-> จบแล้ว <-> LC <-> งด) โดยไม่ต้องเอากลับก่อน
+async function changeDropReason(id){
+  const item = recurring.find(r=>r.id===id);
+  if(!item || !item.dropped) return;
+  const cur = item.dropped;
+  const val = await uiPick(
+    'เปลี่ยนเหตุผลดรอป',
+    `"${item.name||item.code}" ตอนนี้: ${DROP_META[cur] ? DROP_META[cur].label : cur}`,
+    Object.keys(DROP_META).map(k=>({ value:k, label: DROP_META[k].label + (k===cur ? ' (ปัจจุบัน)' : ''), bg: DROP_META[k].bg, fg: DROP_META[k].fg }))
+  );
+  if(!val || val === cur) return;
+  item.dropped = val;
+  logActivity(`เปลี่ยนเหตุผลดรอป "${item.name||item.code}" ${DROP_META[cur].label} → ${DROP_META[val].label}`);
+  renderRecurring(); renderStats();
+  showToast(`"${item.name||item.code}" → ${DROP_META[val].label}`);
+  await persistRecurring(false);
+}
+
 async function undropStory(id){
   const item = recurring.find(r=>r.id===id);
   if(!item) return;
