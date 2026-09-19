@@ -369,6 +369,10 @@
   .all-link{ color:var(--blue); font-size:13px; white-space:nowrap; }
   .all-dropped td{ color:var(--ink-soft); }
   .all-dropped .all-code{ text-decoration:line-through; text-decoration-color:rgba(0,0,0,.35); }
+  /* ช่องวันที่ + ปุ่มวันนี้ */
+  .date-row{ display:flex; gap:8px; align-items:center; }
+  .date-row input[type=date]{ flex:1; min-width:0; cursor:pointer; }
+  .date-today{ font-size:12px; padding:7px 10px; white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -452,7 +456,7 @@
       </datalist>
     </div>
     <div class="field"><label>จำนวนเงิน (บาท)</label><input id="xAmount" type="number" placeholder="0"></div>
-    <div class="field"><label>วันที่ (ไม่บังคับ)</label><input id="xDate" type="date"></div>
+    <div class="field"><label>วันที่ (ไม่บังคับ)</label><div class="date-row"><input id="xDate" type="date"><button type="button" class="btn btn-ghost date-today" onclick="setDateToday('xDate')">วันนี้</button></div></div>
     <div class="field"><label>หมายเหตุ (ไม่บังคับ)</label><input id="xNote" type="text" placeholder="เช่น เติมพ้อยท์"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('modalExpense')">ยกเลิก</button>
@@ -637,7 +641,7 @@
 <div class="modal-backdrop" id="modalSchedule">
   <div class="modal">
     <h3 id="scheduleModalTitle">เพิ่มกำหนดการเปิดเรื่อง</h3>
-    <div class="field"><label>วันที่จะเปิด</label><input id="sDate" type="date"></div>
+    <div class="field"><label>วันที่จะเปิด</label><div class="date-row"><input id="sDate" type="date"><button type="button" class="btn btn-ghost date-today" onclick="setDateToday('sDate')">วันนี้</button></div></div>
     <div class="field"><label>รหัส/ชื่อเรื่อง</label><input id="sTitle" type="text" placeholder="เช่น 18-28 หรือ ชื่อเรื่อง"></div>
     <div class="field"><label>คนทำ (ไม่บังคับ)</label>
       <select id="sPerson">
@@ -2038,6 +2042,18 @@ function clearSearch(id){
   if(activeTab === 'newstories') renderNewStories(); else renderRecurring();
   const box = document.getElementById(id);
   if(box) box.focus({preventScroll:true});
+}
+
+// ช่องวันที่: Chrome เปิดปฏิทินเฉพาะตอนกดไอคอนเล็กๆ ขวาสุด กดกลางช่องได้แค่พิมพ์ — ให้กดตรงไหนก็เปิด
+document.addEventListener('click', e=>{
+  const el = e.target;
+  if(el && el.tagName === 'INPUT' && el.type === 'date' && typeof el.showPicker === 'function'){
+    try{ el.showPicker(); }catch(err){ /* บางเบราว์เซอร์ไม่ให้เรียกซ้อน — ปล่อยให้ใช้แบบเดิม */ }
+  }
+});
+function setDateToday(id){
+  const el = document.getElementById(id);
+  if(el){ el.value = todayDateStr(); el.dispatchEvent(new Event('change', {bubbles:true})); }
 }
 
 function renderRecurring(){

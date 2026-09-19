@@ -834,6 +834,35 @@ step('ตอนค้างตามคนเดิมเมื่อย้า�
       `  document.getElementById('epModalTitle').textContent = 'ตอนที่ค้าง — ' + (item.name || item.code || '') + (hasForeignBacklog(item) ? ' · ' + foreignBacklogLabel(item) : '');`, 'epModalTitle');
 });
 
+// ================= 26) ช่องวันที่: กดตรงไหนก็เปิดปฏิทิน + ปุ่มวันนี้ =================
+step('ช่องวันที่เปิดปฏิทินทันที + ปุ่มวันนี้', 'function setDateToday', () => {
+  // ปุ่ม "วันนี้" ข้างช่องวันที่ 2 ช่อง
+  rep(`<div class="field"><label>วันที่จะเปิด</label><input id="sDate" type="date"></div>`,
+      `<div class="field"><label>วันที่จะเปิด</label><div class="date-row"><input id="sDate" type="date"><button type="button" class="btn btn-ghost date-today" onclick="setDateToday('sDate')">วันนี้</button></div></div>`, 'sDate');
+  rep(`<div class="field"><label>วันที่ (ไม่บังคับ)</label><input id="xDate" type="date"></div>`,
+      `<div class="field"><label>วันที่ (ไม่บังคับ)</label><div class="date-row"><input id="xDate" type="date"><button type="button" class="btn btn-ghost date-today" onclick="setDateToday('xDate')">วันนี้</button></div></div>`, 'xDate');
+  rep(`function renderRecurring(){`,
+`// ช่องวันที่: Chrome เปิดปฏิทินเฉพาะตอนกดไอคอนเล็กๆ ขวาสุด กดกลางช่องได้แค่พิมพ์ — ให้กดตรงไหนก็เปิด
+document.addEventListener('click', e=>{
+  const el = e.target;
+  if(el && el.tagName === 'INPUT' && el.type === 'date' && typeof el.showPicker === 'function'){
+    try{ el.showPicker(); }catch(err){ /* บางเบราว์เซอร์ไม่ให้เรียกซ้อน — ปล่อยให้ใช้แบบเดิม */ }
+  }
+});
+function setDateToday(id){
+  const el = document.getElementById(id);
+  if(el){ el.value = todayDateStr(); el.dispatchEvent(new Event('change', {bubbles:true})); }
+}
+
+function renderRecurring(){`, 'helpers');
+  rep('</style>',
+`  /* ช่องวันที่ + ปุ่มวันนี้ */
+  .date-row{ display:flex; gap:8px; align-items:center; }
+  .date-row input[type=date]{ flex:1; min-width:0; cursor:pointer; }
+  .date-today{ font-size:12px; padding:7px 10px; white-space:nowrap; }
+</style>`, 'css');
+});
+
 // ================= ตรวจก่อนเขียน =================
 group = 'ตรวจท้าย';
 if (s.includes('drive.google.com/drive/folders/')) throw new Error('ยังมีลิงก์ Drive จริงในไฟล์ — SEED ไม่ถูกตัด?');
