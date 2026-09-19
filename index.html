@@ -373,6 +373,16 @@
   .date-row{ display:flex; gap:8px; align-items:center; }
   .date-row input[type=date]{ flex:1; min-width:0; cursor:pointer; }
   .date-today{ font-size:12px; padding:7px 10px; white-space:nowrap; }
+  /* กล่องเลือกเหตุผลดรอป */
+  .pick-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .pick-btn{
+    display:flex; flex-direction:column; align-items:flex-start; gap:3px; text-align:left;
+    padding:12px 14px; border:1px solid; border-radius:12px; cursor:pointer; font-family:inherit; line-height:1.35;
+  }
+  .pick-btn b{ font-size:14px; }
+  .pick-btn small{ font-size:11.5px; opacity:.85; }
+  .pick-btn:hover{ filter:brightness(.96); }
+  @media(max-width:480px){ .pick-grid{ grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
@@ -548,7 +558,7 @@
         <li><b>สถานะรายวัน</b>: <span class="tag" style="background:#f1f3f6;color:#5b6472;">ยังไม่ทำ</span> <span class="tag" style="background:#e6f7ee;color:#1a9c6b;">ทำแล้ว</span> <span class="tag" style="background:#fdf3e3;color:#b9791b;">งด</span>(ต้นทางงดลง) <span class="tag" style="background:#f1eafd;color:#7b3fd4;">เลื่อน</span></li>
         <li><b>＋ ตอน</b>: จัดการตอนที่ค้าง — เพิ่มเลขตอน, ติ๊กออกเมื่อทำเสร็จ, หรือ "เคลียร์ทุกตอน"</li>
         <li><b>🔗 / 📁</b>: ลิงก์ต้นทาง / ลิงก์ Google Drive (กดตอนว่างเพื่อใส่)</li>
-        <li><b>⏏</b>: ดรอปเรื่อง (จบซีซั่น / LC / งดไม่มีกำหนด) · <b>✎</b>: แก้ไข · <b>✕</b>: ลบ (ไปถังขยะ)</li>
+        <li><b>⏏</b>: ดรอปเรื่อง (จบซีซั่น / จบแล้ว / LC / งดไม่มีกำหนด) · <b>✎</b>: แก้ไข · <b>✕</b>: ลบ (ไปถังขยะ)</li>
       </ul>
 
       <h4>📆 ตารางปฏิทิน</h4>
@@ -575,8 +585,8 @@
       <h4>🔴 ป้าย "ค้าง" + แจ้งเตือนงานค้าง</h4>
       <p>เรื่องที่มีตอนค้างขึ้นป้ายแดงบอกจำนวน + เลขตอน เช่น "ค้าง 3 ตอน · ตอน 1,2,3" — <b>ยิ่งค้างเยอะสียิ่งเข้ม</b> · ถ้ามีงานค้าง จะมี<b>แถบเตือนสีแดงบนสุด</b>ตอนเปิดเว็บ บอกว่าค้างกี่ตอน กด "ดูงานค้าง" เพื่อกรองเห็นเฉพาะเรื่องที่ค้างทันที (กดปิดแถบเตือนได้)</p>
 
-      <h4>⏏ ดรอปเรื่อง (จบซีซั่น / LC / งดไม่มีกำหนด)</h4>
-      <p>เรื่องจบซีซั่นหรือโดน LC (ถูกลิขสิทธิ์) กด ⏏ พิมพ์ "จบ", "lc" หรือ "งด" · <b>ถ้ายังมีตอนค้าง เรื่องจะยังอยู่ในงานปกติ</b> (ขึ้นป้าย ⏳ รอดรอป) ให้ทำตอนที่ค้างต่อได้ พอเคลียร์ตอนค้างหมด <b>ระบบจะย้ายเข้าดรอป/จบให้เองอัตโนมัติ</b> — งานค้างไม่หายไปเฉยๆ · กด <b>📥 ดูเรื่องดรอป/จบ</b> เพื่อดู แล้ว "↩ เอากลับ" ได้</p>
+      <h4>⏏ ดรอปเรื่อง (จบซีซั่น / จบแล้ว / LC / งดไม่มีกำหนด)</h4>
+      <p>เรื่องจบซีซั่นหรือโดน LC (ถูกลิขสิทธิ์) กด ⏏ แล้วเลือกเหตุผล · <b>ถ้ายังมีตอนค้าง เรื่องจะยังอยู่ในงานปกติ</b> (ขึ้นป้าย ⏳ รอดรอป) ให้ทำตอนที่ค้างต่อได้ พอเคลียร์ตอนค้างหมด <b>ระบบจะย้ายเข้าดรอป/จบให้เองอัตโนมัติ</b> — งานค้างไม่หายไปเฉยๆ · กด <b>📥 ดูเรื่องดรอป/จบ</b> เพื่อดู แล้ว "↩ เอากลับ" ได้</p>
 
       <h4>📥 ลิงก์โหลดรายวัน + 📚 คลังย้อนหลัง</h4>
       <p>แถบ "ลิงก์โหลดรายวัน" กดขยายเพื่อแปะลิงก์โฟลเดอร์โหลด raw แยกตามวัน (จ.–อา.) ทั้งทีมใช้ร่วมกัน · <b>ใส่ได้หลายลิงก์ต่อวัน</b> (กด ＋ ลิงก์ ของแต่ละวัน ตั้งชื่อกำกับได้ เช่น "ตอนหลัก"/"ตอนพิเศษ") · ✎ แก้ · ✕ ลบทีละลิงก์ · ถ้าลิงก์เปลี่ยนทุกอาทิตย์ กด <b>🧹 ล้าง+เก็บเข้าคลัง</b> ระบบเก็บชุดปัจจุบันเข้าคลังก่อนล้าง · เปิด <b>📚 คลังย้อนหลัง</b> ดูลิงก์สัปดาห์ก่อนๆ ได้ (พับไว้ กดกางดู, ค้นหา/กรองตามเดือนได้)</p>
@@ -1195,6 +1205,7 @@ const DROP_META = {
   ended: {label:'จบซีซั่น', bg:'#eef1f6', fg:'#5b6472'},
   lc:    {label:'LC (ถูกลิขสิทธิ์)', bg:'#fdeaea', fg:'#c0392b'},
   hiatus:{label:'งดไม่มีกำหนด', bg:'#f1eafd', fg:'#7b3fd4'},
+  finished:{label:'จบแล้ว', bg:'#e6f7ee', fg:'#1a9c6b'},
 };
 let searchText = '';
 
@@ -2140,7 +2151,7 @@ function renderRecurring(){
           </select>
           ${item.dropped
             ? `<button class="icon-btn" onclick="undropStory('${item.id}')" title="ยกเลิกการรอดรอป" style="color:#1a9c6b;">↩</button>`
-            : `<button class="icon-btn" onclick="openDropMenu('${item.id}')" title="ดรอปเรื่อง (จบซีซั่น/LC/งดไม่มีกำหนด)" style="color:#b9791b;">⏏</button>`}
+            : `<button class="icon-btn" onclick="openDropMenu('${item.id}')" title="ดรอปเรื่อง (จบซีซั่น / จบแล้ว / LC / งดไม่มีกำหนด)" style="color:#b9791b;">⏏</button>`}
           <button class="icon-btn" onclick="openRecurringModal('${item.id}')" title="แก้ไข" style="color:#6b7480;">✎</button>
           <button class="icon-btn" onclick="deleteRecurring('${item.id}')">✕</button>
         `}
@@ -2431,24 +2442,56 @@ async function removeDayLink(id){
 }
 
 // ===== ดรอปเรื่อง (จบซีซั่น / LC) =====
+// ===== ดรอปเรื่อง: เลือกจากปุ่ม แทนการพิมพ์ =====
+// กล่องเลือกหลายตัวเลือก (สร้าง modal ชั่วคราว) คืน value หรือ null ถ้าปิด/ยกเลิก
+function uiPick(title, message, options){
+  return new Promise(resolve=>{
+    const back = document.createElement('div');
+    back.className = 'modal-backdrop show';
+    back.innerHTML = `<div class="modal" style="max-width:420px;">
+      <h3>${esc(title)}</h3>
+      <p style="font-size:13.5px;color:var(--ink-soft);margin:0 0 14px;white-space:pre-line;">${esc(message)}</p>
+      <div class="pick-grid">
+        ${options.map((o,i)=>`<button type="button" class="pick-btn" data-i="${i}" style="background:${o.bg};color:${o.fg};border-color:${o.fg}33;">
+          <b>${esc(o.label)}</b>${o.hint?`<small>${esc(o.hint)}</small>`:''}
+        </button>`).join('')}
+      </div>
+      <div class="modal-actions"><button type="button" class="btn btn-ghost pick-cancel">ยกเลิก</button></div>
+    </div>`;
+    function done(v){ back.remove(); document.removeEventListener('keydown', onKey); resolve(v); }
+    function onKey(e){ if(e.key === 'Escape') done(null); }
+    back.addEventListener('click', e=>{
+      const b = e.target.closest('.pick-btn');
+      if(b) return done(options[+b.dataset.i].value);
+      if(e.target.closest('.pick-cancel') || e.target === back) done(null);
+    });
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(back);
+  });
+}
+
+// ===== ดรอปเรื่อง (จบซีซั่น / จบแล้ว / LC / งดไม่มีกำหนด) =====
 async function openDropMenu(id){
   const item = recurring.find(r=>r.id===id);
   if(!item) return;
-  const reason = await uiPrompt('ดรอปเรื่อง "'+(item.name||item.code)+'" — พิมพ์ "จบ" = จบซีซั่น, "lc" = โดน LC (ถูกลิขสิทธิ์), "งด" = งดไม่มีกำหนด', {placeholder:'จบ / lc / งด'});
-  if(reason === null) return;
-  const r = reason.toLowerCase();
-  let val = null;
-  if(r==='จบ' || r==='จบซีซั่น' || r==='ended' || r==='จบซีชั่น') val='ended';
-  else if(r==='lc' || r==='แอลซี' || r==='ลิขสิทธิ์') val='lc';
-  else if(r==='งด' || r==='งดไม่มีกำหนด' || r==='พัก' || r==='hiatus') val='hiatus';
-  else { showToast('พิมพ์ "จบ", "lc" หรือ "งด" เท่านั้น'); return; }
+  const eps = pendingEpCount(item);
+  const val = await uiPick(
+    'ดรอปเรื่อง',
+    `"${item.name||item.code}"` + (eps ? `\nยังมีตอนค้าง ${eps} ตอน — จะอยู่ในงานปกติจนเคลียร์หมด แล้วย้ายเข้าดรอปเอง` : ''),
+    [
+      { value:'ended',    label: DROP_META.ended.label,    hint:'ซีซั่นนี้จบ รอซีซั่นหน้า',   bg: DROP_META.ended.bg,    fg: DROP_META.ended.fg },
+      { value:'finished', label: DROP_META.finished.label, hint:'เรื่องจบสมบูรณ์ ไม่มีต่อแล้ว', bg: DROP_META.finished.bg, fg: DROP_META.finished.fg },
+      { value:'lc',       label: DROP_META.lc.label,       hint:'ถูกซื้อลิขสิทธิ์',           bg: DROP_META.lc.bg,       fg: DROP_META.lc.fg },
+      { value:'hiatus',   label: DROP_META.hiatus.label,   hint:'พักไว้ ยังไม่รู้ว่าจะกลับมาเมื่อไหร่', bg: DROP_META.hiatus.bg, fg: DROP_META.hiatus.fg },
+    ]
+  );
+  if(!val) return;
   item.dropped = val;
   logActivity(`ดรอปเรื่อง "${item.name||item.code}" (${DROP_META[val].label})`);
   renderRecurring(); renderStats();
   await persistRecurring();
-  const eps = pendingEpCount(item);
   if(eps > 0){
-    showToast(`ทำเครื่องหมายดรอปแล้ว — ยังมีตอนค้าง ${eps} ตอน จะอยู่ในงานปกติจนเคลียร์หมด แล้วย้ายเข้าดรอปเอง`);
+    showToast(`ทำเครื่องหมาย ${DROP_META[val].label} แล้ว — ยังมีตอนค้าง ${eps} ตอน จะอยู่ในงานปกติจนเคลียร์หมด แล้วย้ายเข้าดรอปเอง`);
   } else {
     showToast('ดรอปเรื่องแล้ว: ' + DROP_META[val].label);
   }

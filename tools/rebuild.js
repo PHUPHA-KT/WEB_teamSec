@@ -863,6 +863,39 @@ function renderRecurring(){`, 'helpers');
 </style>`, 'css');
 });
 
+// ================= 27) ดรอป: ปุ่มเลือก + สถานะ "จบแล้ว" =================
+step('ดรอปเป็นปุ่มเลือก + เพิ่ม "จบแล้ว"', 'function uiPick(', () => {
+  rep(`  hiatus:{label:'งดไม่มีกำหนด', bg:'#f1eafd', fg:'#7b3fd4'},
+};`,
+`  hiatus:{label:'งดไม่มีกำหนด', bg:'#f1eafd', fg:'#7b3fd4'},
+  finished:{label:'จบแล้ว', bg:'#e6f7ee', fg:'#1a9c6b'},
+};`, 'DROP_META finished');
+  // แทน openDropMenu ทั้งฟังก์ชัน
+  const a = s.indexOf('async function openDropMenu(id){');
+  if (a < 0) throw new Error('ไม่เจอ openDropMenu');
+  const b = s.indexOf('\n}\n', a);
+  if (b < 0) throw new Error('ไม่เจอจุดจบ openDropMenu');
+  const js = fs.readFileSync(path.join(__dirname, 'droppick.js'), 'utf8').replace(/\n$/, '');
+  s = s.slice(0, a) + js + s.slice(b + 2);
+  // ข้อความช่วยเหลือ
+  rep(`title="ดรอปเรื่อง (จบซีซั่น/LC/งดไม่มีกำหนด)"`, `title="ดรอปเรื่อง (จบซีซั่น / จบแล้ว / LC / งดไม่มีกำหนด)"`, 'button title');
+  rep(`<h4>⏏ ดรอปเรื่อง (จบซีซั่น / LC / งดไม่มีกำหนด)</h4>`, `<h4>⏏ ดรอปเรื่อง (จบซีซั่น / จบแล้ว / LC / งดไม่มีกำหนด)</h4>`, 'help heading');
+  rep(`<li><b>⏏</b>: ดรอปเรื่อง (จบซีซั่น / LC / งดไม่มีกำหนด)`, `<li><b>⏏</b>: ดรอปเรื่อง (จบซีซั่น / จบแล้ว / LC / งดไม่มีกำหนด)`, 'help list');
+  rep(`กด ⏏ พิมพ์ "จบ", "lc" หรือ "งด"`, `กด ⏏ แล้วเลือกเหตุผล`, 'help text');
+  rep('</style>',
+`  /* กล่องเลือกเหตุผลดรอป */
+  .pick-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .pick-btn{
+    display:flex; flex-direction:column; align-items:flex-start; gap:3px; text-align:left;
+    padding:12px 14px; border:1px solid; border-radius:12px; cursor:pointer; font-family:inherit; line-height:1.35;
+  }
+  .pick-btn b{ font-size:14px; }
+  .pick-btn small{ font-size:11.5px; opacity:.85; }
+  .pick-btn:hover{ filter:brightness(.96); }
+  @media(max-width:480px){ .pick-grid{ grid-template-columns:1fr; } }
+</style>`, 'pick css');
+});
+
 // ================= ตรวจก่อนเขียน =================
 group = 'ตรวจท้าย';
 if (s.includes('drive.google.com/drive/folders/')) throw new Error('ยังมีลิงก์ Drive จริงในไฟล์ — SEED ไม่ถูกตัด?');
