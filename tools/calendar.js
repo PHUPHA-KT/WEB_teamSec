@@ -17,13 +17,13 @@ function renderCalendar(){
       <div class="cal-head cal-head-${color}">${esc(person)} <span style="opacity:.85;font-weight:700;">(${mine.length} เรื่อง)</span></div>
       <table class="cal-table"><tbody>
         ${CAL_DAYS.map(d=>{
-          const items = mine.filter(r=>r.day===d);
+          const items = mine.filter(r=>itemDays(r).includes(d));
           const chips = items.map(r=>{
             const eps = pendingEpCount(r);
             const by = pendingEpsByPerson(r);
             const owner = hasForeignBacklog(r) ? ' · ' + esc(Object.keys(by).filter(p=>p!==r.person).map(p=>p+' '+by[p]).join(', ')) : '';
             const badge = eps ? ` <span class="cal-chip-eps">(ค้าง ${eps}${owner})</span>` : '';
-            return `<span class="cal-chip" data-id="${r.id}" title="ลากเพื่อย้ายวัน/ย้ายคน">${esc((r.code?r.code+'-':'') + (r.name||''))}${badge}</span>`;
+            return `<span class="cal-chip" data-id="${r.id}" data-from="${esc(d)}" title="ลากเพื่อย้ายวัน/ย้ายคน${isMultiDay(r)?' (ย้ายเฉพาะวันนี้)':''}">${esc((r.code?r.code+'-':'') + (r.name||''))}${badge}</span>`;
           }).join('');
           return `<tr>
             <td class="cal-day">${CAL_DAY_LABEL[d]}</td>
@@ -44,15 +44,23 @@ function renderCalendar(){
 }
 
 // ย้ายเรื่องไปช่องใหม่ (ใช้ร่วมกันทั้งเมาส์/ทัช)
-async function moveCalendarItem(id, person, day){
+async function moveCalendarItem(id, person, day, fromDay){
   const item = recurring.find(r=>r.id===id);
   if(!item) return;
-  if(item.person === person && item.day === day) return;
-  const from = `${item.person||'ไม่ระบุ'} / ${item.day||'ไม่ระบุวัน'}`;
+  const days = itemDays(item);
+  fromDay = fromDay && days.includes(fromDay) ? fromDay : days[0];
+  if(item.person === person && fromDay === day) return;
+  const from = `${item.person||'ไม่ระบุ'} / ${fromDay||'ไม่ระบุวัน'}`;
   // ย้ายคนทั้งที่มีตอนค้าง -> ถามว่าหนี้เก่าให้ใครเคลียร์ (ปิดกล่อง = ยกเลิกการย้าย)
   if(person !== item.person && !(await resolveBacklogOnReassign(item, person))){ renderCalendar(); return; }
   item.person = person;
-  item.day = day;
+  if(fromDay !== day){
+    // เรื่องหลายวัน: ย้ายเฉพาะวันที่ลาก สถานะของวันนั้นติดไปด้วย
+    const st = dayStatus(item, fromDay);
+    if(isMultiDay(item)){ item.statusByDay = item.statusByDay || {}; delete item.statusByDay[fromDay]; item.statusByDay[day] = st; }
+    item.days = days.map(d=>d===fromDay ? day : d);
+    normalizeDays(item);
+  }
   const name = item.name || item.code;
   const note = hasForeignBacklog(item) ? ` (${foreignBacklogLabel(item)} เคลียร์ต่อ)` : '';
   logActivity(`ย้าย "${name}" ${from} → ${person} / ${day}${note}`);
@@ -104,20 +112,20 @@ function bindCalendarDrag(root){
     if(!drag) return;
     clearTimeout(drag.holdTimer);
     if(drag.scrollRaf) cancelAnimationFrame(drag.scrollRaf);
-    const started = drag.started, id = drag.id;
+    const started = drag.started, id = drag.id, from = drag.from;
     if(drag.ghost) drag.ghost.remove();
     root.querySelectorAll('.cal-chip-dragging').forEach(c=>c.classList.remove('cal-chip-dragging'));
     clearHover();
     drag = null;
     if(!started || cancelled) return;
     const cell = cellAt(x, y);
-    if(cell) moveCalendarItem(id, cell.dataset.person, cell.dataset.day);
+    if(cell) moveCalendarItem(id, cell.dataset.person, cell.dataset.day, from);
   }
 
   root.addEventListener('pointerdown', e=>{
     const chip = e.target.closest('.cal-chip');
     if(!chip || e.button !== 0) return;
-    drag = { id: chip.dataset.id, chip, startX: e.clientX, startY: e.clientY, started: false, pointerId: e.pointerId };
+    drag = { id: chip.dataset.id, from: chip.dataset.from, chip, startX: e.clientX, startY: e.clientY, started: false, pointerId: e.pointerId };
     if(e.pointerType === 'mouse'){
       start(chip, e.clientX, e.clientY);
       e.preventDefault();

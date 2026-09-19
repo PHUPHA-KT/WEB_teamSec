@@ -928,6 +928,106 @@ async function undropStory(id){`, 'changeDropReason');
 </style>`, 'css');
 });
 
+// ================= 29) เรื่องเดียวหลายวันต่อสัปดาห์ =================
+step('เรื่องหลายวัน/สัปดาห์ (days + statusByDay)', 'function itemDays(', () => {
+  const js = fs.readFileSync(path.join(__dirname, 'multiday.js'), 'utf8').replace(/\n$/, '');
+  rep(`function pendingEpCount(item){`, js + `\n\nfunction pendingEpCount(item){`, 'helpers');
+
+  // รีเซ็ตรายสัปดาห์: ทุกวันของเรื่อง
+  rep(`  items.forEach(item=>{
+    if(item.status !== 'pending'){
+      item.status = 'pending';
+      item.pendingSinceDate = null;
+      changed = true;
+    }
+  });`,
+`  items.forEach(item=>{
+    if(isMultiDay(item)){
+      const sb = item.statusByDay || {};
+      if(itemDays(item).some(d=>(sb[d] || 'pending') !== 'pending')){ item.statusByDay = {}; item.status = 'pending'; item.pendingSinceDate = null; changed = true; }
+      return;
+    }
+    if(item.status !== 'pending'){
+      item.status = 'pending';
+      item.pendingSinceDate = null;
+      changed = true;
+    }
+  });`, 'reset');
+
+  // สถิติ "ทำแล้วสัปดาห์นี้" นับต่อวัน
+  rep(`  const doneToday = active.filter(r=>r.status==='done').length;`,
+      `  const doneToday = active.reduce((n,r)=> n + itemDays(r).filter(d=>dayStatus(r,d)==='done').length, 0);`, 'stats');
+
+  // ตัวกรองวัน
+  rep(`  if(dayFilter!=='ทั้งหมด' && item.day!==dayFilter) return false;`,
+      `  if(dayFilter!=='ทั้งหมด' && !itemDays(item).includes(dayFilter)) return false;`, 'matchesFilters');
+
+  // รายการงานประจำ: 1 แถวต่อ (เรื่อง, วัน)
+  rep(`    items.sort((a,b)=> DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day));`,
+`    // เรื่องหลายวัน = หลายแถว (แถวละวัน สถานะแยกกัน) — ถ้ากรองวันอยู่ โชว์เฉพาะวันนั้น
+    const rows = [];
+    items.forEach(it=>itemDays(it).filter(d=>dayFilter==='ทั้งหมด' || d===dayFilter).forEach(d=>rows.push({ item: it, rowDay: d })));
+    rows.sort((a,b)=> DAY_ORDER.indexOf(a.rowDay) - DAY_ORDER.indexOf(b.rowDay));`, 'rows');
+  rep(`    items.forEach(item=>{
+      const effDropped = isEffectivelyDropped(item);`,
+`    rows.forEach(({ item, rowDay })=>{
+      const effDropped = isEffectivelyDropped(item);`, 'row loop');
+  rep(`          <div class="item-code">\${item.code ? esc(item.code)+' · ' : ''}\${esc(item.name)||'(ไม่มีชื่อ)'}\${dropBadge}</div>`,
+      `          <div class="item-code">\${item.code ? esc(item.code)+' · ' : ''}\${esc(item.name)||'(ไม่มีชื่อ)'}\${isMultiDay(item)?\` <span class="multi-badge" title="\${esc(itemDays(item).join(' · '))}">\${itemDays(item).length} วัน/สัปดาห์</span>\`:''}\${dropBadge}</div>`, 'multi badge');
+  rep(`        <span class="day-pill" style="\${dayPillStyle(item.day)}">\${item.day}</span>`,
+      `        <span class="day-pill" style="\${dayPillStyle(rowDay)}">\${rowDay}</span>`, 'day pill');
+  rep(`<select class="status-select" style="background:\${STATUS_META[item.status||'pending'].bg};color:\${STATUS_META[item.status||'pending'].fg};"
+            onchange="updateStatus('\${item.id}', this.value)">
+            \${Object.keys(STATUS_META).map(k=>\`<option value="\${k}" \${((item.status||'pending')===k)?'selected':''}>\${STATUS_META[k].label}</option>\`).join('')}`,
+`<select class="status-select" style="background:\${STATUS_META[dayStatus(item,rowDay)].bg};color:\${STATUS_META[dayStatus(item,rowDay)].fg};"
+            onchange="updateStatus('\${item.id}', this.value, '\${rowDay}')">
+            \${Object.keys(STATUS_META).map(k=>\`<option value="\${k}" \${(dayStatus(item,rowDay)===k)?'selected':''}>\${STATUS_META[k].label}</option>\`).join('')}`, 'status select');
+
+  // เปลี่ยนสถานะต่อวัน
+  rep(`async function updateStatus(id, value){
+  const item = recurring.find(r=>r.id===id);
+  if(!item || !STATUS_META[value]) return;
+  item.status = value;
+  if(value === 'pending' && dayHasPassedThisWeek(item)){`,
+`async function updateStatus(id, value, day){
+  const item = recurring.find(r=>r.id===id);
+  if(!item || !STATUS_META[value]) return;
+  day = day && itemDays(item).includes(day) ? day : itemDays(item)[0];
+  setDayStatus(item, day, value);
+  if(value === 'pending' && dayHasPassed(day)){`, 'updateStatus');
+  rep(`  logActivity(\`เปลี่ยนสถานะ "\${item.name||item.code}" เป็น \${STATUS_META[value].label}\`);`,
+      `  logActivity(\`เปลี่ยนสถานะ "\${item.name||item.code}"\${isMultiDay(item)?' ('+day+')':''} เป็น \${STATUS_META[value].label}\`);`, 'updateStatus log');
+
+  // modal: ติ๊กวันได้หลายวัน
+  rep(`      <select id="rDay">
+        <option>จันทร์</option><option>อังคาร</option><option>พุธ</option><option>พฤหัสบดี</option>
+        <option>ศุกร์</option><option>เสาร์</option><option>อาทิตย์</option><option>ไม่ระบุวัน</option><option>จบแล้ว</option>
+      </select>`,
+`      <div id="rDays" class="day-checks"></div>
+      <div style="font-size:11.5px;color:var(--ink-soft);margin-top:4px;">ติ๊กได้หลายวันถ้าเรื่องลงหลายวันต่อสัปดาห์ — แต่ละวันมีสถานะทำแล้ว/ยังไม่ทำแยกกัน</div>`, 'rDay html');
+  rep(`  document.getElementById('rDay').value = item ? (item.day||'จันทร์') : 'จันทร์';`,
+      `  const rd = document.getElementById('rDays'); if(!rd.children.length) rd.innerHTML = dayChecksHtml();
+  setDayChecks(item ? itemDays(item) : ['จันทร์']);`, 'openRecurringModal');
+  rep(`    day: document.getElementById('rDay').value,`,
+      `    day: readDayChecks()[0],
+    days: readDayChecks(),`, 'saveNewRecurring data');
+  rep(`    Object.assign(item, data); // เก็บ status, ตอนค้าง, ฯลฯ ไว้เหมือนเดิม`,
+      `    Object.assign(item, data); // เก็บ status, ตอนค้าง, ฯลฯ ไว้เหมือนเดิม
+    normalizeDays(item);`, 'saveNewRecurring edit');
+  rep(`    recurring.push({ id: uid('r'), ...data, chapter:'', status:'pending', pendingSinceDate:null, pendingEpisodes:[] });`,
+      `    recurring.push({ id: uid('r'), ...data, chapter:'', status:'pending', pendingSinceDate:null, pendingEpisodes:[] });
+    normalizeDays(recurring[recurring.length-1]);`, 'saveNewRecurring new');
+
+  rep('</style>',
+`  /* เรื่องหลายวัน */
+  .day-checks{ display:flex; flex-wrap:wrap; gap:6px; }
+  .day-check{ display:inline-flex; align-items:center; gap:5px; border:1px solid var(--line); border-radius:999px; padding:5px 10px 5px 8px; font-size:12.5px; cursor:pointer; background:var(--card); }
+  .day-check:has(input:checked){ background:var(--blue-bg); border-color:var(--blue); color:var(--blue); font-weight:700; }
+  .day-check input{ margin:0; }
+  .multi-badge{ display:inline-block; margin-left:6px; padding:1px 7px; border-radius:6px; font-size:11px; font-weight:700; background:var(--blue-bg); color:var(--blue); vertical-align:middle; }
+</style>`, 'css');
+});
+
 // ================= ตรวจก่อนเขียน =================
 group = 'ตรวจท้าย';
 if (s.includes('drive.google.com/drive/folders/')) throw new Error('ยังมีลิงก์ Drive จริงในไฟล์ — SEED ไม่ถูกตัด?');

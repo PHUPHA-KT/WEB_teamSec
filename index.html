@@ -385,6 +385,12 @@
   @media(max-width:480px){ .pick-grid{ grid-template-columns:1fr; } }
   .drop-badge-edit{ cursor:pointer; }
   .drop-badge-edit:hover{ filter:brightness(.93); }
+  /* เรื่องหลายวัน */
+  .day-checks{ display:flex; flex-wrap:wrap; gap:6px; }
+  .day-check{ display:inline-flex; align-items:center; gap:5px; border:1px solid var(--line); border-radius:999px; padding:5px 10px 5px 8px; font-size:12.5px; cursor:pointer; background:var(--card); }
+  .day-check:has(input:checked){ background:var(--blue-bg); border-color:var(--blue); color:var(--blue); font-weight:700; }
+  .day-check input{ margin:0; }
+  .multi-badge{ display:inline-block; margin-left:6px; padding:1px 7px; border-radius:6px; font-size:11px; font-weight:700; background:var(--blue-bg); color:var(--blue); vertical-align:middle; }
 </style>
 </head>
 <body>
@@ -429,10 +435,8 @@
       <select id="rPerson"><option value="">— ยังไม่ระบุ —</option><option value="เหนือ">เหนือ</option><option value="บิ๊ก">บิ๊ก</option><option value="ยูตะ">ยูตะ</option><option value="น๊อต">น๊อต</option></select>
     </div>
     <div class="field"><label>วัน</label>
-      <select id="rDay">
-        <option>จันทร์</option><option>อังคาร</option><option>พุธ</option><option>พฤหัสบดี</option>
-        <option>ศุกร์</option><option>เสาร์</option><option>อาทิตย์</option><option>ไม่ระบุวัน</option><option>จบแล้ว</option>
-      </select>
+      <div id="rDays" class="day-checks"></div>
+      <div style="font-size:11.5px;color:var(--ink-soft);margin-top:4px;">ติ๊กได้หลายวันถ้าเรื่องลงหลายวันต่อสัปดาห์ — แต่ละวันมีสถานะทำแล้ว/ยังไม่ทำแยกกัน</div>
     </div>
     <div class="field"><label>ลิงก์ต้นทาง (ไม่บังคับ)</label><input id="rLink" type="text" placeholder="https://"></div>
     <div class="field"><label>ลิงก์ Google Drive (ไม่บังคับ)</label><input id="rDrive" type="text" placeholder="https://drive.google.com/..."></div>
@@ -1142,6 +1146,70 @@ async function resolveBacklogOnReassign(item, newPerson){
   return true;
 }
 
+// ===== เรื่องเดียวมีหลายวันต่อสัปดาห์ =====
+// item.days        = ['อาทิตย์','จันทร์','อังคาร']   (ไม่มี = ใช้ item.day วันเดียวเหมือนเดิม)
+// item.statusByDay = { 'อาทิตย์':'done', 'จันทร์':'pending', ... }  สถานะแยกต่อวัน (เฉพาะหลายวัน)
+// item.day         = วันแรก เก็บไว้ให้โค้ดเก่า/export อ่านได้เสมอ
+// ตอนค้าง / ลิงก์ / คนทำ / ดรอป ใช้ร่วมกันทุกวัน — เป็นเรื่องเดียวกัน
+
+function itemDays(item){
+  return (Array.isArray(item.days) && item.days.length) ? item.days : [item.day || 'ไม่ระบุวัน'];
+}
+function isMultiDay(item){ return itemDays(item).length > 1; }
+function dayStatus(item, day){
+  if(!isMultiDay(item)) return item.status || 'pending';
+  return (item.statusByDay || {})[day] || 'pending';
+}
+function setDayStatus(item, day, st){
+  if(!isMultiDay(item)){ item.status = st; return; }
+  item.statusByDay = item.statusByDay || {};
+  item.statusByDay[day] = st;
+  // สรุปเป็น item.status ให้ที่อื่นอ่านได้: ครบทุกวัน = done ไม่งั้น pending
+  item.status = itemDays(item).every(d=>(item.statusByDay[d] || 'pending') === 'done') ? 'done' : 'pending';
+}
+function dayHasPassed(day){
+  const idx = WEEKDAY_ONLY.indexOf(day);
+  return idx !== -1 && idx < todayWeekdayIndex();
+}
+// หลังแก้วันใน modal / ลากในปฏิทิน: จัด day/days/statusByDay ให้สอดคล้อง
+function normalizeDays(item){
+  const seen = new Set();
+  const days = itemDays(item).filter(d=>{ if(seen.has(d)) return false; seen.add(d); return true; });
+  item.day = days[0];
+  if(days.length > 1){
+    item.days = days;
+    item.statusByDay = item.statusByDay || {};
+    for(const k of Object.keys(item.statusByDay)) if(!days.includes(k)) delete item.statusByDay[k];
+    item.status = days.every(d=>(item.statusByDay[d] || 'pending') === 'done') ? 'done' : 'pending';
+  } else {
+    // กลับเป็นวันเดียว: เอาสถานะของวันที่เหลือมาเป็นสถานะเรื่อง
+    if(item.statusByDay && item.statusByDay[days[0]]) item.status = item.statusByDay[days[0]];
+    delete item.days;
+    delete item.statusByDay;
+  }
+}
+
+// ---- modal: ติ๊กวันได้หลายวัน ----
+const DAY_CHOICES = ['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์','ไม่ระบุวัน','จบแล้ว'];
+const DAY_EXCLUSIVE = ['ไม่ระบุวัน','จบแล้ว'];   // เลือกอันนี้แล้วเลือกวันอื่นไม่ได้
+function dayChecksHtml(){
+  return DAY_CHOICES.map(d=>`<label class="day-check"><input type="checkbox" value="${d}" onchange="onDayCheck(this)"> ${d}</label>`).join('');
+}
+function setDayChecks(days){
+  const set = new Set(days);
+  document.querySelectorAll('#rDays input').forEach(cb=>{ cb.checked = set.has(cb.value); });
+}
+function readDayChecks(){
+  const out = Array.from(document.querySelectorAll('#rDays input:checked')).map(cb=>cb.value);
+  return out.length ? out : ['ไม่ระบุวัน'];
+}
+function onDayCheck(cb){
+  if(!cb.checked) return;
+  const boxes = Array.from(document.querySelectorAll('#rDays input'));
+  if(DAY_EXCLUSIVE.includes(cb.value)) boxes.forEach(b=>{ if(b !== cb) b.checked = false; });
+  else boxes.forEach(b=>{ if(DAY_EXCLUSIVE.includes(b.value)) b.checked = false; });
+}
+
 function pendingEpCount(item){
   return (item.pendingEpisodes && item.pendingEpisodes.length) || 0;
 }
@@ -1178,6 +1246,11 @@ function currentWeekMondayStr(){
 function resetNonPendingToPending(items){
   let changed = false;
   items.forEach(item=>{
+    if(isMultiDay(item)){
+      const sb = item.statusByDay || {};
+      if(itemDays(item).some(d=>(sb[d] || 'pending') !== 'pending')){ item.statusByDay = {}; item.status = 'pending'; item.pendingSinceDate = null; changed = true; }
+      return;
+    }
     if(item.status !== 'pending'){
       item.status = 'pending';
       item.pendingSinceDate = null;
@@ -1957,7 +2030,7 @@ function closeModal(id){
 function renderStats(){
   const active = recurring.filter(r=>!isEffectivelyDropped(r));
   const total = active.length;
-  const doneToday = active.filter(r=>r.status==='done').length;
+  const doneToday = active.reduce((n,r)=> n + itemDays(r).filter(d=>dayStatus(r,d)==='done').length, 0);
   const storiesOverdue = active.filter(r=>pendingEpCount(r)>0).length;
   const episodesOverdue = active.reduce((s,r)=>s+pendingEpCount(r),0);
   const totalSpent = expenses.reduce((s,e)=>s+Number(e.amount||0),0);
@@ -2018,7 +2091,7 @@ function matchesFilters(item){
   if(effDropped && !showDropped) return false;
   if(showDropped && !effDropped) return false;
   if(showOnlyPending && pendingEpCount(item)===0) return false; // โหมดดูเฉพาะงานค้าง
-  if(dayFilter!=='ทั้งหมด' && item.day!==dayFilter) return false;
+  if(dayFilter!=='ทั้งหมด' && !itemDays(item).includes(dayFilter)) return false;
   if(personFilter!=='ทั้งหมด' && !isPersonInvolved(item, personFilter)) return false;
   if(searchText){
     const s = searchText.toLowerCase();
@@ -2117,14 +2190,17 @@ function renderRecurring(){
     const items = groups[person];
     if(!items.length) return;
     any = true;
-    items.sort((a,b)=> DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day));
+    // เรื่องหลายวัน = หลายแถว (แถวละวัน สถานะแยกกัน) — ถ้ากรองวันอยู่ โชว์เฉพาะวันนั้น
+    const rows = [];
+    items.forEach(it=>itemDays(it).filter(d=>dayFilter==='ทั้งหมด' || d===dayFilter).forEach(d=>rows.push({ item: it, rowDay: d })));
+    rows.sort((a,b)=> DAY_ORDER.indexOf(a.rowDay) - DAY_ORDER.indexOf(b.rowDay));
     const color = person ? PERSON_COLOR[person] : 'gray';
     const label = person || 'ยังไม่ระบุคนทำ';
     html += `<div class="person-section">
       <div class="person-head" style="background:var(--${color})">
         <span>${label}</span><small>${items.length} เรื่อง</small>
       </div>`;
-    items.forEach(item=>{
+    rows.forEach(({ item, rowDay })=>{
       const effDropped = isEffectivelyDropped(item);
       const dropBadge = item.dropped
         ? (effDropped
@@ -2133,10 +2209,10 @@ function renderRecurring(){
         : '';
       html += `<div class="item-row">
         <div class="item-main">
-          <div class="item-code">${item.code ? esc(item.code)+' · ' : ''}${esc(item.name)||'(ไม่มีชื่อ)'}${dropBadge}</div>
+          <div class="item-code">${item.code ? esc(item.code)+' · ' : ''}${esc(item.name)||'(ไม่มีชื่อ)'}${isMultiDay(item)?` <span class="multi-badge" title="${esc(itemDays(item).join(' · '))}">${itemDays(item).length} วัน/สัปดาห์</span>`:''}${dropBadge}</div>
           ${overdueBadgeHtml(item)}
         </div>
-        <span class="day-pill" style="${dayPillStyle(item.day)}">${item.day}</span>
+        <span class="day-pill" style="${dayPillStyle(rowDay)}">${rowDay}</span>
         ${effDropped ? `
           <button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px;" onclick="undropStory('${item.id}')">↩ เอากลับ</button>
           <button class="icon-btn" onclick="openRecurringModal('${item.id}')" title="แก้ไข" style="color:#6b7480;">✎</button>
@@ -2147,9 +2223,9 @@ function renderRecurring(){
              onclick="${item.link?'':'event.preventDefault(); promptLink(\''+item.id+'\')'}">🔗</a>
           <a class="link-btn ${item.gdrive?'':'empty'}" href="${safeUrl(item.gdrive)}" target="_blank" title="ลิงก์ Google Drive"
              onclick="${item.gdrive?'':'event.preventDefault(); promptDriveLink(\''+item.id+'\')'}">📁</a>
-          <select class="status-select" style="background:${STATUS_META[item.status||'pending'].bg};color:${STATUS_META[item.status||'pending'].fg};"
-            onchange="updateStatus('${item.id}', this.value)">
-            ${Object.keys(STATUS_META).map(k=>`<option value="${k}" ${((item.status||'pending')===k)?'selected':''}>${STATUS_META[k].label}</option>`).join('')}
+          <select class="status-select" style="background:${STATUS_META[dayStatus(item,rowDay)].bg};color:${STATUS_META[dayStatus(item,rowDay)].fg};"
+            onchange="updateStatus('${item.id}', this.value, '${rowDay}')">
+            ${Object.keys(STATUS_META).map(k=>`<option value="${k}" ${(dayStatus(item,rowDay)===k)?'selected':''}>${STATUS_META[k].label}</option>`).join('')}
           </select>
           ${item.dropped
             ? `<button class="icon-btn" onclick="undropStory('${item.id}')" title="ยกเลิกการรอดรอป" style="color:#1a9c6b;">↩</button>`
@@ -2534,16 +2610,17 @@ async function undropStory(id){
   showToast(`"${item.name||item.code}" กลับมางานปกติแล้ว — อยู่ที่ ${item.person||'ไม่ระบุคน'} · ${item.day||'ไม่ระบุวัน'}`);
 }
 
-async function updateStatus(id, value){
+async function updateStatus(id, value, day){
   const item = recurring.find(r=>r.id===id);
   if(!item || !STATUS_META[value]) return;
-  item.status = value;
-  if(value === 'pending' && dayHasPassedThisWeek(item)){
+  day = day && itemDays(item).includes(day) ? day : itemDays(item)[0];
+  setDayStatus(item, day, value);
+  if(value === 'pending' && dayHasPassed(day)){
     item.pendingSinceDate = todayDateStr(); // เริ่มนับค้างใหม่
   } else {
     item.pendingSinceDate = null;
   }
-  logActivity(`เปลี่ยนสถานะ "${item.name||item.code}" เป็น ${STATUS_META[value].label}`);
+  logActivity(`เปลี่ยนสถานะ "${item.name||item.code}"${isMultiDay(item)?' ('+day+')':''} เป็น ${STATUS_META[value].label}`);
   renderRecurring(); renderStats();
   await persistRecurring(false);
 }
@@ -2668,7 +2745,8 @@ function openRecurringModal(id){
   document.getElementById('rCode').value = item ? (item.code||'') : '';
   document.getElementById('rName').value = item ? (item.name||'') : '';
   document.getElementById('rPerson').value = item ? (item.person||'') : '';
-  document.getElementById('rDay').value = item ? (item.day||'จันทร์') : 'จันทร์';
+  const rd = document.getElementById('rDays'); if(!rd.children.length) rd.innerHTML = dayChecksHtml();
+  setDayChecks(item ? itemDays(item) : ['จันทร์']);
   document.getElementById('rLink').value = item ? (item.link||'') : '';
   document.getElementById('rDrive').value = item ? (item.gdrive||'') : '';
   openModal('modalRecurring');
@@ -2679,7 +2757,8 @@ async function saveNewRecurring(){
   const data = {
     code: document.getElementById('rCode').value.trim(),
     name,
-    day: document.getElementById('rDay').value,
+    day: readDayChecks()[0],
+    days: readDayChecks(),
     person: document.getElementById('rPerson').value,
     link: document.getElementById('rLink').value.trim(),
     gdrive: document.getElementById('rDrive').value.trim(),
@@ -2689,8 +2768,10 @@ async function saveNewRecurring(){
     if(!item){ showToast('เรื่องนี้ถูกลบไปแล้ว'); closeModal('modalRecurring'); return; }
     if(data.person !== item.person && !(await resolveBacklogOnReassign(item, data.person))) return;   // ปิดกล่อง = ไม่บันทึก
     Object.assign(item, data); // เก็บ status, ตอนค้าง, ฯลฯ ไว้เหมือนเดิม
+    normalizeDays(item);
   } else {
     recurring.push({ id: uid('r'), ...data, chapter:'', status:'pending', pendingSinceDate:null, pendingEpisodes:[] });
+    normalizeDays(recurring[recurring.length-1]);
     logActivity(`เพิ่มเรื่องประจำ "${data.name||data.code}"`);
     // ย้ายมาจากเรื่องเปิดใหม่: เอาตัวเดิมออก (ลงถังขยะ กู้ได้) จะได้ไม่มี 2 ที่
     if(promoteFromNewId){
@@ -3354,13 +3435,13 @@ function renderCalendar(){
       <div class="cal-head cal-head-${color}">${esc(person)} <span style="opacity:.85;font-weight:700;">(${mine.length} เรื่อง)</span></div>
       <table class="cal-table"><tbody>
         ${CAL_DAYS.map(d=>{
-          const items = mine.filter(r=>r.day===d);
+          const items = mine.filter(r=>itemDays(r).includes(d));
           const chips = items.map(r=>{
             const eps = pendingEpCount(r);
             const by = pendingEpsByPerson(r);
             const owner = hasForeignBacklog(r) ? ' · ' + esc(Object.keys(by).filter(p=>p!==r.person).map(p=>p+' '+by[p]).join(', ')) : '';
             const badge = eps ? ` <span class="cal-chip-eps">(ค้าง ${eps}${owner})</span>` : '';
-            return `<span class="cal-chip" data-id="${r.id}" title="ลากเพื่อย้ายวัน/ย้ายคน">${esc((r.code?r.code+'-':'') + (r.name||''))}${badge}</span>`;
+            return `<span class="cal-chip" data-id="${r.id}" data-from="${esc(d)}" title="ลากเพื่อย้ายวัน/ย้ายคน${isMultiDay(r)?' (ย้ายเฉพาะวันนี้)':''}">${esc((r.code?r.code+'-':'') + (r.name||''))}${badge}</span>`;
           }).join('');
           return `<tr>
             <td class="cal-day">${CAL_DAY_LABEL[d]}</td>
@@ -3381,15 +3462,23 @@ function renderCalendar(){
 }
 
 // ย้ายเรื่องไปช่องใหม่ (ใช้ร่วมกันทั้งเมาส์/ทัช)
-async function moveCalendarItem(id, person, day){
+async function moveCalendarItem(id, person, day, fromDay){
   const item = recurring.find(r=>r.id===id);
   if(!item) return;
-  if(item.person === person && item.day === day) return;
-  const from = `${item.person||'ไม่ระบุ'} / ${item.day||'ไม่ระบุวัน'}`;
+  const days = itemDays(item);
+  fromDay = fromDay && days.includes(fromDay) ? fromDay : days[0];
+  if(item.person === person && fromDay === day) return;
+  const from = `${item.person||'ไม่ระบุ'} / ${fromDay||'ไม่ระบุวัน'}`;
   // ย้ายคนทั้งที่มีตอนค้าง -> ถามว่าหนี้เก่าให้ใครเคลียร์ (ปิดกล่อง = ยกเลิกการย้าย)
   if(person !== item.person && !(await resolveBacklogOnReassign(item, person))){ renderCalendar(); return; }
   item.person = person;
-  item.day = day;
+  if(fromDay !== day){
+    // เรื่องหลายวัน: ย้ายเฉพาะวันที่ลาก สถานะของวันนั้นติดไปด้วย
+    const st = dayStatus(item, fromDay);
+    if(isMultiDay(item)){ item.statusByDay = item.statusByDay || {}; delete item.statusByDay[fromDay]; item.statusByDay[day] = st; }
+    item.days = days.map(d=>d===fromDay ? day : d);
+    normalizeDays(item);
+  }
   const name = item.name || item.code;
   const note = hasForeignBacklog(item) ? ` (${foreignBacklogLabel(item)} เคลียร์ต่อ)` : '';
   logActivity(`ย้าย "${name}" ${from} → ${person} / ${day}${note}`);
@@ -3441,20 +3530,20 @@ function bindCalendarDrag(root){
     if(!drag) return;
     clearTimeout(drag.holdTimer);
     if(drag.scrollRaf) cancelAnimationFrame(drag.scrollRaf);
-    const started = drag.started, id = drag.id;
+    const started = drag.started, id = drag.id, from = drag.from;
     if(drag.ghost) drag.ghost.remove();
     root.querySelectorAll('.cal-chip-dragging').forEach(c=>c.classList.remove('cal-chip-dragging'));
     clearHover();
     drag = null;
     if(!started || cancelled) return;
     const cell = cellAt(x, y);
-    if(cell) moveCalendarItem(id, cell.dataset.person, cell.dataset.day);
+    if(cell) moveCalendarItem(id, cell.dataset.person, cell.dataset.day, from);
   }
 
   root.addEventListener('pointerdown', e=>{
     const chip = e.target.closest('.cal-chip');
     if(!chip || e.button !== 0) return;
-    drag = { id: chip.dataset.id, chip, startX: e.clientX, startY: e.clientY, started: false, pointerId: e.pointerId };
+    drag = { id: chip.dataset.id, from: chip.dataset.from, chip, startX: e.clientX, startY: e.clientY, started: false, pointerId: e.pointerId };
     if(e.pointerType === 'mouse'){
       start(chip, e.clientX, e.clientY);
       e.preventDefault();
