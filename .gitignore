@@ -2,3 +2,4 @@
 ระบบจัดการงานคัดเรื่อง.html
 *.backup.html
 seed-*.json
+.claude/

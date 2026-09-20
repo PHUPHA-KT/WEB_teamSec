@@ -1028,6 +1028,51 @@ step('เรื่องหลายวัน/สัปดาห์ (days + stat
 </style>`, 'css');
 });
 
+// ================= 30) ตอนล่าสุดที่ทำแล้ว (lastEp) =================
+step('ตอนล่าสุดที่ทำแล้ว (lastEp)', 'function bumpLastEp(', () => {
+  const js = fs.readFileSync(path.join(__dirname, 'lastep.js'), 'utf8').replace(/\n$/, '');
+  rep(`function pendingEpCount(item){`, js + `\n\nfunction pendingEpCount(item){`, 'helpers');
+
+  // กด ✕ ตอนค้าง = ทำตอนนั้นแล้ว
+  rep(`  if(i < 0 || i >= eps.length) return;
+  eps.splice(i, 1);
+  item.pendingEpisodes = eps;`,
+`  if(i < 0 || i >= eps.length) return;
+  bumpLastEp(item, eps[i]);
+  eps.splice(i, 1);
+  item.pendingEpisodes = eps;`, 'removeEpisodeAt');
+  rep(`  if(!await uiConfirm('ทำครบทุกตอนแล้ว เอาตอนที่ค้างออกทั้งหมด?', 'เคลียร์ทุกตอน')) return;
+  item.pendingEpisodes = [];`,
+`  if(!await uiConfirm('ทำครบทุกตอนแล้ว เอาตอนที่ค้างออกทั้งหมด?', 'เคลียร์ทุกตอน')) return;
+  bumpLastEp(item, item.pendingEpisodes);
+  item.pendingEpisodes = [];`, 'clearAllEpisodes');
+
+  // ป้ายในแถวงานประจำ (ใต้ชื่อ ข้างป้ายค้าง)
+  rep(`          \${overdueBadgeHtml(item)}
+        </div>
+        <span class="day-pill" style="\${dayPillStyle(rowDay)}">\${rowDay}</span>`,
+`          <div class="ep-line">\${lastEpBadgeHtml(item)}</div>
+          \${overdueBadgeHtml(item)}
+        </div>
+        <span class="day-pill" style="\${dayPillStyle(rowDay)}">\${rowDay}</span>`, 'row badge');
+
+  // แท็บทุกเรื่อง: คอลัมน์ตอนล่าสุด
+  rep(`      <td>\${esc(r.name||'—')}\${drop}</td>
+      <td>\${link}</td>`,
+`      <td>\${esc(r.name||'—')}\${drop}</td>
+      <td>\${lastEpBadgeHtml(r)}</td>
+      <td>\${link}</td>`, 'allstories cell');
+  rep(`<thead><tr><th>รหัส</th><th>ชื่อเรื่อง</th><th>ลิงก์ต้นทาง</th></tr></thead>`,
+      `<thead><tr><th>รหัส</th><th>ชื่อเรื่อง</th><th>ตอนล่าสุด</th><th>ลิงก์ต้นทาง</th></tr></thead>`, 'allstories head');
+
+  rep('</style>',
+`  /* ตอนล่าสุดที่ทำแล้ว */
+  .lastep-badge{ display:inline-block; padding:1px 8px; border-radius:6px; font-size:11.5px; font-weight:700; background:var(--green-bg,#e6f6ee); color:var(--green,#1a9c6b); cursor:pointer; white-space:nowrap; }
+  .lastep-badge:hover{ filter:brightness(.93); }
+  .lastep-empty{ background:var(--gray-bg); color:var(--ink-soft); font-weight:600; }
+</style>`, 'css');
+});
+
 // ================= ตรวจก่อนเขียน =================
 group = 'ตรวจท้าย';
 if (s.includes('drive.google.com/drive/folders/')) throw new Error('ยังมีลิงก์ Drive จริงในไฟล์ — SEED ไม่ถูกตัด?');
