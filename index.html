@@ -395,6 +395,9 @@
   .lastep-badge{ display:inline-block; padding:1px 8px; border-radius:6px; font-size:11.5px; font-weight:700; background:var(--green-bg,#e6f6ee); color:var(--green,#1a9c6b); cursor:pointer; white-space:nowrap; }
   .lastep-badge:hover{ filter:brightness(.93); }
   .lastep-empty{ background:var(--gray-bg); color:var(--ink-soft); font-weight:600; }
+  /* ป้ายเว็บต้นทาง */
+  .src-badge{ display:inline-block; margin-right:6px; padding:1px 6px; border-radius:5px; font-size:10.5px; font-weight:800; letter-spacing:.3px; vertical-align:middle; line-height:1.5; }
+  body.dark .src-badge{ filter:brightness(.85) saturate(1.2); }
 </style>
 </head>
 <body>
@@ -1247,6 +1250,36 @@ async function editLastEp(id){
   logActivity(`ตอนล่าสุด "${item.name||item.code}" → ${val === undefined ? 'ล้าง' : epLabel(val)}`);
   renderRecurring();
   await persistRecurring(false);
+}
+
+// ===== ป้ายเว็บต้นทาง (ย่อจากโดเมนของ item.link) =====
+// เพิ่ม/แก้ตัวย่อที่นี่ที่เดียว — โดเมนที่ไม่อยู่ในตาราง ใช้ชื่อโดเมนส่วนแรก (vortexscans)
+const SOURCE_ABBR = {
+  'lezhin.com':          { abbr:'LZ',   bg:'#fdecec', fg:'#c0392b' },
+  'ridibooks.com':       { abbr:'RIDI', bg:'#e6f0fb', fg:'#1f5fbf' },
+  'page.kakao.com':      { abbr:'KKO',  bg:'#fff6d6', fg:'#9a6d00' },
+  'toptoon.com':         { abbr:'TT',   bg:'#e8f7f1', fg:'#1a7f57' },
+  'mrblue.com':          { abbr:'MRB',  bg:'#eaf2ff', fg:'#2b4c8c' },
+  'mangadex.org':        { abbr:'MD',   bg:'#fdeee6', fg:'#b3541e' },
+  'en-thunderscans.com': { abbr:'THS',  bg:'#f1ecfa', fg:'#6a3fb3' },
+  'vortexscans.org':     { abbr:'VTX',  bg:'#f1ecfa', fg:'#6a3fb3' },
+};
+function sourceInfo(url){
+  let host;
+  try{ host = new URL(String(url)).hostname.replace(/^www\./, '').toLowerCase(); }catch(e){ return null; }
+  const known = SOURCE_ABBR[host];
+  if(known) return { host, ...known };
+  // ไม่รู้จัก: เอาส่วนแรกของโดเมน (ตัด TLD) ยาวสุด 8 ตัว
+  const parts = host.split('.');
+  parts.pop();                                                        // ตัด TLD (.com .org .kr)
+  if(parts.length > 1 && /^(co|com|net|org|ac|go|or|ne)$/.test(parts[parts.length-1])) parts.pop(); // .co.kr .com.tw
+  const base = parts[parts.length-1] || host;
+  return { host, abbr: base.slice(0, 8), bg:'var(--gray-bg)', fg:'var(--ink-soft)' };
+}
+function sourceBadgeHtml(item){
+  const s = sourceInfo(item.link);
+  if(!s) return '';
+  return `<span class="src-badge" style="background:${s.bg};color:${s.fg};" title="${esc(s.host)}">${esc(s.abbr)}</span>`;
 }
 
 function pendingEpCount(item){
@@ -2248,7 +2281,7 @@ function renderRecurring(){
         : '';
       html += `<div class="item-row">
         <div class="item-main">
-          <div class="item-code">${item.code ? esc(item.code)+' · ' : ''}${esc(item.name)||'(ไม่มีชื่อ)'}${isMultiDay(item)?` <span class="multi-badge" title="${esc(itemDays(item).join(' · '))}">${itemDays(item).length} วัน/สัปดาห์</span>`:''}${dropBadge}</div>
+          <div class="item-code">${sourceBadgeHtml(item)}${item.code ? esc(item.code)+' · ' : ''}${esc(item.name)||'(ไม่มีชื่อ)'}${isMultiDay(item)?` <span class="multi-badge" title="${esc(itemDays(item).join(' · '))}">${itemDays(item).length} วัน/สัปดาห์</span>`:''}${dropBadge}</div>
           <div class="ep-line">${lastEpBadgeHtml(item)}</div>
           ${overdueBadgeHtml(item)}
         </div>
@@ -3272,7 +3305,7 @@ function renderAllStories(){
       ? ` <span class="drop-badge" style="background:${DROP_META[r.dropped].bg};color:${DROP_META[r.dropped].fg};">${DROP_META[r.dropped].label}</span>`
       : '';
     const link = r.link
-      ? `<a href="${safeUrl(r.link)}" target="_blank" rel="noopener" class="all-link" title="${esc(r.link)}">${esc(linkHostLabel(r.link))} ↗</a>`
+      ? `${sourceBadgeHtml(r)}<a href="${safeUrl(r.link)}" target="_blank" rel="noopener" class="all-link" title="${esc(r.link)}">${esc(linkHostLabel(r.link))} ↗</a>`
       : '<span style="color:var(--ink-soft);">—</span>';
     return `<tr class="${r.dropped?'all-dropped':''}">
       <td class="all-code">${esc(r.code||'—')}</td>

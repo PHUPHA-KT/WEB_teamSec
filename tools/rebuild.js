@@ -1073,6 +1073,26 @@ step('ตอนล่าสุดที่ทำแล้ว (lastEp)', 'functio
 </style>`, 'css');
 });
 
+// ================= 31) ป้ายเว็บต้นทาง (ตัวย่อจากโดเมน) =================
+step('ป้ายเว็บต้นทาง (ตัวย่อ)', 'function sourceBadgeHtml(', () => {
+  const js = fs.readFileSync(path.join(__dirname, 'source.js'), 'utf8').replace(/\n$/, '');
+  rep(`function pendingEpCount(item){`, js + `\n\nfunction pendingEpCount(item){`, 'helpers');
+
+  // งานประจำ: หน้ารหัสเรื่อง
+  rep(`          <div class="item-code">\${item.code ? esc(item.code)+' · ' : ''}\${esc(item.name)||'(ไม่มีชื่อ)'}`,
+      `          <div class="item-code">\${sourceBadgeHtml(item)}\${item.code ? esc(item.code)+' · ' : ''}\${esc(item.name)||'(ไม่มีชื่อ)'}`, 'row badge');
+
+  // ทุกเรื่อง: หน้าชื่อลิงก์
+  rep(`      ? \`<a href="\${safeUrl(r.link)}" target="_blank" rel="noopener" class="all-link" title="\${esc(r.link)}">\${esc(linkHostLabel(r.link))} ↗</a>\``,
+      `      ? \`\${sourceBadgeHtml(r)}<a href="\${safeUrl(r.link)}" target="_blank" rel="noopener" class="all-link" title="\${esc(r.link)}">\${esc(linkHostLabel(r.link))} ↗</a>\``, 'allstories cell');
+
+  rep('</style>',
+`  /* ป้ายเว็บต้นทาง */
+  .src-badge{ display:inline-block; margin-right:6px; padding:1px 6px; border-radius:5px; font-size:10.5px; font-weight:800; letter-spacing:.3px; vertical-align:middle; line-height:1.5; }
+  body.dark .src-badge{ filter:brightness(.85) saturate(1.2); }
+</style>`, 'css');
+});
+
 // ================= ตรวจก่อนเขียน =================
 group = 'ตรวจท้าย';
 if (s.includes('drive.google.com/drive/folders/')) throw new Error('ยังมีลิงก์ Drive จริงในไฟล์ — SEED ไม่ถูกตัด?');
