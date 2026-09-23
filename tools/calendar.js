@@ -50,11 +50,29 @@ async function moveCalendarItem(id, person, day, fromDay){
   const days = itemDays(item);
   fromDay = fromDay && days.includes(fromDay) ? fromDay : days[0];
   if(item.person === person && fromDay === day) return;
-  const from = `${item.person||'ไม่ระบุ'} / ${fromDay||'ไม่ระบุวัน'}`;
+  // เรื่องหลายวัน: วางทับวันที่มีอยู่แล้ว = วันหาย + สถานะโดนทับ -> ไม่ย้าย
+  // (ข้ามคน + วันที่มีอยู่แล้ว = ย้ายแค่คน วันคงเดิม)
+  if(fromDay !== day && days.includes(day)){
+    if(item.person === person){
+      showToast(`"${item.name||item.code}" ลง${CAL_DAY_LABEL[day] || day}อยู่แล้ว`);
+      renderCalendar(); return;
+    }
+    day = fromDay;
+  }
+  // เรื่องหลายวัน -> ไม่ระบุวัน/จบแล้ว: ต้องเป็นวันเดียวทั้งเรื่อง (เหมือนใน modal) ถามก่อน
+  let collapse = false;
+  if(fromDay !== day && isMultiDay(item) && DAY_EXCLUSIVE.includes(day)){
+    if(!await uiConfirm(`เปลี่ยนทั้งเรื่อง "${item.name||item.code}" เป็น "${day}"?\n(เอาทุกวันออก: ${days.join(', ')})`, 'เปลี่ยนเป็น ' + day)){ renderCalendar(); return; }
+    collapse = true;
+  }
+  const from = `${item.person||'ไม่ระบุ'} / ${collapse ? days.join(', ') : (fromDay||'ไม่ระบุวัน')}`;
   // ย้ายคนทั้งที่มีตอนค้าง -> ถามว่าหนี้เก่าให้ใครเคลียร์ (ปิดกล่อง = ยกเลิกการย้าย)
   if(person !== item.person && !(await resolveBacklogOnReassign(item, person))){ renderCalendar(); return; }
   item.person = person;
-  if(fromDay !== day){
+  if(collapse){
+    item.days = [day];
+    normalizeDays(item);
+  } else if(fromDay !== day){
     // เรื่องหลายวัน: ย้ายเฉพาะวันที่ลาก สถานะของวันนั้นติดไปด้วย
     const st = dayStatus(item, fromDay);
     if(isMultiDay(item)){ item.statusByDay = item.statusByDay || {}; delete item.statusByDay[fromDay]; item.statusByDay[day] = st; }
