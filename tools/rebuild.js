@@ -1093,6 +1093,48 @@ step('ป้ายเว็บต้นทาง (ตัวย่อ)', 'functio
 </style>`, 'css');
 });
 
+// ================= 32) ย้ายเรื่องเปิดใหม่เข้างานประจำได้ก่อนติ๊กครบ =================
+step('ย้ายเข้างานประจำก่อนติ๊กครบ (promotedId)', 'src.promotedId =', () => {
+  // renderNewStories/promoteNewToRecurring มาจาก newstories.js (ขั้น 16) — ที่นี่แก้ตอนบันทึก + ตอนติ๊ก
+  rep(`      if(src){
+        await moveToTrash('newstories', src);
+        newStories = newStories.filter(n=>n.id!==promoteFromNewId);
+        logActivity(\`ย้าย "\${src.code}" จากเรื่องเปิดใหม่เข้างานประจำ\`);
+        showToast('ย้ายเข้างานประจำแล้ว — เรื่องเปิดใหม่ตัวเดิมอยู่ในถังขยะ');
+      }`,
+`      if(src){
+        const pr = newStoryProgress(src);
+        if(pr.missing.length){
+          // ยังติ๊กไม่ครบ: การ์ดอยู่ต่อ รอคนที่เหลือ แล้วลงถังขยะเองตอนครบ
+          src.promotedId = recurring[recurring.length-1].id;
+          logActivity(\`ย้าย "\${src.code}" เข้างานประจำ (เรื่องเปิดใหม่ยังรอ \${pr.missing.join(', ')})\`);
+          showToast('ย้ายเข้างานประจำแล้ว — การ์ดเรื่องเปิดใหม่รอ ' + pr.missing.join(', ') + ' ติ๊ก แล้วหายเอง');
+        } else {
+          await moveToTrash('newstories', src);
+          newStories = newStories.filter(n=>n.id!==promoteFromNewId);
+          logActivity(\`ย้าย "\${src.code}" จากเรื่องเปิดใหม่เข้างานประจำ\`);
+          showToast('ย้ายเข้างานประจำแล้ว — เรื่องเปิดใหม่ตัวเดิมอยู่ในถังขยะ');
+        }
+      }`, 'saveNewRecurring');
+
+  rep(`  item.contrib[person] = !item.contrib[person];
+  renderNewStories(); renderStats();
+  await persistNew(false);`,
+`  item.contrib[person] = !item.contrib[person];
+  // อยู่ในงานประจำแล้ว + คนสุดท้ายติ๊ก -> การ์ดลงถังขยะเอง
+  if(promotedTarget(item) && !newStoryProgress(item).missing.length){
+    await moveToTrash('newstories', item);
+    newStories = newStories.filter(n=>n.id!==id);
+    logActivity(\`"\${item.code}" ติ๊กครบแล้ว — เอาออกจากเรื่องเปิดใหม่ (อยู่ในงานประจำแล้ว)\`);
+    showToast('ติ๊กครบแล้ว — การ์ดย้ายลงถังขยะ (เรื่องอยู่ในงานประจำแล้ว)');
+  }
+  renderNewStories(); renderStats();
+  await persistNew(false);`, 'toggleContrib');
+
+  rep('</style>', `  .promoted-badge{ display:inline-block; padding:3px 9px; border-radius:7px; font-size:12px; font-weight:700; background:var(--green-bg); color:var(--green); }
+</style>`, 'css');
+});
+
 // ================= ตรวจก่อนเขียน =================
 group = 'ตรวจท้าย';
 if (s.includes('drive.google.com/drive/folders/')) throw new Error('ยังมีลิงก์ Drive จริงในไฟล์ — SEED ไม่ถูกตัด?');

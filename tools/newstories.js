@@ -3,7 +3,8 @@
 // - badge บอก 2/4 + บอกว่าใครยังไม่ติ๊ก
 // - ชิป ⭐ ที่ฉันยังไม่ติ๊ก
 // - เพิ่มเมื่อ X วันก่อน (จาก createdAt — ของเก่าไม่มีก็ไม่โชว์)
-// - ปุ่ม → ย้ายเข้างานประจำ บนการ์ดที่เสร็จแล้ว (กรอก modal ให้ แล้วเรื่องเปิดใหม่ย้ายลงถังขยะเอง)
+// - ปุ่ม → ย้ายเข้างานประจำ ได้ทุกการ์ด ไม่ต้องรอติ๊กครบ (กรอก modal ให้)
+//   ครบแล้ว = การ์ดลงถังขยะทันที / ยังไม่ครบ = การ์ดอยู่ต่อ (promotedId) จนคนสุดท้ายติ๊กแล้วลงถังขยะเอง
 let newShowDone = false;
 let newMineOnly = false;
 let promoteFromNewId = null;   // เรื่องเปิดใหม่ที่กำลังถูกย้ายเข้างานประจำ (saveNewRecurring ใช้)
@@ -12,6 +13,10 @@ function newStoryProgress(item){
   const c = item.contrib || {};
   const missing = PEOPLE.filter(p=>!c[p]);
   return { done: PEOPLE.length - missing.length, total: PEOPLE.length, missing };
+}
+// งานประจำที่การ์ดนี้ถูกย้ายไปแล้ว (ถ้างานประจำถูกลบไป = ถือว่ายังไม่ได้ย้าย)
+function promotedTarget(item){
+  return item.promotedId ? recurring.find(r=>r.id===item.promotedId) || null : null;
 }
 function agoLabel(iso){
   if(!iso) return '';
@@ -71,8 +76,9 @@ function renderNewStories(){
     if(isDone){ statusClass='status-done'; statusLabel='เสร็จแล้ว'; }
     else if(pr.done>0){ statusClass='status-progress'; statusLabel=`กำลังทำ ${pr.done}/${pr.total}`; }
     const ago = agoLabel(item.createdAt);
+    const promoted = promotedTarget(item);
     const metaBits = [];
-    if(!isDone && pr.done>0) metaBits.push('เหลือ: ' + pr.missing.map(esc).join(', '));
+    if(!isDone && pr.done>0 && !promoted) metaBits.push('เหลือ: ' + pr.missing.map(esc).join(', '));
     if(ago) metaBits.push(ago);
     return `<div class="new-card">
       <div class="new-card-top">
@@ -84,7 +90,9 @@ function renderNewStories(){
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
           <span class="status-badge ${statusClass}">${statusLabel}</span>
-          ${isDone?`<button class="btn btn-ghost sched-act sched-act-ok" onclick="promoteNewToRecurring('${item.id}')" title="ย้ายไปเป็นงานประจำรายสัปดาห์">→ งานประจำ</button>`:''}
+          ${promoted
+            ? `<span class="promoted-badge" title="เข้างานประจำแล้ว การ์ดนี้จะหายเองเมื่อทุกคนติ๊กครบ">✓ อยู่ในงานประจำแล้ว${pr.missing.length ? ' · รอ: ' + pr.missing.map(esc).join(', ') : ''}</span>`
+            : `<button class="btn btn-ghost sched-act ${isDone?'sched-act-ok':''}" onclick="promoteNewToRecurring('${item.id}')" title="ย้ายไปเป็นงานประจำรายสัปดาห์ (ไม่ต้องรอติ๊กครบ)">→ งานประจำ</button>`}
           <button class="icon-btn" onclick="openNewModal('${item.id}')" title="แก้ไข" style="color:#6b7480;">✎</button>
           <button class="icon-btn" onclick="deleteNewStory('${item.id}')">✕</button>
         </div>
@@ -126,6 +134,7 @@ function renderNewStories(){
 function promoteNewToRecurring(id){
   const item = newStories.find(n=>n.id===id);
   if(!item) return;
+  if(promotedTarget(item)){ showToast('เรื่องนี้อยู่ในงานประจำแล้ว'); return; }
   openRecurringModal();
   const cn = splitCodeName(item.code);
   document.getElementById('rCode').value = cn.code;
