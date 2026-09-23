@@ -63,6 +63,8 @@ const importable = JSON.stringify({
   version: 3,
   exportedAt: now.toISOString(),
   source: 'github-actions-backup',
+  // week the statuses belong to — the app's import shows it when restoring an older file
+  resetWeek: data.last_reset_week ? String(data.last_reset_week.value) : undefined,
   data: {
     recurring_stories: app.recurring_stories || [],
     new_stories: app.new_stories || [],

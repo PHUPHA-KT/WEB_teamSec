@@ -87,3 +87,11 @@ backups/
 - สคริปต์**ไม่มี**คำสั่งเขียนไป Supabase เลย — ต่อให้ secret หลุด ทำได้แค่อ่าน (และ RLS ก็ไม่ให้ลบอยู่แล้ว)
 - ปฏิเสธเขียนไฟล์ถ้า DB ว่างหรือ appdata พัง — ไม่มีทาง backup เปล่าทับ backup ดี
 - repo ต้อง **private** — ข้างในคือข้อมูลจริงของทีม
+
+## ตอนนี้รันจากเครื่อง (Actions ติด billing)
+
+บัญชี GitHub มีการชำระเงินค้าง ทำให้ Actions ใน repo private ไม่เริ่มงาน (`startup_failure`) — workflow `backup` ถูกปิดไว้
+
+- Task Scheduler: งาน **WEB_teamSec backup** รัน `run-backup.ps1` ทุกวัน 12:00 (ปิดเครื่อง = รันตอนเปิดครั้งถัดไป)
+- ค่าล็อกอินอยู่ใน `backup.env` ข้างสคริปต์ (gitignored) ผลแต่ละรอบอยู่ใน `backup.log`
+- แก้ billing ได้แล้ว: `gh workflow enable backup -R PHUPHA-KT/WEB_teamSec-backup` แล้วลบงานใน Task Scheduler
