@@ -1135,6 +1135,38 @@ step('ย้ายเข้างานประจำก่อนติ๊ก�
 </style>`, 'css');
 });
 
+// ================= 33) รวมการแก้พร้อมกันทีละช่อง + ประวัติเก็บ 30 วัน =================
+step('merge ทีละช่อง + ประวัติ 30 วัน', 'function mergeField(', () => {
+  const js = fs.readFileSync(path.join(__dirname, 'merge.js'), 'utf8').replace(/\n$/, '');
+  rep(`function mergeById(baseArr, oursArr, theirsArr){`, js + `\n\nfunction mergeById(baseArr, oursArr, theirsArr){`, 'helpers');
+  rep(`    if(weChanged) result.push(o);
+    else if(theyChanged) result.push(t);
+    else result.push(o);`,
+`    if(weChanged && theyChanged) result.push(b === undefined ? o : mergeItemFields(b, o, t));   // แก้ทั้งคู่ -> รวมทีละช่อง
+    else if(weChanged) result.push(o);
+    else if(theyChanged) result.push(t);
+    else result.push(o);`, 'mergeById both changed');
+
+  // ประวัติ: 150 รายการหมดใน 2-3 วัน -> เก็บ 30 วัน (สูงสุด 1500)
+  rep(`  if(activity.length > 150) activity = activity.slice(-150);`,
+`  pruneActivity();`, 'logActivity cap');
+  rep(`function logActivity(text){`,
+`const ACTIVITY_KEEP_DAYS = 30;
+const ACTIVITY_MAX = 1500;
+function pruneActivity(){
+  const cutoff = new Date(Date.now() - ACTIVITY_KEEP_DAYS*86400000).toISOString();
+  activity = activity.filter(a=>!a.at || a.at >= cutoff);
+  if(activity.length > ACTIVITY_MAX){
+    activity.sort((a,b)=>(a.at||'').localeCompare(b.at||''));
+    activity = activity.slice(-ACTIVITY_MAX);
+  }
+}
+function logActivity(text){`, 'pruneActivity');
+  rep(`// บันทึกกิจกรรม (ใครทำอะไร) — เก็บล่าสุด 150 รายการ`, `// บันทึกกิจกรรม (ใครทำอะไร) — เก็บ 30 วันล่าสุด (สูงสุด 1500)`, 'comment');
+  rep(`เก็บ 150 รายการล่าสุด · แชร์ทั้งทีม`, `เก็บย้อนหลัง 30 วัน · แชร์ทั้งทีม`, 'history modal text');
+  rep(`เก็บ 150 รายการล่าสุด แชร์ทั้งทีม`, `เก็บย้อนหลัง 30 วัน แชร์ทั้งทีม`, 'manual text');
+});
+
 // ================= ตรวจก่อนเขียน =================
 group = 'ตรวจท้าย';
 if (s.includes('drive.google.com/drive/folders/')) throw new Error('ยังมีลิงก์ Drive จริงในไฟล์ — SEED ไม่ถูกตัด?');

@@ -509,7 +509,7 @@
 <div class="modal-backdrop" id="modalHistory">
   <div class="modal" style="max-width:460px;">
     <h3>🕘 ประวัติกิจกรรม</h3>
-    <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 10px;">บันทึกล่าสุด (ใครทำอะไรเมื่อไหร่) เก็บ 150 รายการล่าสุด · แชร์ทั้งทีม · ตั้งชื่อตัวเองที่ปุ่ม ⚙️ ในแท็บงานประจำ เพื่อให้บันทึกว่าเป็นคุณ</p>
+    <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 10px;">บันทึกล่าสุด (ใครทำอะไรเมื่อไหร่) เก็บย้อนหลัง 30 วัน · แชร์ทั้งทีม · ตั้งชื่อตัวเองที่ปุ่ม ⚙️ ในแท็บงานประจำ เพื่อให้บันทึกว่าเป็นคุณ</p>
     <div id="historyList" style="max-height:50vh; overflow:auto;"></div>
     <div class="modal-actions">
       <button class="btn btn-danger-ghost" onclick="clearHistory()" style="flex:1; justify-content:center;">ล้างประวัติ</button>
@@ -615,7 +615,7 @@
       <p>ทุกอย่างที่ลบ (ทุกแท็บ) มาอยู่ที่นี่ กู้คืนกลับที่เดิมได้ หรือลบถาวรทีหลัง เป็นถังกลางทั้งทีม เผลอลบก็ไม่หายทันที</p>
 
       <h4>🕘 ประวัติกิจกรรม</h4>
-      <p>บันทึกว่าใครทำอะไรเมื่อไหร่ (เพิ่ม/ลบ/เปลี่ยนสถานะ/ดรอป/กู้คืน ฯลฯ) เก็บ 150 รายการล่าสุด แชร์ทั้งทีม — ต้องตั้งชื่อที่ ⚙️ ก่อน ไม่งั้นขึ้น "ไม่ระบุ"</p>
+      <p>บันทึกว่าใครทำอะไรเมื่อไหร่ (เพิ่ม/ลบ/เปลี่ยนสถานะ/ดรอป/กู้คืน ฯลฯ) เก็บย้อนหลัง 30 วัน แชร์ทั้งทีม — ต้องตั้งชื่อที่ ⚙️ ก่อน ไม่งั้นขึ้น "ไม่ระบุ"</p>
 
       <h4>💾 สำรอง / กู้คืน</h4>
       <p><b>ส่งออก</b> = ดาวน์โหลดข้อมูลทั้งหมดเก็บกันหาย · <b>นำเข้า</b> = โหลดไฟล์กลับมา (⚠️ เขียนทับทั้งทีม — ระบบดาวน์โหลดสำรองของปัจจุบันให้ก่อนอัตโนมัติ กันพลาด) แนะนำสำรองเป็นระยะ</p>
@@ -1557,6 +1557,42 @@ async function loadAll(){
 // - รายการที่คนอื่นแก้ (เราไม่ได้แตะ) → ใช้ของเขา
 // - รายการที่เพิ่มใหม่ทั้งสองฝั่ง → เก็บไว้ทั้งคู่
 // - รายการที่ถูกลบ → ลบก็ต่อเมื่ออีกฝั่งไม่ได้แก้ (ถ้าอีกฝั่งแก้ ให้คงไว้ กันงานหาย)
+// ===== รวมการแก้ของ 2 เครื่องทีละช่อง (ไม่ใช่ทั้งเรื่อง) =====
+// A เปลี่ยนสถานะ + B เพิ่มตอนค้าง เรื่องเดียวกันพร้อมกัน -> ได้ทั้งคู่
+// - ช่องที่มีคนเดียวแก้ -> เอาของคนนั้น
+// - object (statusByDay, pendingOwners, contrib) -> รวมทีละ key
+// - array ค่าธรรมดา (pendingEpisodes, days) -> ใครเพิ่มก็เก็บ ใครลบก็ลบ
+// - ชนกันจริง (แก้ช่องเดียวกันเป็นคนละค่า) -> ของเครื่องนี้ชนะ
+function isPlainObj(x){ return x !== null && typeof x === 'object' && !Array.isArray(x); }
+function mergeField(b, o, t){
+  const S = x => x === undefined ? null : JSON.stringify(x);
+  if(S(o) === S(b)) return t;
+  if(S(t) === S(b) || S(o) === S(t)) return o;
+  if(isPlainObj(o) && isPlainObj(t)){
+    const base = isPlainObj(b) ? b : {};
+    const out = {};
+    new Set([...Object.keys(o), ...Object.keys(t)]).forEach(k=>{
+      const v = mergeField(base[k], o[k], t[k]);
+      if(v !== undefined) out[k] = v;
+    });
+    return out;
+  }
+  if(Array.isArray(o) && Array.isArray(t) && [...o, ...t].every(x=>x === null || typeof x !== 'object')){
+    const base = new Set((Array.isArray(b) ? b : []).map(S));
+    const inT = new Set(t.map(S)), inO = new Set(o.map(S));
+    const out = o.filter(x=>!(base.has(S(x)) && !inT.has(S(x))));      // เขาลบ -> ลบ
+    t.forEach(x=>{ if(!base.has(S(x)) && !inO.has(S(x))) out.push(x); }); // เขาเพิ่ม -> เพิ่ม
+    return out;
+  }
+  return o;
+}
+function mergeItemFields(b, o, t){
+  const m = mergeField(b, o, t);
+  // สถานะสรุปของเรื่องหลายวันต้องตรงกับ statusByDay ที่รวมแล้ว
+  if(isPlainObj(m) && Array.isArray(m.days) && typeof normalizeDays === 'function') normalizeDays(m);
+  return m;
+}
+
 function mergeById(baseArr, oursArr, theirsArr){
   const bm = {}, om = {}, tm = {};
   (baseArr||[]).forEach(x=>bm[x.id]=x);
@@ -1581,7 +1617,8 @@ function mergeById(baseArr, oursArr, theirsArr){
       if(weChanged) result.push(o); // เราแก้ → คงของเราไว้
       continue;                                          // ไม่งั้นลบตามเขา
     }
-    if(weChanged) result.push(o);
+    if(weChanged && theyChanged) result.push(b === undefined ? o : mergeItemFields(b, o, t));   // แก้ทั้งคู่ -> รวมทีละช่อง
+    else if(weChanged) result.push(o);
     else if(theyChanged) result.push(t);
     else result.push(o);
   }
@@ -2397,7 +2434,7 @@ function flushActivity(){
   activityDirty = false;
   persistActivity();
 }
-// บันทึกกิจกรรม (ใครทำอะไร) — เก็บล่าสุด 150 รายการ, เขียนจริงหน่วงไว้ ~8 วิ
+// บันทึกกิจกรรม (ใครทำอะไร) — เก็บ 30 วันล่าสุด (สูงสุด 1500), เขียนจริงหน่วงไว้ ~8 วิ
 // ชื่อสำหรับประวัติ: ชื่อในบัญชี Supabase (user_metadata.name) > ชื่อที่ตั้งเองผ่าน ⭐ > ส่วนหน้าอีเมล
 function currentUserName(){
   const u = (window.storage && window.storage.currentUser) ? window.storage.currentUser() : null;
@@ -2406,10 +2443,20 @@ function currentUserName(){
   if(u && u.email) return u.email.split('@')[0];
   return 'ไม่ระบุ';
 }
+const ACTIVITY_KEEP_DAYS = 30;
+const ACTIVITY_MAX = 1500;
+function pruneActivity(){
+  const cutoff = new Date(Date.now() - ACTIVITY_KEEP_DAYS*86400000).toISOString();
+  activity = activity.filter(a=>!a.at || a.at >= cutoff);
+  if(activity.length > ACTIVITY_MAX){
+    activity.sort((a,b)=>(a.at||'').localeCompare(b.at||''));
+    activity = activity.slice(-ACTIVITY_MAX);
+  }
+}
 function logActivity(text){
   const entry = { id: uid('a'), who: currentUserName(), text, at: new Date().toISOString() };
   activity.push(entry);
-  if(activity.length > 150) activity = activity.slice(-150);
+  pruneActivity();
   activityDirty = true;
   if(!activityFlushTimer) activityFlushTimer = setTimeout(flushActivity, 8000);
 }
