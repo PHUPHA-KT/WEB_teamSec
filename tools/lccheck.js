@@ -19,11 +19,10 @@ function lcPassesFilter(r){
 // ยังไม่เคยเช็คขึ้นก่อน แล้วเรียงจากเช็คนานสุด
 function lcSortKey(r){ const d = lcDaysAgo(r); return d === null ? Infinity : d; }
 
-// ค้น Google ด้วยชื่อต้นฉบับ + ชื่อแปล (มีชื่อเดียวก็ใช้ชื่อเดียว)
+// ค้น Google ด้วยชื่อต้นฉบับเป็นหลัก — ยังไม่มีต้นฉบับค่อยใช้ชื่อแปล
+function lcSearchName(r){ return (r.origName || '').trim() || (r.name || '').trim() || (r.code || ''); }
 function lcSearchUrl(r){
-  const names = [r.origName, r.name].map(n=>(n||'').trim()).filter((n,i,a)=>n && a.indexOf(n) === i);
-  const q = names.length ? names.map(n=>'"' + n.replace(/"/g, '') + '"').join(' OR ') : (r.code || '');
-  return 'https://www.google.com/search?q=' + encodeURIComponent(q);
+  return 'https://www.google.com/search?q=' + encodeURIComponent('"' + lcSearchName(r).replace(/"/g, '') + '"');
 }
 function lcBadgeHtml(r){
   const d = lcDaysAgo(r);
@@ -38,7 +37,9 @@ function lcCellHtml(r){
   return `<div class="lc-cell">
     ${lcBadgeHtml(r)}
     <div class="lc-actions">
-      <a class="lc-btn" href="${safeUrl(lcSearchUrl(r))}" target="_blank" rel="noopener" title="ค้น Google ด้วยชื่อต้นฉบับ + ชื่อแปล">🔍 Google</a>
+      ${(r.origName || '').trim()
+        ? `<a class="lc-btn" href="${safeUrl(lcSearchUrl(r))}" target="_blank" rel="noopener" title="ค้น Google: ${esc(r.origName)}">🔍 Google</a>`
+        : `<a class="lc-btn lc-btn-weak" href="${safeUrl(lcSearchUrl(r))}" target="_blank" rel="noopener" title="ยังไม่มีชื่อต้นฉบับ — ค้นด้วยชื่อแปลแทน (แม่นน้อยกว่า)">🔍 Google (ชื่อแปล)</a>`}
       <button type="button" class="lc-btn lc-btn-ok" onclick="markLcChecked('${r.id}')">✓ ยังไม่มี LC</button>
       <button type="button" class="lc-btn lc-btn-found" onclick="markLcFound('${r.id}')">⚠ มี LC</button>
     </div>

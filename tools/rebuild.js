@@ -1239,6 +1239,7 @@ step('โหมดเช็ค LC (lcCheck)', 'function lcCellHtml(', () => {
   .lc-ok{ background:var(--green-bg); color:var(--green); }
   .lc-btn{ display:inline-flex; align-items:center; padding:4px 9px; border-radius:7px; border:1px solid var(--line); background:var(--card); color:var(--ink); font-size:12px; font-family:inherit; cursor:pointer; text-decoration:none; white-space:nowrap; }
   .lc-btn:hover{ border-color:var(--blue); color:var(--blue); }
+  .lc-btn-weak{ border-style:dashed; color:var(--ink-soft); }
   .lc-btn-ok:hover{ border-color:var(--green); color:var(--green); }
   .lc-btn-found:hover{ border-color:#c0392b; color:#c0392b; }
 </style>`, 'css');
