@@ -2,6 +2,26 @@
 // โชว์แค่ รหัส · ชื่อ · ลิงก์ต้นทาง (+ป้ายดรอปเล็กๆ ให้รู้ว่าเลิกทำแล้ว) มีค้นหา
 let allSearch = '';
 
+// ชื่อต้นฉบับใต้ชื่อเรื่อง — กดแก้ได้ / ยังไม่มีขึ้นปุ่ม + ชื่อต้นฉบับ
+// (ไม่มีชื่อแปล = ต้นฉบับเป็นชื่อหลักอยู่แล้ว เหลือแค่ปุ่มแก้เล็กๆ)
+function allOrigHtml(r){
+  if(!r.origName) return `<button type="button" class="orig-add" onclick="editOrigName('${r.id}')">+ ชื่อต้นฉบับ</button>`;
+  if(!r.name) return `<button type="button" class="orig-add" onclick="editOrigName('${r.id}')">✎ ต้นฉบับ</button>`;
+  return `<div class="orig-name orig-edit" onclick="editOrigName('${r.id}')" title="กดเพื่อแก้ชื่อต้นฉบับ">${esc(r.origName)} ✎</div>`;
+}
+async function editOrigName(id){
+  const item = recurring.find(r=>r.id===id);
+  if(!item) return;
+  const val = await uiPrompt(`ชื่อต้นฉบับของ "${displayName(item) || item.code}" (เว้นว่าง = ล้าง)`, { value: item.origName || '', placeholder: 'เกาหลี / ญี่ปุ่น / อังกฤษ' });
+  if(val === null || val === undefined) return;
+  if(val === (item.origName || '')) return;
+  if(!val && !item.name){ showToast('เรื่องนี้ไม่มีชื่อแปล — ล้างชื่อต้นฉบับไม่ได้'); return; }
+  if(val) item.origName = val; else delete item.origName;
+  logActivity(`ชื่อต้นฉบับ "${item.name || item.code}" → ${val || 'ล้าง'}`);
+  renderAllStories();
+  await persistRecurring(false);
+}
+
 function renderAllStories(){
   const container = document.getElementById('mainContent');
   const activeEl = document.activeElement;
@@ -24,7 +44,7 @@ function renderAllStories(){
       : '<span style="color:var(--ink-soft);">—</span>';
     return `<tr class="${r.dropped?'all-dropped':''}">
       <td class="all-code">${esc(r.code||'—')}</td>
-      <td>${esc(displayName(r)||'—')}${drop}${origNameHtml(r)}</td>
+      <td>${esc(displayName(r)||'—')}${drop}${allOrigHtml(r)}</td>
       <td>${link}</td>
     </tr>`;
   }).join('');
