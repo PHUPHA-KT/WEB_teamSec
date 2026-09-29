@@ -1057,9 +1057,9 @@ step('ตอนล่าสุดที่ทำแล้ว (lastEp)', 'functio
         <span class="day-pill" style="\${dayPillStyle(rowDay)}">\${rowDay}</span>`, 'row badge');
 
   // แท็บทุกเรื่อง: คอลัมน์ตอนล่าสุด
-  rep(`      <td>\${esc(displayName(r)||'—')}\${drop}\${allOrigHtml(r)}</td>
+  rep(`      <td>\${allNameHtml(r)}\${drop}\${allOrigHtml(r)}</td>
       <td>\${link}</td>`,
-`      <td>\${esc(displayName(r)||'—')}\${drop}\${allOrigHtml(r)}</td>
+`      <td>\${allNameHtml(r)}\${drop}\${allOrigHtml(r)}</td>
       <td>\${lastEpBadgeHtml(r)}</td>
       <td>\${link}</td>`, 'allstories cell');
   rep(`<thead><tr><th>รหัส</th><th>ชื่อเรื่อง</th><th>ลิงก์ต้นทาง</th></tr></thead>`,
@@ -1214,6 +1214,9 @@ step('ชื่อแปล + ชื่อต้นฉบับ (origName)', 'fu
     }`, 'migration');
 
   rep('</style>', `  .orig-name{ font-size:12px; color:var(--ink-soft); margin-top:1px; line-height:1.35; }
+  .name-edit{ cursor:pointer; border-bottom:1px dashed transparent; }
+  .name-edit:hover{ color:var(--blue); border-bottom-color:var(--blue); }
+  .name-edit:hover::after{ content:" ✎"; font-size:11px; }
   .orig-edit{ cursor:pointer; }
   .orig-edit:hover{ color:var(--blue); }
   .orig-add{ display:block; margin-top:2px; padding:0; border:none; background:none; font-size:11.5px; color:var(--ink-soft); cursor:pointer; font-family:inherit; }
