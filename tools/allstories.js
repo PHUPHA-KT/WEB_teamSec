@@ -9,9 +9,9 @@ function renderAllStories(){
 
   const q = allSearch.trim().toLowerCase();
   const list = recurring
-    .filter(r => !q || (r.code||'').toLowerCase().includes(q) || (r.name||'').toLowerCase().includes(q))
+    .filter(r => !q || (r.code||'').toLowerCase().includes(q) || nameMatches(r, q))
     .slice()
-    .sort((a,b)=> String(a.code||'').localeCompare(String(b.code||''), 'th', {numeric:true}) || String(a.name||'').localeCompare(String(b.name||''), 'th'));
+    .sort((a,b)=> String(a.code||'').localeCompare(String(b.code||''), 'th', {numeric:true}) || displayName(a).localeCompare(displayName(b), 'th'));
 
   const dropped = recurring.filter(r=>r.dropped).length;
 
@@ -24,7 +24,7 @@ function renderAllStories(){
       : '<span style="color:var(--ink-soft);">—</span>';
     return `<tr class="${r.dropped?'all-dropped':''}">
       <td class="all-code">${esc(r.code||'—')}</td>
-      <td>${esc(r.name||'—')}${drop}</td>
+      <td>${esc(displayName(r)||'—')}${drop}${origNameHtml(r)}</td>
       <td>${link}</td>
     </tr>`;
   }).join('');

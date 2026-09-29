@@ -138,7 +138,10 @@ function promoteNewToRecurring(id){
   openRecurringModal();
   const cn = splitCodeName(item.code);
   document.getElementById('rCode').value = cn.code;
-  document.getElementById('rName').value = item.name || cn.name;
+  // ชื่อที่ติดมากับรหัส (เกาหลี/ญี่ปุ่น) = ต้นฉบับ -> เหลือกรอกชื่อแปลเอง
+  const orig = cn.name !== cn.code ? cn.name : '';
+  document.getElementById('rName').value = item.name || '';
+  document.getElementById('rOrigName').value = orig;
   document.getElementById('rLink').value = item.link || '';
   document.getElementById('rDrive').value = item.gdrive || '';
   document.getElementById('recurringModalTitle').textContent = 'ย้ายเข้างานประจำ — เลือกวันและคนทำ';

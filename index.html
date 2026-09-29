@@ -399,6 +399,7 @@
   .src-badge{ display:inline-block; margin-right:6px; padding:1px 6px; border-radius:5px; font-size:10.5px; font-weight:800; letter-spacing:.3px; vertical-align:middle; line-height:1.5; }
   body.dark .src-badge{ filter:brightness(.85) saturate(1.2); }
   .promoted-badge{ display:inline-block; padding:3px 9px; border-radius:7px; font-size:12px; font-weight:700; background:var(--green-bg); color:var(--green); }
+  .orig-name{ font-size:12px; color:var(--ink-soft); margin-top:1px; line-height:1.35; }
 </style>
 </head>
 <body>
@@ -438,7 +439,8 @@
   <div class="modal">
     <h3 id="recurringModalTitle">เพิ่มเรื่องประจำ</h3>
     <div class="field"><label>รหัสเรื่อง (เช่น 4-9)</label><input id="rCode" type="text" placeholder="ไม่บังคับ"></div>
-    <div class="field"><label>ชื่อเรื่อง</label><input id="rName" type="text" placeholder="ชื่อเรื่อง"></div>
+    <div class="field"><label>ชื่อแปล (ไทย)</label><input id="rName" type="text" placeholder="ชื่อเรื่องภาษาไทย"></div>
+    <div class="field"><label>ชื่อต้นฉบับ</label><input id="rOrigName" type="text" placeholder="เกาหลี / ญี่ปุ่น / อังกฤษ"></div>
     <div class="field"><label>คนทำ</label>
       <select id="rPerson"><option value="">— ยังไม่ระบุ —</option><option value="เหนือ">เหนือ</option><option value="บิ๊ก">บิ๊ก</option><option value="ยูตะ">ยูตะ</option><option value="น๊อต">น๊อต</option></select>
     </div>
@@ -1283,6 +1285,20 @@ function sourceBadgeHtml(item){
   return `<span class="src-badge" style="background:${s.bg};color:${s.fg};" title="${esc(s.host)}">${esc(s.abbr)}</span>`;
 }
 
+// ===== ชื่อเรื่อง 2 แบบ: ชื่อแปล (item.name) + ชื่อต้นฉบับ (item.origName) =====
+// ไม่มีชื่อแปล = ใช้ชื่อต้นฉบับแสดงแทนทุกที่
+function displayName(item){ return (item && (item.name || item.origName)) || ''; }
+// บรรทัดชื่อต้นฉบับตัวเล็ก (โชว์เฉพาะเมื่อมีทั้ง 2 ชื่อ — ถ้ามีแต่ต้นฉบับ มันขึ้นเป็นชื่อหลักอยู่แล้ว)
+function origNameHtml(item){
+  return item.name && item.origName ? `<div class="orig-name">${esc(item.origName)}</div>` : '';
+}
+function nameMatches(item, q){
+  return (item.name||'').toLowerCase().includes(q) || (item.origName||'').toLowerCase().includes(q);
+}
+// ข้อความมีตัวอักษรไทยไหม / เป็นอักษรเกาหลี-ญี่ปุ่น-จีนไหม (ใช้ย้ายชื่อเก่าที่ใส่ต้นฉบับไว้ในช่องชื่อแปล)
+function hasThai(s){ return /[฀-๿]/.test(s || ''); }
+function hasCJK(s){ return /[가-힯ᄀ-ᇿ぀-ヿ一-鿿]/.test(s || ''); }
+
 function pendingEpCount(item){
   return (item.pendingEpisodes && item.pendingEpisodes.length) || 0;
 }
@@ -1496,6 +1512,9 @@ async function loadAll(){
   recurring.forEach(item=>{
     if(!item.gdrive && CODE_GDRIVE_MAP[item.code] && codeUnique(item.code)){
       item.gdrive = CODE_GDRIVE_MAP[item.code]; migrated = true;
+    }
+    if(item.name && !item.origName && !hasThai(item.name) && hasCJK(item.name)){
+      item.origName = item.name; item.name = ''; migrated = true;
     }
     if(!item.status){
       item.status = item.done ? 'done' : 'pending'; delete item.done; migrated = true;
@@ -1791,7 +1810,7 @@ async function persistTrash(toast=false){ await persistData(toast); }
 // ===== ถังขยะ: ลบแล้วเก็บไว้กู้คืนได้ =====
 const COLLECTION_LABELS = { recurring:'งานประจำ', newstories:'เรื่องเปิดใหม่', expenses:'ค่าใช้จ่าย', schedule:'กำหนดการ' };
 function trashLabelOf(coll, item){
-  if(coll==='recurring' || coll==='newstories') return (item.code? item.code+' · ':'') + (item.name || '(ไม่มีชื่อ)');
+  if(coll==='recurring' || coll==='newstories') return (item.code? item.code+' · ':'') + (displayName(item) || '(ไม่มีชื่อ)');
   if(coll==='expenses') return (item.platform||'') + ' · ' + fmtBaht(item.amount) + ' บาท';
   if(coll==='schedule') return item.title || '(ไม่มีชื่อ)';
   return '(รายการ)';
@@ -2205,7 +2224,7 @@ function matchesFilters(item){
   if(personFilter!=='ทั้งหมด' && !isPersonInvolved(item, personFilter)) return false;
   if(searchText){
     const s = searchText.toLowerCase();
-    if(!(item.code||'').toLowerCase().includes(s) && !(item.name||'').toLowerCase().includes(s)) return false;
+    if(!(item.code||'').toLowerCase().includes(s) && !nameMatches(item, s)) return false;
   }
   return true;
 }
@@ -2319,7 +2338,8 @@ function renderRecurring(){
         : '';
       html += `<div class="item-row">
         <div class="item-main">
-          <div class="item-code">${sourceBadgeHtml(item)}${item.code ? esc(item.code)+' · ' : ''}${esc(item.name)||'(ไม่มีชื่อ)'}${isMultiDay(item)?` <span class="multi-badge" title="${esc(itemDays(item).join(' · '))}">${itemDays(item).length} วัน/สัปดาห์</span>`:''}${dropBadge}</div>
+          <div class="item-code">${sourceBadgeHtml(item)}${item.code ? esc(item.code)+' · ' : ''}${esc(displayName(item))||'(ไม่มีชื่อ)'}${isMultiDay(item)?` <span class="multi-badge" title="${esc(itemDays(item).join(' · '))}">${itemDays(item).length} วัน/สัปดาห์</span>`:''}${dropBadge}</div>
+          ${origNameHtml(item)}
           <div class="ep-line">${lastEpBadgeHtml(item)}</div>
           ${overdueBadgeHtml(item)}
         </div>
@@ -2867,6 +2887,7 @@ function openRecurringModal(id){
   document.getElementById('recurringModalTitle').textContent = item ? 'แก้ไขเรื่องประจำ' : 'เพิ่มเรื่องประจำ';
   document.getElementById('rCode').value = item ? (item.code||'') : '';
   document.getElementById('rName').value = item ? (item.name||'') : '';
+  document.getElementById('rOrigName').value = item ? (item.origName||'') : '';
   document.getElementById('rPerson').value = item ? (item.person||'') : '';
   const rd = document.getElementById('rDays'); if(!rd.children.length) rd.innerHTML = dayChecksHtml();
   setDayChecks(item ? itemDays(item) : ['จันทร์']);
@@ -2876,10 +2897,12 @@ function openRecurringModal(id){
 }
 async function saveNewRecurring(){
   const name = document.getElementById('rName').value.trim();
-  if(!name){ showToast('กรุณาใส่ชื่อเรื่อง'); return; }
+  const origName = document.getElementById('rOrigName').value.trim();
+  if(!name && !origName){ showToast('กรุณาใส่ชื่อเรื่อง (ชื่อแปลหรือต้นฉบับอย่างน้อย 1 ช่อง)'); return; }
   const data = {
     code: document.getElementById('rCode').value.trim(),
     name,
+    origName,
     day: readDayChecks()[0],
     days: readDayChecks(),
     person: document.getElementById('rPerson').value,
@@ -3064,7 +3087,10 @@ function promoteNewToRecurring(id){
   openRecurringModal();
   const cn = splitCodeName(item.code);
   document.getElementById('rCode').value = cn.code;
-  document.getElementById('rName').value = item.name || cn.name;
+  // ชื่อที่ติดมากับรหัส (เกาหลี/ญี่ปุ่น) = ต้นฉบับ -> เหลือกรอกชื่อแปลเอง
+  const orig = cn.name !== cn.code ? cn.name : '';
+  document.getElementById('rName').value = item.name || '';
+  document.getElementById('rOrigName').value = orig;
   document.getElementById('rLink').value = item.link || '';
   document.getElementById('rDrive').value = item.gdrive || '';
   document.getElementById('recurringModalTitle').textContent = 'ย้ายเข้างานประจำ — เลือกวันและคนทำ';
@@ -3366,9 +3392,9 @@ function renderAllStories(){
 
   const q = allSearch.trim().toLowerCase();
   const list = recurring
-    .filter(r => !q || (r.code||'').toLowerCase().includes(q) || (r.name||'').toLowerCase().includes(q))
+    .filter(r => !q || (r.code||'').toLowerCase().includes(q) || nameMatches(r, q))
     .slice()
-    .sort((a,b)=> String(a.code||'').localeCompare(String(b.code||''), 'th', {numeric:true}) || String(a.name||'').localeCompare(String(b.name||''), 'th'));
+    .sort((a,b)=> String(a.code||'').localeCompare(String(b.code||''), 'th', {numeric:true}) || displayName(a).localeCompare(displayName(b), 'th'));
 
   const dropped = recurring.filter(r=>r.dropped).length;
 
@@ -3381,7 +3407,7 @@ function renderAllStories(){
       : '<span style="color:var(--ink-soft);">—</span>';
     return `<tr class="${r.dropped?'all-dropped':''}">
       <td class="all-code">${esc(r.code||'—')}</td>
-      <td>${esc(r.name||'—')}${drop}</td>
+      <td>${esc(displayName(r)||'—')}${drop}${origNameHtml(r)}</td>
       <td>${lastEpBadgeHtml(r)}</td>
       <td>${link}</td>
     </tr>`;
@@ -3589,7 +3615,7 @@ function renderCalendar(){
             const by = pendingEpsByPerson(r);
             const owner = hasForeignBacklog(r) ? ' · ' + esc(Object.keys(by).filter(p=>p!==r.person).map(p=>p+' '+by[p]).join(', ')) : '';
             const badge = eps ? ` <span class="cal-chip-eps">(ค้าง ${eps}${owner})</span>` : '';
-            return `<span class="cal-chip" data-id="${r.id}" data-from="${esc(d)}" title="ลากเพื่อย้ายวัน/ย้ายคน${isMultiDay(r)?' (ย้ายเฉพาะวันนี้)':''}">${esc((r.code?r.code+'-':'') + (r.name||''))}${badge}</span>`;
+            return `<span class="cal-chip" data-id="${r.id}" data-from="${esc(d)}" title="ลากเพื่อย้ายวัน/ย้ายคน${isMultiDay(r)?' (ย้ายเฉพาะวันนี้)':''}">${esc((r.code?r.code+'-':'') + displayName(r))}${badge}</span>`;
           }).join('');
           return `<tr>
             <td class="cal-day">${CAL_DAY_LABEL[d]}</td>

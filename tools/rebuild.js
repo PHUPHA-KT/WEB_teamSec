@@ -1057,9 +1057,9 @@ step('ตอนล่าสุดที่ทำแล้ว (lastEp)', 'functio
         <span class="day-pill" style="\${dayPillStyle(rowDay)}">\${rowDay}</span>`, 'row badge');
 
   // แท็บทุกเรื่อง: คอลัมน์ตอนล่าสุด
-  rep(`      <td>\${esc(r.name||'—')}\${drop}</td>
+  rep(`      <td>\${esc(displayName(r)||'—')}\${drop}\${origNameHtml(r)}</td>
       <td>\${link}</td>`,
-`      <td>\${esc(r.name||'—')}\${drop}</td>
+`      <td>\${esc(displayName(r)||'—')}\${drop}\${origNameHtml(r)}</td>
       <td>\${lastEpBadgeHtml(r)}</td>
       <td>\${link}</td>`, 'allstories cell');
   rep(`<thead><tr><th>รหัส</th><th>ชื่อเรื่อง</th><th>ลิงก์ต้นทาง</th></tr></thead>`,
@@ -1165,6 +1165,56 @@ function logActivity(text){`, 'pruneActivity');
   rep(`// บันทึกกิจกรรม (ใครทำอะไร) — เก็บล่าสุด 150 รายการ`, `// บันทึกกิจกรรม (ใครทำอะไร) — เก็บ 30 วันล่าสุด (สูงสุด 1500)`, 'comment');
   rep(`เก็บ 150 รายการล่าสุด · แชร์ทั้งทีม`, `เก็บย้อนหลัง 30 วัน · แชร์ทั้งทีม`, 'history modal text');
   rep(`เก็บ 150 รายการล่าสุด แชร์ทั้งทีม`, `เก็บย้อนหลัง 30 วัน แชร์ทั้งทีม`, 'manual text');
+});
+
+// ================= 34) ชื่อเรื่อง 2 แบบ: ชื่อแปล + ต้นฉบับ (origName) =================
+step('ชื่อแปล + ชื่อต้นฉบับ (origName)', 'function displayName(', () => {
+  const js = fs.readFileSync(path.join(__dirname, 'origname.js'), 'utf8').replace(/\n$/, '');
+  rep(`function pendingEpCount(item){`, js + `\n\nfunction pendingEpCount(item){`, 'helpers');
+
+  // modal: 2 ช่อง
+  rep(`<div class="field"><label>ชื่อเรื่อง</label><input id="rName" type="text" placeholder="ชื่อเรื่อง"></div>`,
+`<div class="field"><label>ชื่อแปล (ไทย)</label><input id="rName" type="text" placeholder="ชื่อเรื่องภาษาไทย"></div>
+    <div class="field"><label>ชื่อต้นฉบับ</label><input id="rOrigName" type="text" placeholder="เกาหลี / ญี่ปุ่น / อังกฤษ"></div>`, 'modal fields');
+  rep(`  document.getElementById('rName').value = item ? (item.name||'') : '';`,
+`  document.getElementById('rName').value = item ? (item.name||'') : '';
+  document.getElementById('rOrigName').value = item ? (item.origName||'') : '';`, 'openRecurringModal');
+  rep(`  const name = document.getElementById('rName').value.trim();
+  if(!name){ showToast('กรุณาใส่ชื่อเรื่อง'); return; }`,
+`  const name = document.getElementById('rName').value.trim();
+  const origName = document.getElementById('rOrigName').value.trim();
+  if(!name && !origName){ showToast('กรุณาใส่ชื่อเรื่อง (ชื่อแปลหรือต้นฉบับอย่างน้อย 1 ช่อง)'); return; }`, 'save validate');
+  rep(`    name,
+    day: readDayChecks()[0],`,
+`    name,
+    origName,
+    day: readDayChecks()[0],`, 'save data');
+
+  // แถวงานประจำ
+  rep(`\${esc(item.name)||'(ไม่มีชื่อ)'}\${isMultiDay(item)`, `\${esc(displayName(item))||'(ไม่มีชื่อ)'}\${isMultiDay(item)`, 'row name');
+  rep(`\${dropBadge}</div>
+          <div class="ep-line">\${lastEpBadgeHtml(item)}</div>`,
+`\${dropBadge}</div>
+          \${origNameHtml(item)}
+          <div class="ep-line">\${lastEpBadgeHtml(item)}</div>`, 'row orig line');
+
+  // ค้นหา + ป้ายถังขยะ
+  rep(`!(item.name||'').toLowerCase().includes(s)) return false;`, `!nameMatches(item, s)) return false;`, 'matchesFilters');
+  rep(`(item.name || '(ไม่มีชื่อ)')`, `(displayName(item) || '(ไม่มีชื่อ)')`, 'trash label');
+
+  // ข้อมูลเก่า: ช่องชื่อแปลที่จริงๆ เป็นชื่อต้นฉบับ (ไม่มีไทย + เป็นอักษรเกาหลี/ญี่ปุ่น/จีน) -> ย้ายไป origName
+  rep(`    if(!item.status){
+      item.status = item.done ? 'done' : 'pending'; delete item.done; migrated = true;
+    }`,
+`    if(item.name && !item.origName && !hasThai(item.name) && hasCJK(item.name)){
+      item.origName = item.name; item.name = ''; migrated = true;
+    }
+    if(!item.status){
+      item.status = item.done ? 'done' : 'pending'; delete item.done; migrated = true;
+    }`, 'migration');
+
+  rep('</style>', `  .orig-name{ font-size:12px; color:var(--ink-soft); margin-top:1px; line-height:1.35; }
+</style>`, 'css');
 });
 
 // ================= ตรวจก่อนเขียน =================
