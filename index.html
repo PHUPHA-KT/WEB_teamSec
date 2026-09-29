@@ -407,6 +407,19 @@
   .orig-edit:hover{ color:var(--blue); }
   .orig-add{ display:block; margin-top:2px; padding:0; border:none; background:none; font-size:11.5px; color:var(--ink-soft); cursor:pointer; font-family:inherit; }
   .orig-add:hover{ color:var(--blue); text-decoration:underline; }
+  /* โหมดเช็ค LC */
+  .lc-bar{ margin-bottom:10px; align-items:center; }
+  .lc-progress{ font-size:12px; color:var(--ink-soft); white-space:nowrap; margin-left:4px; }
+  .lc-cell{ display:flex; flex-direction:column; gap:5px; min-width:190px; }
+  .lc-actions{ display:flex; flex-wrap:wrap; gap:5px; }
+  .lc-badge{ display:inline-block; align-self:flex-start; padding:1px 8px; border-radius:6px; font-size:11.5px; font-weight:700; white-space:nowrap; }
+  .lc-never{ background:#fdecec; color:#c0392b; }
+  .lc-due{ background:#fdf3e3; color:#b9791b; }
+  .lc-ok{ background:var(--green-bg); color:var(--green); }
+  .lc-btn{ display:inline-flex; align-items:center; padding:4px 9px; border-radius:7px; border:1px solid var(--line); background:var(--card); color:var(--ink); font-size:12px; font-family:inherit; cursor:pointer; text-decoration:none; white-space:nowrap; }
+  .lc-btn:hover{ border-color:var(--blue); color:var(--blue); }
+  .lc-btn-ok:hover{ border-color:var(--green); color:var(--green); }
+  .lc-btn-found:hover{ border-color:#c0392b; color:#c0392b; }
 </style>
 </head>
 <body>
@@ -1305,6 +1318,88 @@ function nameMatches(item, q){
 // ข้อความมีตัวอักษรไทยไหม / เป็นอักษรเกาหลี-ญี่ปุ่น-จีนไหม (ใช้ย้ายชื่อเก่าที่ใส่ต้นฉบับไว้ในช่องชื่อแปล)
 function hasThai(s){ return /[฀-๿]/.test(s || ''); }
 function hasCJK(s){ return /[가-힯ᄀ-ᇿ぀-ヿ一-鿿]/.test(s || ''); }
+
+// ===== โหมดเช็คลิขสิทธิ์ (LC) ในแท็บทุกเรื่อง =====
+// item.lcCheck = { at: ISO, by: ชื่อคนเช็ค }  — บันทึกตอนกด "✓ ยังไม่มี LC"
+// ครบ LC_RECHECK_DAYS วัน = ถึงรอบเช็คใหม่เอง ไม่ต้องกดรีเซ็ต
+const LC_RECHECK_DAYS = 30;
+let allLcMode = false;
+let allLcFilter = 'due';   // due = ถึงรอบ (รวมยังไม่เคยเช็ค) / never = ยังไม่เคยเช็ค / all
+
+function lcDaysAgo(r){
+  if(!r.lcCheck || !r.lcCheck.at) return null;
+  const d = Math.floor((Date.now() - Date.parse(r.lcCheck.at)) / 86400000);
+  return isNaN(d) ? null : Math.max(0, d);
+}
+function lcIsDue(r){ const d = lcDaysAgo(r); return d === null || d >= LC_RECHECK_DAYS; }
+function lcPassesFilter(r){
+  if(allLcFilter === 'never') return lcDaysAgo(r) === null;
+  if(allLcFilter === 'due') return lcIsDue(r);
+  return true;
+}
+// ยังไม่เคยเช็คขึ้นก่อน แล้วเรียงจากเช็คนานสุด
+function lcSortKey(r){ const d = lcDaysAgo(r); return d === null ? Infinity : d; }
+
+// ค้น Google ด้วยชื่อต้นฉบับ + ชื่อแปล (มีชื่อเดียวก็ใช้ชื่อเดียว)
+function lcSearchUrl(r){
+  const names = [r.origName, r.name].map(n=>(n||'').trim()).filter((n,i,a)=>n && a.indexOf(n) === i);
+  const q = names.length ? names.map(n=>'"' + n.replace(/"/g, '') + '"').join(' OR ') : (r.code || '');
+  return 'https://www.google.com/search?q=' + encodeURIComponent(q);
+}
+function lcBadgeHtml(r){
+  const d = lcDaysAgo(r);
+  if(d === null) return `<span class="lc-badge lc-never">ยังไม่เคยเช็ค</span>`;
+  const when = d === 0 ? 'วันนี้' : d + ' วันก่อน';
+  const who = r.lcCheck.by ? ' · ' + esc(r.lcCheck.by) : '';
+  return d >= LC_RECHECK_DAYS
+    ? `<span class="lc-badge lc-due">เช็ค ${when}${who} · ถึงรอบ</span>`
+    : `<span class="lc-badge lc-ok">เช็ค ${when}${who}</span>`;
+}
+function lcCellHtml(r){
+  return `<div class="lc-cell">
+    ${lcBadgeHtml(r)}
+    <div class="lc-actions">
+      <a class="lc-btn" href="${safeUrl(lcSearchUrl(r))}" target="_blank" rel="noopener" title="ค้น Google ด้วยชื่อต้นฉบับ + ชื่อแปล">🔍 Google</a>
+      <button type="button" class="lc-btn lc-btn-ok" onclick="markLcChecked('${r.id}')">✓ ยังไม่มี LC</button>
+      <button type="button" class="lc-btn lc-btn-found" onclick="markLcFound('${r.id}')">⚠ มี LC</button>
+    </div>
+  </div>`;
+}
+function lcToolbarHtml(){
+  const active = recurring.filter(r=>!r.dropped);
+  const due = active.filter(lcIsDue).length;
+  const never = active.filter(r=>lcDaysAgo(r) === null).length;
+  const chip = (key, label) => `<div class="filter-chip ${allLcFilter===key?'active':''}" onclick="allLcFilter='${key}';renderAllStories()">${label}</div>`;
+  return `<div class="chip-scroll lc-bar">
+    ${chip('due', `ถึงรอบเช็ค (${due})`)}
+    ${chip('never', `ยังไม่เคยเช็ค (${never})`)}
+    ${chip('all', `ทั้งหมด (${active.length})`)}
+    <span class="lc-progress">เช็คแล้ว ${active.length - due} / ${active.length} เรื่อง · เช็คซ้ำทุก ${LC_RECHECK_DAYS} วัน · ไม่รวมเรื่องที่ดรอป</span>
+  </div>`;
+}
+function toggleLcMode(){ allLcMode = !allLcMode; renderAllStories(); }
+
+async function markLcChecked(id){
+  const item = recurring.find(r=>r.id===id);
+  if(!item) return;
+  item.lcCheck = { at: new Date().toISOString(), by: currentUserName() };
+  logActivity(`เช็ค LC "${displayName(item) || item.code}" — ยังไม่มี`);
+  renderAllStories();
+  await persistRecurring(false);
+}
+async function markLcFound(id){
+  const item = recurring.find(r=>r.id===id);
+  if(!item) return;
+  const eps = pendingEpCount(item);
+  const ok = await uiConfirm(`"${displayName(item) || item.code}" มี LC แล้ว — ดรอปเรื่องนี้ด้วยเหตุผล "${DROP_META.lc.label}"?` + (eps ? `\n(ยังค้าง ${eps} ตอน จะอยู่ในงานปกติจนเคลียร์หมด)` : ''), 'ดรอป (LC)');
+  if(!ok) return;
+  item.lcCheck = { at: new Date().toISOString(), by: currentUserName(), found: true };
+  item.dropped = 'lc';
+  logActivity(`เช็ค LC "${displayName(item) || item.code}" — มี LC แล้ว → ดรอป (${DROP_META.lc.label})`);
+  renderAllStories(); renderStats();
+  await persistRecurring(false);
+  showToast('ดรอปแล้ว: ' + DROP_META.lc.label);
+}
 
 function pendingEpCount(item){
   return (item.pendingEpisodes && item.pendingEpisodes.length) || 0;
@@ -3439,8 +3534,10 @@ function renderAllStories(){
   const q = allSearch.trim().toLowerCase();
   const list = recurring
     .filter(r => !q || (r.code||'').toLowerCase().includes(q) || nameMatches(r, q))
+    .filter(r => !allLcMode || (!r.dropped && lcPassesFilter(r)))   // โหมดเช็ค LC: ไม่รวมดรอป + ตามตัวกรองรอบ
     .slice()
-    .sort((a,b)=> String(a.code||'').localeCompare(String(b.code||''), 'th', {numeric:true}) || displayName(a).localeCompare(displayName(b), 'th'));
+    .sort((a,b)=> (allLcMode ? lcSortKey(b) - lcSortKey(a) : 0)
+      || String(a.code||'').localeCompare(String(b.code||''), 'th', {numeric:true}) || displayName(a).localeCompare(displayName(b), 'th'));
 
   const dropped = recurring.filter(r=>r.dropped).length;
 
@@ -3456,6 +3553,7 @@ function renderAllStories(){
       <td>${allNameHtml(r)}${drop}${allOrigHtml(r)}</td>
       <td>${lastEpBadgeHtml(r)}</td>
       <td>${link}</td>
+      ${allLcMode ? `<td>${lcCellHtml(r)}</td>` : ''}
     </tr>`;
   }).join('');
 
@@ -3466,14 +3564,18 @@ function renderAllStories(){
         ${allSearch ? `<button type="button" class="search-clear" onclick="allSearch='';renderAllStories();document.getElementById('searchBoxAll').focus()" title="ล้างคำค้น">✕</button>` : ''}
       </div>
       <span style="font-size:12.5px;color:var(--ink-soft);white-space:nowrap;">${list.length} / ${recurring.length} เรื่อง${dropped?` · ดรอป ${dropped}`:''}</span>
+      <button type="button" class="btn ${allLcMode?'btn-primary':'btn-ghost'}" onclick="toggleLcMode()" title="ไล่เช็คว่าเรื่องไหนมีลิขสิทธิ์ (LC) แล้ว">🔎 เช็ค LC${allLcMode?' ✕':''}</button>
     </div>
+    ${allLcMode ? lcToolbarHtml() : ''}
     ${list.length ? `
       <div class="table-wrap"><table class="data-table all-table">
         <thead><tr><th>รหัส</th><th>ชื่อเรื่อง</th><th>ตอนล่าสุด</th><th>ลิงก์ต้นทาง</th></tr></thead>
         <tbody>${rows}</tbody>
       </table></div>`
-      : `<div class="empty-state">${recurring.length ? 'ไม่พบเรื่องที่ตรงกับคำค้น' : 'ยังไม่มีเรื่อง'}</div>`}
+      : `<div class="empty-state">${allLcMode && !q ? 'ไม่มีเรื่องที่ถึงรอบเช็ค 🎉' : recurring.length ? 'ไม่พบเรื่องที่ตรงกับคำค้น' : 'ยังไม่มีเรื่อง'}</div>`}
   `;
+  // หัวคอลัมน์เช็ค LC (ใส่หลัง render — แถวหัวตารางเป็น anchor ของขั้นอื่นใน rebuild)
+  if(allLcMode){ const hr = container.querySelector('.all-table thead tr'); if(hr) hr.insertAdjacentHTML('beforeend', '<th>เช็ค LC</th>'); }
 
   const box = document.getElementById('searchBoxAll');
   box.addEventListener('input', e=>{ allSearch = e.target.value; renderAllStories(); });

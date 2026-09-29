@@ -49,8 +49,10 @@ function renderAllStories(){
   const q = allSearch.trim().toLowerCase();
   const list = recurring
     .filter(r => !q || (r.code||'').toLowerCase().includes(q) || nameMatches(r, q))
+    .filter(r => !allLcMode || (!r.dropped && lcPassesFilter(r)))   // โหมดเช็ค LC: ไม่รวมดรอป + ตามตัวกรองรอบ
     .slice()
-    .sort((a,b)=> String(a.code||'').localeCompare(String(b.code||''), 'th', {numeric:true}) || displayName(a).localeCompare(displayName(b), 'th'));
+    .sort((a,b)=> (allLcMode ? lcSortKey(b) - lcSortKey(a) : 0)
+      || String(a.code||'').localeCompare(String(b.code||''), 'th', {numeric:true}) || displayName(a).localeCompare(displayName(b), 'th'));
 
   const dropped = recurring.filter(r=>r.dropped).length;
 
@@ -65,6 +67,7 @@ function renderAllStories(){
       <td class="all-code">${esc(r.code||'—')}</td>
       <td>${allNameHtml(r)}${drop}${allOrigHtml(r)}</td>
       <td>${link}</td>
+      ${allLcMode ? `<td>${lcCellHtml(r)}</td>` : ''}
     </tr>`;
   }).join('');
 
@@ -75,14 +78,18 @@ function renderAllStories(){
         ${allSearch ? `<button type="button" class="search-clear" onclick="allSearch='';renderAllStories();document.getElementById('searchBoxAll').focus()" title="ล้างคำค้น">✕</button>` : ''}
       </div>
       <span style="font-size:12.5px;color:var(--ink-soft);white-space:nowrap;">${list.length} / ${recurring.length} เรื่อง${dropped?` · ดรอป ${dropped}`:''}</span>
+      <button type="button" class="btn ${allLcMode?'btn-primary':'btn-ghost'}" onclick="toggleLcMode()" title="ไล่เช็คว่าเรื่องไหนมีลิขสิทธิ์ (LC) แล้ว">🔎 เช็ค LC${allLcMode?' ✕':''}</button>
     </div>
+    ${allLcMode ? lcToolbarHtml() : ''}
     ${list.length ? `
       <div class="table-wrap"><table class="data-table all-table">
         <thead><tr><th>รหัส</th><th>ชื่อเรื่อง</th><th>ลิงก์ต้นทาง</th></tr></thead>
         <tbody>${rows}</tbody>
       </table></div>`
-      : `<div class="empty-state">${recurring.length ? 'ไม่พบเรื่องที่ตรงกับคำค้น' : 'ยังไม่มีเรื่อง'}</div>`}
+      : `<div class="empty-state">${allLcMode && !q ? 'ไม่มีเรื่องที่ถึงรอบเช็ค 🎉' : recurring.length ? 'ไม่พบเรื่องที่ตรงกับคำค้น' : 'ยังไม่มีเรื่อง'}</div>`}
   `;
+  // หัวคอลัมน์เช็ค LC (ใส่หลัง render — แถวหัวตารางเป็น anchor ของขั้นอื่นใน rebuild)
+  if(allLcMode){ const hr = container.querySelector('.all-table thead tr'); if(hr) hr.insertAdjacentHTML('beforeend', '<th>เช็ค LC</th>'); }
 
   const box = document.getElementById('searchBoxAll');
   box.addEventListener('input', e=>{ allSearch = e.target.value; renderAllStories(); });

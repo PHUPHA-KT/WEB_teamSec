@@ -1224,6 +1224,26 @@ step('ชื่อแปล + ชื่อต้นฉบับ (origName)', 'fu
 </style>`, 'css');
 });
 
+// ================= 35) โหมดเช็คลิขสิทธิ์ (LC) ในแท็บทุกเรื่อง =================
+step('โหมดเช็ค LC (lcCheck)', 'function lcCellHtml(', () => {
+  const js = fs.readFileSync(path.join(__dirname, 'lccheck.js'), 'utf8').replace(/\n$/, '');
+  rep(`function pendingEpCount(item){`, js + `\n\nfunction pendingEpCount(item){`, 'helpers');
+  rep('</style>', `  /* โหมดเช็ค LC */
+  .lc-bar{ margin-bottom:10px; align-items:center; }
+  .lc-progress{ font-size:12px; color:var(--ink-soft); white-space:nowrap; margin-left:4px; }
+  .lc-cell{ display:flex; flex-direction:column; gap:5px; min-width:190px; }
+  .lc-actions{ display:flex; flex-wrap:wrap; gap:5px; }
+  .lc-badge{ display:inline-block; align-self:flex-start; padding:1px 8px; border-radius:6px; font-size:11.5px; font-weight:700; white-space:nowrap; }
+  .lc-never{ background:#fdecec; color:#c0392b; }
+  .lc-due{ background:#fdf3e3; color:#b9791b; }
+  .lc-ok{ background:var(--green-bg); color:var(--green); }
+  .lc-btn{ display:inline-flex; align-items:center; padding:4px 9px; border-radius:7px; border:1px solid var(--line); background:var(--card); color:var(--ink); font-size:12px; font-family:inherit; cursor:pointer; text-decoration:none; white-space:nowrap; }
+  .lc-btn:hover{ border-color:var(--blue); color:var(--blue); }
+  .lc-btn-ok:hover{ border-color:var(--green); color:var(--green); }
+  .lc-btn-found:hover{ border-color:#c0392b; color:#c0392b; }
+</style>`, 'css');
+});
+
 // ================= ตรวจก่อนเขียน =================
 group = 'ตรวจท้าย';
 if (s.includes('drive.google.com/drive/folders/')) throw new Error('ยังมีลิงก์ Drive จริงในไฟล์ — SEED ไม่ถูกตัด?');
