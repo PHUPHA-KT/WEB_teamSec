@@ -8,6 +8,9 @@ function itemDays(item){
   return (Array.isArray(item.days) && item.days.length) ? item.days : [item.day || 'ไม่ระบุวัน'];
 }
 function isMultiDay(item){ return itemDays(item).length > 1; }
+// ตอนต่อสัปดาห์ = จำนวนวันจริงที่ลง (ไม่ระบุวัน / จบแล้ว = 0)
+function weekEpCount(item){ return itemDays(item).filter(d=>WEEKDAY_ONLY.includes(d)).length; }
+function weekEpTotal(items){ return items.reduce((n, r)=>n + weekEpCount(r), 0); }
 function dayStatus(item, day){
   if(!isMultiDay(item)) return item.status || 'pending';
   return (item.statusByDay || {})[day] || 'pending';

@@ -14,7 +14,7 @@ function renderCalendar(){
     const mine = active.filter(r=>r.person===person);
     const color = PERSON_COLOR[person];
     html += `<div class="cal-card cal-${color}">
-      <div class="cal-head cal-head-${color}">${esc(person)} <span style="opacity:.85;font-weight:700;">(${mine.length} เรื่อง)</span></div>
+      <div class="cal-head cal-head-${color}">${esc(person)} <span style="opacity:.85;font-weight:700;">(${mine.length} เรื่อง · ${weekEpTotal(mine)} ตอน/สัปดาห์)</span></div>
       <table class="cal-table"><tbody>
         ${CAL_DAYS.map(d=>{
           const items = mine.filter(r=>itemDays(r).includes(d));

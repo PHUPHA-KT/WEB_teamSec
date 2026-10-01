@@ -1245,6 +1245,16 @@ step('โหมดเช็ค LC (lcCheck)', 'function lcCellHtml(', () => {
 </style>`, 'css');
 });
 
+// ================= 36) จำนวนตอน/สัปดาห์ต่อคน (เรื่องหลายวันนับตามวัน) =================
+step('ตอน/สัปดาห์ ต่อคน', 'stat[r.person].week', () => {
+  rep(`  PEOPLE.forEach(p=>stat[p]={stories:0, eps:0});`, `  PEOPLE.forEach(p=>stat[p]={stories:0, eps:0, week:0});`, 'workload init');
+  rep(`    stat[r.person].stories++;`, `    stat[r.person].stories++;
+    stat[r.person].week += weekEpCount(r);`, 'workload count');
+  rep(`<div class="wl-nums"><b>\${s.stories}</b> เรื่อง · <b style=`,
+      `<div class="wl-nums"><b>\${s.stories}</b> เรื่อง · <b>\${s.week}</b> ตอน/สัปดาห์ · <b style=`, 'workload card');
+  rep(`<small>\${items.length} เรื่อง</small>`, `<small>\${items.length} เรื่อง · \${weekEpTotal(items)} ตอน/สัปดาห์</small>`, 'person section head');
+});
+
 // ================= ตรวจก่อนเขียน =================
 group = 'ตรวจท้าย';
 if (s.includes('drive.google.com/drive/folders/')) throw new Error('ยังมีลิงก์ Drive จริงในไฟล์ — SEED ไม่ถูกตัด?');

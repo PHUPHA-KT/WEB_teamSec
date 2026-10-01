@@ -1187,6 +1187,9 @@ function itemDays(item){
   return (Array.isArray(item.days) && item.days.length) ? item.days : [item.day || 'ไม่ระบุวัน'];
 }
 function isMultiDay(item){ return itemDays(item).length > 1; }
+// ตอนต่อสัปดาห์ = จำนวนวันจริงที่ลง (ไม่ระบุวัน / จบแล้ว = 0)
+function weekEpCount(item){ return itemDays(item).filter(d=>WEEKDAY_ONLY.includes(d)).length; }
+function weekEpTotal(items){ return items.reduce((n, r)=>n + weekEpCount(r), 0); }
 function dayStatus(item, day){
   if(!isMultiDay(item)) return item.status || 'pending';
   return (item.statusByDay || {})[day] || 'pending';
@@ -2432,7 +2435,7 @@ function renderRecurring(){
     const label = person || 'ยังไม่ระบุคนทำ';
     html += `<div class="person-section">
       <div class="person-head" style="background:var(--${color})">
-        <span>${label}</span><small>${items.length} เรื่อง</small>
+        <span>${label}</span><small>${items.length} เรื่อง · ${weekEpTotal(items)} ตอน/สัปดาห์</small>
       </div>`;
     rows.forEach(({ item, rowDay })=>{
       const effDropped = isEffectivelyDropped(item);
@@ -2523,11 +2526,12 @@ async function promptSetMe(){
 // ===== ภาระแต่ละคน (นับเฉพาะเรื่องที่ยังไม่ดรอป) =====
 function workloadPanelHtml(){
   const stat = {};
-  PEOPLE.forEach(p=>stat[p]={stories:0, eps:0});
+  PEOPLE.forEach(p=>stat[p]={stories:0, eps:0, week:0});
   recurring.forEach(r=>{
     if(r.dropped) return;
     if(!PEOPLE.includes(r.person)) return;
     stat[r.person].stories++;
+    stat[r.person].week += weekEpCount(r);
     const by = pendingEpsByPerson(r);
     for(const p of Object.keys(by)) if(PEOPLE.includes(p)) stat[p].eps += by[p];
   });
@@ -2536,7 +2540,7 @@ function workloadPanelHtml(){
     const mine = p===myPerson;
     return `<div class="wl-card ${mine?'wl-mine':''}" style="border-color:var(--${PERSON_COLOR[p]});" onclick="setPersonFilter('${p}')">
       <div class="wl-name" style="color:var(--${PERSON_COLOR[p]})">${p}${mine?' ⭐':''}</div>
-      <div class="wl-nums"><b>${s.stories}</b> เรื่อง · <b style="color:${s.eps?'#c0392b':'inherit'}">${s.eps}</b> ตอนค้าง</div>
+      <div class="wl-nums"><b>${s.stories}</b> เรื่อง · <b>${s.week}</b> ตอน/สัปดาห์ · <b style="color:${s.eps?'#c0392b':'inherit'}">${s.eps}</b> ตอนค้าง</div>
     </div>`;
   }).join('');
   return `<div class="wl-wrap">${cards}</div>`;
@@ -3757,7 +3761,7 @@ function renderCalendar(){
     const mine = active.filter(r=>r.person===person);
     const color = PERSON_COLOR[person];
     html += `<div class="cal-card cal-${color}">
-      <div class="cal-head cal-head-${color}">${esc(person)} <span style="opacity:.85;font-weight:700;">(${mine.length} เรื่อง)</span></div>
+      <div class="cal-head cal-head-${color}">${esc(person)} <span style="opacity:.85;font-weight:700;">(${mine.length} เรื่อง · ${weekEpTotal(mine)} ตอน/สัปดาห์)</span></div>
       <table class="cal-table"><tbody>
         ${CAL_DAYS.map(d=>{
           const items = mine.filter(r=>itemDays(r).includes(d));
