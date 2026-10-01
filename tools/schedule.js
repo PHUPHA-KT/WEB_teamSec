@@ -44,11 +44,40 @@ function scheduleActionsHtml(e){
     + `<button class="icon-btn" onclick="deleteSchedule('${e.id}')" title="ลบ">✕</button>`;
 }
 
+// ===== เลขรันรหัสเรื่อง: [วัน-]18-<เลข>[-ชื่อ] =====
+// หาเลขสูงสุดจากทุกแท็บ (กำหนดการ + เรื่องเปิดใหม่ + งานประจำ รวมดรอป) กันใช้เลขซ้ำ
+// รหัสแบบอื่น (7-3, 5-11-1) ไม่นับ
+function codeSerial(str){
+  const m = String(str || '').trim().match(/(?:^|-)18-(\d+)(?!\d)/);
+  return m ? Number(m[1]) : null;
+}
+function codeSerialBarHtml(){
+  const all = [
+    ...scheduleEntries.map(e=>e.title),
+    ...newStories.map(n=>n.code),
+    ...recurring.map(r=>r.code),
+  ].map(codeSerial).filter(n=>n !== null);
+  if(!all.length) return '';
+  const max = Math.max(...all);
+  const reserved = [...new Set(scheduleEntries.filter(e=>e.status !== 'opened').map(e=>codeSerial(e.title)).filter(n=>n !== null))].sort((a,b)=>a-b);
+  return `<div class="code-serial-bar">
+    <span>รหัสล่าสุด <b>18-${max}</b></span>
+    <span>· เลขถัดไป <button type="button" class="code-next" onclick="openScheduleWithCode('18-${max+1}')" title="เพิ่มกำหนดการด้วยรหัสนี้">18-${max+1} ＋</button></span>
+    ${reserved.length ? `<span>· จองไว้ยังไม่เปิด: ${reserved.map(n=>'18-'+n).join(', ')}</span>` : ''}
+  </div>`;
+}
+function openScheduleWithCode(code){
+  openScheduleModal();
+  document.getElementById('sTitle').value = code + '-';
+  setTimeout(()=>{ const t = document.getElementById('sTitle'); t.focus(); t.selectionStart = t.selectionEnd = t.value.length; }, 50);
+}
+
 function renderSchedule(){
   const container = document.getElementById('mainContent');
   let html = `
     <div class="toolbar">
       <button class="btn btn-primary" onclick="openScheduleModal()">+ เพิ่มกำหนดการ</button>
+      ${codeSerialBarHtml()}
     </div>
   `;
   if(!scheduleEntries.length){

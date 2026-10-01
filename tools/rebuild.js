@@ -1309,7 +1309,11 @@ step('กำหนดการ: ตอนแรกออกก่อน (firstDa
   }
   scheduleSourceForNew = null;`, 'saveNewStory sentToNew');
 
-  rep('</style>', `  .sched-first{ font-size:11.5px; color:#6a3fb3; font-weight:700; }
+  rep('</style>', `  .code-serial-bar{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 6px; font-size:12.5px; color:var(--ink-soft); }
+  .code-serial-bar b{ color:var(--ink); }
+  .code-next{ border:1px dashed var(--blue); background:var(--blue-bg); color:var(--blue); border-radius:6px; padding:1px 7px; font:inherit; font-weight:700; cursor:pointer; }
+  .code-next:hover{ border-style:solid; }
+  .sched-first{ font-size:11.5px; color:#6a3fb3; font-weight:700; }
   .sched-act-first{ color:#6a3fb3; border-color:#6a3fb3; }
   .sched-sent{ font-size:12px; color:var(--green); font-weight:700; margin-right:6px; white-space:nowrap; }
 </style>`, 'css');
