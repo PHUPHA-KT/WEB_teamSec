@@ -1255,6 +1255,66 @@ step('ตอน/สัปดาห์ ต่อคน', 'stat[r.person].week', (
   rep(`<small>\${items.length} เรื่อง</small>`, `<small>\${items.length} เรื่อง · \${weekEpTotal(items)} ตอน/สัปดาห์</small>`, 'person section head');
 });
 
+// ================= 37) กำหนดการ: ตอนแรกออกก่อน แล้วที่เหลือตามวันเปิด =================
+step('กำหนดการ: ตอนแรกออกก่อน (firstDate / firstout)', "firstout:", () => {
+  rep(`  preparing: {label:'กำลังเตรียม', bg:'#fdf3e3', fg:'#b9791b'},`,
+`  preparing: {label:'กำลังเตรียม', bg:'#fdf3e3', fg:'#b9791b'},
+  firstout:  {label:'ตอนแรกออกแล้ว', bg:'#f1ecfa', fg:'#6a3fb3'},`, 'status');
+
+  // นับถอยหลังไปวันถัดไปที่ต้องสนใจ (ตอนแรก หรือ ที่เหลือ)
+  rep(`  if(entry.status === 'opened') return '';
+  const d = daysUntil(entry.date);
+  if(d === null) return '';
+  if(d < 0) return \`<span class="overdue-badge" style="background:#e0403a">เลยมา \${-d} วัน</span>\`;
+  if(d === 0) return \`<span class="overdue-badge" style="background:#e07a29">วันนี้</span>\`;
+  if(d <= 3) return \`<span class="overdue-badge" style="background:#b9791b">อีก \${d} วัน</span>\`;
+  return \`<span style="font-size:12px;color:var(--ink-soft);">อีก \${d} วัน</span>\`;`,
+`  if(entry.status === 'opened') return '';
+  const target = scheduleNextDate(entry);
+  const pre = entry.firstDate ? (target === entry.firstDate ? 'ตอนแรก ' : 'ที่เหลือ ') : '';
+  const d = daysUntil(target);
+  if(d === null) return '';
+  if(d < 0) return \`<span class="overdue-badge" style="background:#e0403a">\${pre}เลยมา \${-d} วัน</span>\`;
+  if(d === 0) return \`<span class="overdue-badge" style="background:#e07a29">\${pre}วันนี้</span>\`;
+  if(d <= 3) return \`<span class="overdue-badge" style="background:#b9791b">\${pre}อีก \${d} วัน</span>\`;
+  return \`<span style="font-size:12px;color:var(--ink-soft);">\${pre}อีก \${d} วัน</span>\`;`, 'countdown');
+
+  // modal: วันตอนแรก (ไม่บังคับ) + สถานะใหม่
+  rep(`    <div class="field"><label>วันที่จะเปิด</label><div class="date-row"><input id="sDate" type="date">`,
+`    <div class="field"><label>วันตอนแรกออก (ไม่บังคับ — เรื่องที่ตอนแรกมาก่อน)</label><div class="date-row"><input id="sFirstDate" type="date"><button type="button" class="btn btn-ghost date-today" onclick="setDateToday('sFirstDate')">วันนี้</button></div></div>
+    <div class="field"><label>วันที่จะเปิด (ตอนที่เหลือ / ทั้งเรื่อง)</label><div class="date-row"><input id="sDate" type="date">`, 'modal first date');
+  rep(`        <option value="preparing">กำลังเตรียม</option>
+        <option value="opened">เปิดแล้ว</option>`,
+`        <option value="preparing">กำลังเตรียม</option>
+        <option value="firstout">ตอนแรกออกแล้ว</option>
+        <option value="opened">เปิดแล้ว</option>`, 'modal status');
+  rep(`  document.getElementById('sDate').value = entry ? (entry.date||'') : '';`,
+`  document.getElementById('sDate').value = entry ? (entry.date||'') : '';
+  document.getElementById('sFirstDate').value = entry ? (entry.firstDate||'') : '';`, 'openScheduleModal');
+  rep(`    date: document.getElementById('sDate').value || '',`,
+`    date: document.getElementById('sDate').value || '',
+    firstDate: document.getElementById('sFirstDate').value || '',`, 'saveSchedule');
+
+  // ส่งเข้าเรื่องเปิดใหม่สำเร็จ -> ติดธงที่กำหนดการ กันส่งซ้ำ
+  rep(`function openNewModal(id){
+  editingNewId = id || null;`,
+`function openNewModal(id){
+  editingNewId = id || null;
+  scheduleSourceForNew = null;   // เปิดปกติ = ไม่ได้มาจากกำหนดการ`, 'openNewModal reset');
+  rep(`    logActivity(\`เพิ่มเรื่องเปิดใหม่ "\${data.code}"\`);
+  }`,
+`    logActivity(\`เพิ่มเรื่องเปิดใหม่ "\${data.code}"\`);
+    const src = scheduleSourceForNew && scheduleEntries.find(e=>e.id===scheduleSourceForNew);
+    if(src) src.sentToNew = true;
+  }
+  scheduleSourceForNew = null;`, 'saveNewStory sentToNew');
+
+  rep('</style>', `  .sched-first{ font-size:11.5px; color:#6a3fb3; font-weight:700; }
+  .sched-act-first{ color:#6a3fb3; border-color:#6a3fb3; }
+  .sched-sent{ font-size:12px; color:var(--green); font-weight:700; margin-right:6px; white-space:nowrap; }
+</style>`, 'css');
+});
+
 // ================= ตรวจก่อนเขียน =================
 group = 'ตรวจท้าย';
 if (s.includes('drive.google.com/drive/folders/')) throw new Error('ยังมีลิงก์ Drive จริงในไฟล์ — SEED ไม่ถูกตัด?');

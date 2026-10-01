@@ -2,6 +2,8 @@
 // - ยังไม่เปิดขึ้นก่อน (ใกล้สุดก่อน) / เปิดแล้วไปท้าย (ใหม่สุดก่อน) และซ่อนที่เปิดเกิน 14 วัน
 // - desktop = ตาราง, มือถือ = การ์ด (สลับด้วย CSS)
 // - ปุ่ม ✓ เปิดแล้ว กดทีเดียว / ปุ่ม → สร้างเรื่องเปิดใหม่ กรอกให้จากกำหนดการ
+// - เรื่องที่ตอนแรกออกก่อน (firstDate): ✓ ตอนแรกออก -> สถานะ firstout -> ส่งเข้าเรื่องเปิดใหม่ได้เลย
+//   แล้วรอตอนที่เหลือตามวันที่เปิด (date) ค่อยกด ✓ เปิดแล้ว · sentToNew = ส่งเข้าเรื่องเปิดใหม่แล้ว กันซ้ำ
 const SCHEDULE_OPENED_KEEP_DAYS = 14;
 let showAllOpened = false;
 
@@ -17,11 +19,27 @@ function thaiDateLabel(dateStr){
   return TH_DOW[d.getDay()] + ' ' + d.getDate() + ' ' + TH_MON[d.getMonth()] + yearPart;
 }
 
+let scheduleSourceForNew = null;   // กำหนดการที่กำลังส่งเข้าเรื่องเปิดใหม่ (saveNewStory ใช้)
+
+// วันถัดไปที่ต้องสนใจ: ยังไม่ถึงตอนแรก = วันตอนแรก, ไม่งั้น = วันเปิด (ตอนที่เหลือ)
+function scheduleNextDate(e){
+  return e.firstDate && e.status !== 'firstout' && e.status !== 'opened' ? e.firstDate : e.date;
+}
+function scheduleDateHtml(e){
+  if(!e.firstDate) return thaiDateLabel(e.date);
+  return `<div class="sched-first">ตอนแรก ${thaiDateLabel(e.firstDate)}</div><div>ที่เหลือ ${thaiDateLabel(e.date)}</div>`;
+}
 function scheduleActionsHtml(e){
   const open = e.status === 'opened';
-  return (open
-      ? `<button class="btn btn-ghost sched-act" onclick="scheduleToNewStory('${e.id}')" title="สร้างเรื่องเปิดใหม่จากกำหนดการนี้">→ เรื่องเปิดใหม่</button>`
-      : `<button class="btn btn-ghost sched-act sched-act-ok" onclick="markScheduleOpened('${e.id}')" title="ทำเครื่องหมายว่าเปิดแล้ว">✓ เปิดแล้ว</button>`)
+  const toNew = e.sentToNew
+    ? `<span class="sched-sent" title="ส่งเข้าเรื่องเปิดใหม่แล้ว">✓ อยู่ในเรื่องเปิดใหม่</span>`
+    : `<button class="btn btn-ghost sched-act" onclick="scheduleToNewStory('${e.id}')" title="สร้างเรื่องเปิดใหม่จากกำหนดการนี้">→ เรื่องเปิดใหม่</button>`;
+  const firstPending = e.firstDate && e.status !== 'firstout';
+  return (open ? toNew
+      : firstPending
+        ? `<button class="btn btn-ghost sched-act sched-act-first" onclick="markScheduleFirstOut('${e.id}')" title="ตอนแรกออกแล้ว — เริ่มทำได้">✓ ตอนแรกออก</button>`
+        : (e.status === 'firstout' ? toNew : '')
+          + `<button class="btn btn-ghost sched-act sched-act-ok" onclick="markScheduleOpened('${e.id}')" title="ตอนที่เหลือออกแล้ว / เปิดครบ">✓ เปิดแล้ว</button>`)
     + `<button class="icon-btn" onclick="openScheduleModal('${e.id}')" title="แก้ไข" style="color:#6b7480;">✎</button>`
     + `<button class="icon-btn" onclick="deleteSchedule('${e.id}')" title="ลบ">✕</button>`;
 }
@@ -40,7 +58,8 @@ function renderSchedule(){
   }
 
   const byDateAsc = (a,b)=>{ if(!a.date) return 1; if(!b.date) return -1; return a.date.localeCompare(b.date); };
-  const upcoming = scheduleEntries.filter(e=>e.status!=='opened').sort(byDateAsc);
+  const byNextAsc = (a,b)=>{ const x = scheduleNextDate(a), y = scheduleNextDate(b); if(!x) return 1; if(!y) return -1; return x.localeCompare(y); };
+  const upcoming = scheduleEntries.filter(e=>e.status!=='opened').sort(byNextAsc);
   const openedAll = scheduleEntries.filter(e=>e.status==='opened').sort((a,b)=>byDateAsc(b,a));
   const cutoff = Date.now() - SCHEDULE_OPENED_KEEP_DAYS * 86400000;
   const isRecent = e => !e.date || Date.parse(e.date + 'T00:00:00') >= cutoff;
@@ -50,7 +69,7 @@ function renderSchedule(){
   const rowHtml = e => {
     const st = SCHEDULE_STATUS[e.status] || SCHEDULE_STATUS.planned;
     return `<tr>
-      <td style="white-space:nowrap;">${thaiDateLabel(e.date)}</td>
+      <td style="white-space:nowrap;">${scheduleDateHtml(e)}</td>
       <td>${countdownLabel(e)}</td>
       <td><b>${esc(e.title)}</b>${e.link?` <a href="${safeUrl(e.link)}" target="_blank" style="font-size:12px;color:#1c6fd1;">🔗</a>`:''}</td>
       <td>${e.person?esc(e.person):'—'}</td>
@@ -65,7 +84,7 @@ function renderSchedule(){
       <div class="new-card-top">
         <div>
           <div class="new-code">${esc(e.title)}${e.link?` <a href="${safeUrl(e.link)}" target="_blank" style="font-size:12px;color:#1c6fd1;">🔗</a>`:''}</div>
-          <div class="sched-meta">${thaiDateLabel(e.date)}${e.person?' · '+esc(e.person):''} ${countdownLabel(e)}</div>
+          <div class="sched-meta">${e.firstDate ? 'ตอนแรก ' + thaiDateLabel(e.firstDate) + ' · ที่เหลือ ' : ''}${thaiDateLabel(e.date)}${e.person?' · '+esc(e.person):''} ${countdownLabel(e)}</div>
         </div>
         <span class="status-badge" style="background:${st.bg};color:${st.fg};white-space:nowrap;">${st.label}</span>
       </div>
@@ -105,6 +124,18 @@ async function markScheduleOpened(id){
   await persistSchedule(false);
 }
 
+// ตอนแรกออกแล้ว: ทีมเริ่มทำได้ — ส่งเข้าเรื่องเปิดใหม่ แล้วรอตอนที่เหลือ
+async function markScheduleFirstOut(id){
+  const e = scheduleEntries.find(x=>x.id===id);
+  if(!e) return;
+  e.status = 'firstout';
+  if(!e.firstDate) e.firstDate = todayDateStr();
+  logActivity(`ตอนแรก "${e.title}" ออกแล้ว`);
+  renderSchedule(); renderStats();
+  showToast('✓ ' + e.title + ' — ตอนแรกออกแล้ว · กด → เรื่องเปิดใหม่ ให้ทีมเริ่มทำ');
+  await persistSchedule(false);
+}
+
 // กรอก modal "เรื่องเปิดใหม่" จากกำหนดการ ไม่ต้องพิมพ์รหัส/ชื่อ/ลิงก์ซ้ำ
 function scheduleToNewStory(id){
   const e = scheduleEntries.find(x=>x.id===id);
@@ -113,4 +144,5 @@ function scheduleToNewStory(id){
   document.getElementById('nCode').value = e.title || '';
   document.getElementById('nLink').value = e.link || '';
   document.getElementById('newModalTitle').textContent = 'เพิ่มเรื่องเปิดใหม่ (จากกำหนดการ)';
+  scheduleSourceForNew = id;   // บันทึกแล้ว saveNewStory จะติด sentToNew ให้
 }

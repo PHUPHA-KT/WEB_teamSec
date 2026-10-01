@@ -421,6 +421,9 @@
   .lc-btn-weak{ border-style:dashed; color:var(--ink-soft); }
   .lc-btn-ok:hover{ border-color:var(--green); color:var(--green); }
   .lc-btn-found:hover{ border-color:#c0392b; color:#c0392b; }
+  .sched-first{ font-size:11.5px; color:#6a3fb3; font-weight:700; }
+  .sched-act-first{ color:#6a3fb3; border-color:#6a3fb3; }
+  .sched-sent{ font-size:12px; color:var(--green); font-weight:700; margin-right:6px; white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -688,7 +691,8 @@
 <div class="modal-backdrop" id="modalSchedule">
   <div class="modal">
     <h3 id="scheduleModalTitle">เพิ่มกำหนดการเปิดเรื่อง</h3>
-    <div class="field"><label>วันที่จะเปิด</label><div class="date-row"><input id="sDate" type="date"><button type="button" class="btn btn-ghost date-today" onclick="setDateToday('sDate')">วันนี้</button></div></div>
+    <div class="field"><label>วันตอนแรกออก (ไม่บังคับ — เรื่องที่ตอนแรกมาก่อน)</label><div class="date-row"><input id="sFirstDate" type="date"><button type="button" class="btn btn-ghost date-today" onclick="setDateToday('sFirstDate')">วันนี้</button></div></div>
+    <div class="field"><label>วันที่จะเปิด (ตอนที่เหลือ / ทั้งเรื่อง)</label><div class="date-row"><input id="sDate" type="date"><button type="button" class="btn btn-ghost date-today" onclick="setDateToday('sDate')">วันนี้</button></div></div>
     <div class="field"><label>รหัส/ชื่อเรื่อง</label><input id="sTitle" type="text" placeholder="เช่น 18-28 หรือ ชื่อเรื่อง"></div>
     <div class="field"><label>คนทำ (ไม่บังคับ)</label>
       <select id="sPerson">
@@ -701,6 +705,7 @@
       <select id="sStatus">
         <option value="planned">วางแผนไว้</option>
         <option value="preparing">กำลังเตรียม</option>
+        <option value="firstout">ตอนแรกออกแล้ว</option>
         <option value="opened">เปิดแล้ว</option>
       </select>
     </div>
@@ -3232,6 +3237,7 @@ async function deleteNewStory(id){
 let editingNewId = null;
 function openNewModal(id){
   editingNewId = id || null;
+  scheduleSourceForNew = null;   // เปิดปกติ = ไม่ได้มาจากกำหนดการ
   const item = id ? newStories.find(n=>n.id===id) : null;
   document.getElementById('newModalTitle').textContent = item ? 'แก้ไขเรื่องเปิดใหม่' : 'เพิ่มเรื่องเปิดใหม่';
   document.getElementById('nCode').value = item ? (item.code||'') : '';
@@ -3254,7 +3260,10 @@ async function saveNewStory(){
   } else {
     newStories.push({ id: uid('n'), ...data, name:'', createdAt: new Date().toISOString(), contrib:{'เหนือ':false,'บิ๊ก':false,'ยูตะ':false,'น๊อต':false} });
     logActivity(`เพิ่มเรื่องเปิดใหม่ "${data.code}"`);
+    const src = scheduleSourceForNew && scheduleEntries.find(e=>e.id===scheduleSourceForNew);
+    if(src) src.sentToNew = true;
   }
+  scheduleSourceForNew = null;
   editingNewId = null;
   closeModal('modalNew');
   renderNewStories(); renderStats();
@@ -3451,6 +3460,7 @@ async function deleteExpense(id){
 const SCHEDULE_STATUS = {
   planned:   {label:'วางแผนไว้',   bg:'#eaf2fd', fg:'#1c6fd1'},
   preparing: {label:'กำลังเตรียม', bg:'#fdf3e3', fg:'#b9791b'},
+  firstout:  {label:'ตอนแรกออกแล้ว', bg:'#f1ecfa', fg:'#6a3fb3'},
   opened:    {label:'เปิดแล้ว',    bg:'#e6f7ee', fg:'#1a9c6b'},
 };
 let editingScheduleId = null;
@@ -3463,18 +3473,22 @@ function daysUntil(dateStr){
 }
 function countdownLabel(entry){
   if(entry.status === 'opened') return '';
-  const d = daysUntil(entry.date);
+  const target = scheduleNextDate(entry);
+  const pre = entry.firstDate ? (target === entry.firstDate ? 'ตอนแรก ' : 'ที่เหลือ ') : '';
+  const d = daysUntil(target);
   if(d === null) return '';
-  if(d < 0) return `<span class="overdue-badge" style="background:#e0403a">เลยมา ${-d} วัน</span>`;
-  if(d === 0) return `<span class="overdue-badge" style="background:#e07a29">วันนี้</span>`;
-  if(d <= 3) return `<span class="overdue-badge" style="background:#b9791b">อีก ${d} วัน</span>`;
-  return `<span style="font-size:12px;color:var(--ink-soft);">อีก ${d} วัน</span>`;
+  if(d < 0) return `<span class="overdue-badge" style="background:#e0403a">${pre}เลยมา ${-d} วัน</span>`;
+  if(d === 0) return `<span class="overdue-badge" style="background:#e07a29">${pre}วันนี้</span>`;
+  if(d <= 3) return `<span class="overdue-badge" style="background:#b9791b">${pre}อีก ${d} วัน</span>`;
+  return `<span style="font-size:12px;color:var(--ink-soft);">${pre}อีก ${d} วัน</span>`;
 }
 
 // ===== กำหนดการเปิดเรื่อง (แทน renderSchedule เดิม) =====
 // - ยังไม่เปิดขึ้นก่อน (ใกล้สุดก่อน) / เปิดแล้วไปท้าย (ใหม่สุดก่อน) และซ่อนที่เปิดเกิน 14 วัน
 // - desktop = ตาราง, มือถือ = การ์ด (สลับด้วย CSS)
 // - ปุ่ม ✓ เปิดแล้ว กดทีเดียว / ปุ่ม → สร้างเรื่องเปิดใหม่ กรอกให้จากกำหนดการ
+// - เรื่องที่ตอนแรกออกก่อน (firstDate): ✓ ตอนแรกออก -> สถานะ firstout -> ส่งเข้าเรื่องเปิดใหม่ได้เลย
+//   แล้วรอตอนที่เหลือตามวันที่เปิด (date) ค่อยกด ✓ เปิดแล้ว · sentToNew = ส่งเข้าเรื่องเปิดใหม่แล้ว กันซ้ำ
 const SCHEDULE_OPENED_KEEP_DAYS = 14;
 let showAllOpened = false;
 
@@ -3490,6 +3504,16 @@ function thaiDateLabel(dateStr){
   return TH_DOW[d.getDay()] + ' ' + d.getDate() + ' ' + TH_MON[d.getMonth()] + yearPart;
 }
 
+let scheduleSourceForNew = null;   // กำหนดการที่กำลังส่งเข้าเรื่องเปิดใหม่ (saveNewStory ใช้)
+
+// วันถัดไปที่ต้องสนใจ: ยังไม่ถึงตอนแรก = วันตอนแรก, ไม่งั้น = วันเปิด (ตอนที่เหลือ)
+function scheduleNextDate(e){
+  return e.firstDate && e.status !== 'firstout' && e.status !== 'opened' ? e.firstDate : e.date;
+}
+function scheduleDateHtml(e){
+  if(!e.firstDate) return thaiDateLabel(e.date);
+  return `<div class="sched-first">ตอนแรก ${thaiDateLabel(e.firstDate)}</div><div>ที่เหลือ ${thaiDateLabel(e.date)}</div>`;
+}
 // ===== แท็บ "ทุกเรื่อง" — รายการเรื่องประจำทั้งหมด รวมที่ดรอป/จบแล้ว =====
 // โชว์แค่ รหัส · ชื่อ · ลิงก์ต้นทาง (+ป้ายดรอปเล็กๆ ให้รู้ว่าเลิกทำแล้ว) มีค้นหา
 let allSearch = '';
@@ -3591,9 +3615,15 @@ function renderAllStories(){
 
 function scheduleActionsHtml(e){
   const open = e.status === 'opened';
-  return (open
-      ? `<button class="btn btn-ghost sched-act" onclick="scheduleToNewStory('${e.id}')" title="สร้างเรื่องเปิดใหม่จากกำหนดการนี้">→ เรื่องเปิดใหม่</button>`
-      : `<button class="btn btn-ghost sched-act sched-act-ok" onclick="markScheduleOpened('${e.id}')" title="ทำเครื่องหมายว่าเปิดแล้ว">✓ เปิดแล้ว</button>`)
+  const toNew = e.sentToNew
+    ? `<span class="sched-sent" title="ส่งเข้าเรื่องเปิดใหม่แล้ว">✓ อยู่ในเรื่องเปิดใหม่</span>`
+    : `<button class="btn btn-ghost sched-act" onclick="scheduleToNewStory('${e.id}')" title="สร้างเรื่องเปิดใหม่จากกำหนดการนี้">→ เรื่องเปิดใหม่</button>`;
+  const firstPending = e.firstDate && e.status !== 'firstout';
+  return (open ? toNew
+      : firstPending
+        ? `<button class="btn btn-ghost sched-act sched-act-first" onclick="markScheduleFirstOut('${e.id}')" title="ตอนแรกออกแล้ว — เริ่มทำได้">✓ ตอนแรกออก</button>`
+        : (e.status === 'firstout' ? toNew : '')
+          + `<button class="btn btn-ghost sched-act sched-act-ok" onclick="markScheduleOpened('${e.id}')" title="ตอนที่เหลือออกแล้ว / เปิดครบ">✓ เปิดแล้ว</button>`)
     + `<button class="icon-btn" onclick="openScheduleModal('${e.id}')" title="แก้ไข" style="color:#6b7480;">✎</button>`
     + `<button class="icon-btn" onclick="deleteSchedule('${e.id}')" title="ลบ">✕</button>`;
 }
@@ -3612,7 +3642,8 @@ function renderSchedule(){
   }
 
   const byDateAsc = (a,b)=>{ if(!a.date) return 1; if(!b.date) return -1; return a.date.localeCompare(b.date); };
-  const upcoming = scheduleEntries.filter(e=>e.status!=='opened').sort(byDateAsc);
+  const byNextAsc = (a,b)=>{ const x = scheduleNextDate(a), y = scheduleNextDate(b); if(!x) return 1; if(!y) return -1; return x.localeCompare(y); };
+  const upcoming = scheduleEntries.filter(e=>e.status!=='opened').sort(byNextAsc);
   const openedAll = scheduleEntries.filter(e=>e.status==='opened').sort((a,b)=>byDateAsc(b,a));
   const cutoff = Date.now() - SCHEDULE_OPENED_KEEP_DAYS * 86400000;
   const isRecent = e => !e.date || Date.parse(e.date + 'T00:00:00') >= cutoff;
@@ -3622,7 +3653,7 @@ function renderSchedule(){
   const rowHtml = e => {
     const st = SCHEDULE_STATUS[e.status] || SCHEDULE_STATUS.planned;
     return `<tr>
-      <td style="white-space:nowrap;">${thaiDateLabel(e.date)}</td>
+      <td style="white-space:nowrap;">${scheduleDateHtml(e)}</td>
       <td>${countdownLabel(e)}</td>
       <td><b>${esc(e.title)}</b>${e.link?` <a href="${safeUrl(e.link)}" target="_blank" style="font-size:12px;color:#1c6fd1;">🔗</a>`:''}</td>
       <td>${e.person?esc(e.person):'—'}</td>
@@ -3637,7 +3668,7 @@ function renderSchedule(){
       <div class="new-card-top">
         <div>
           <div class="new-code">${esc(e.title)}${e.link?` <a href="${safeUrl(e.link)}" target="_blank" style="font-size:12px;color:#1c6fd1;">🔗</a>`:''}</div>
-          <div class="sched-meta">${thaiDateLabel(e.date)}${e.person?' · '+esc(e.person):''} ${countdownLabel(e)}</div>
+          <div class="sched-meta">${e.firstDate ? 'ตอนแรก ' + thaiDateLabel(e.firstDate) + ' · ที่เหลือ ' : ''}${thaiDateLabel(e.date)}${e.person?' · '+esc(e.person):''} ${countdownLabel(e)}</div>
         </div>
         <span class="status-badge" style="background:${st.bg};color:${st.fg};white-space:nowrap;">${st.label}</span>
       </div>
@@ -3677,6 +3708,18 @@ async function markScheduleOpened(id){
   await persistSchedule(false);
 }
 
+// ตอนแรกออกแล้ว: ทีมเริ่มทำได้ — ส่งเข้าเรื่องเปิดใหม่ แล้วรอตอนที่เหลือ
+async function markScheduleFirstOut(id){
+  const e = scheduleEntries.find(x=>x.id===id);
+  if(!e) return;
+  e.status = 'firstout';
+  if(!e.firstDate) e.firstDate = todayDateStr();
+  logActivity(`ตอนแรก "${e.title}" ออกแล้ว`);
+  renderSchedule(); renderStats();
+  showToast('✓ ' + e.title + ' — ตอนแรกออกแล้ว · กด → เรื่องเปิดใหม่ ให้ทีมเริ่มทำ');
+  await persistSchedule(false);
+}
+
 // กรอก modal "เรื่องเปิดใหม่" จากกำหนดการ ไม่ต้องพิมพ์รหัส/ชื่อ/ลิงก์ซ้ำ
 function scheduleToNewStory(id){
   const e = scheduleEntries.find(x=>x.id===id);
@@ -3685,6 +3728,7 @@ function scheduleToNewStory(id){
   document.getElementById('nCode').value = e.title || '';
   document.getElementById('nLink').value = e.link || '';
   document.getElementById('newModalTitle').textContent = 'เพิ่มเรื่องเปิดใหม่ (จากกำหนดการ)';
+  scheduleSourceForNew = id;   // บันทึกแล้ว saveNewStory จะติด sentToNew ให้
 }
 
 function openScheduleModal(id){
@@ -3692,6 +3736,7 @@ function openScheduleModal(id){
   const entry = id ? scheduleEntries.find(e=>e.id===id) : null;
   document.getElementById('scheduleModalTitle').textContent = entry ? 'แก้ไขกำหนดการ' : 'เพิ่มกำหนดการเปิดเรื่อง';
   document.getElementById('sDate').value = entry ? (entry.date||'') : '';
+  document.getElementById('sFirstDate').value = entry ? (entry.firstDate||'') : '';
   document.getElementById('sTitle').value = entry ? (entry.title||'') : '';
   document.getElementById('sPerson').value = entry ? (entry.person||'') : '';
   document.getElementById('sStatus').value = entry ? (entry.status||'planned') : 'planned';
@@ -3705,6 +3750,7 @@ async function saveSchedule(){
   if(!title){ showToast('กรุณาใส่รหัสหรือชื่อเรื่อง'); return; }
   const data = {
     date: document.getElementById('sDate').value || '',
+    firstDate: document.getElementById('sFirstDate').value || '',
     title,
     person: document.getElementById('sPerson').value,
     status: document.getElementById('sStatus').value,
