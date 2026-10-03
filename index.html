@@ -1731,15 +1731,17 @@ function mergeItemFields(b, o, t){
 
 function mergeById(baseArr, oursArr, theirsArr){
   const bm = {}, om = {}, tm = {};
-  (baseArr||[]).forEach(x=>bm[x.id]=x);
-  (oursArr||[]).forEach(x=>om[x.id]=x);
-  (theirsArr||[]).forEach(x=>tm[x.id]=x);
+  // ถังขยะเก็บเป็น trashId ไม่มี id — ไม่งั้นทุกชิ้นได้ key เดียวกันแล้วเหลือชิ้นเดียว
+  const mergeKey = x => (x && x.id !== undefined) ? x.id : (x && x.trashId);
+  (baseArr||[]).forEach(x=>bm[mergeKey(x)]=x);
+  (oursArr||[]).forEach(x=>om[mergeKey(x)]=x);
+  (theirsArr||[]).forEach(x=>tm[mergeKey(x)]=x);
   const S = x => x===undefined ? null : JSON.stringify(x);
   // ลำดับ: ยึดของเราก่อน แล้วต่อท้ายด้วยรายการที่มีเฉพาะฝั่งเขา (เพื่อความเสถียร)
   const orderIds = [];
   const seen = new Set();
-  (oursArr||[]).forEach(x=>{ if(!seen.has(x.id)){orderIds.push(x.id);seen.add(x.id);} });
-  (theirsArr||[]).forEach(x=>{ if(!seen.has(x.id)){orderIds.push(x.id);seen.add(x.id);} });
+  (oursArr||[]).forEach(x=>{ const k = mergeKey(x); if(!seen.has(k)){orderIds.push(k);seen.add(k);} });
+  (theirsArr||[]).forEach(x=>{ const k = mergeKey(x); if(!seen.has(k)){orderIds.push(k);seen.add(k);} });
   const result = [];
   for(const id of orderIds){
     const b = bm[id], o = om[id], t = tm[id];

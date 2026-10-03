@@ -1319,6 +1319,25 @@ step('กำหนดการ: ตอนแรกออกก่อน (firstDa
 </style>`, 'css');
 });
 
+// ================= 38) mergeById: รายการในถังขยะไม่มี id (ใช้ trashId) =================
+// เดิมใช้ x.id อย่างเดียว -> ทุกชิ้นในถังขยะได้ key undefined ร่วมกัน -> merge ตอนเซฟเหลือชิ้นเดียว
+step('mergeById ใช้ trashId เมื่อไม่มี id (ถังขยะหาย)', 'const mergeKey = ', () => {
+  rep(`  const bm = {}, om = {}, tm = {};
+  (baseArr||[]).forEach(x=>bm[x.id]=x);
+  (oursArr||[]).forEach(x=>om[x.id]=x);
+  (theirsArr||[]).forEach(x=>tm[x.id]=x);`,
+`  const bm = {}, om = {}, tm = {};
+  // ถังขยะเก็บเป็น trashId ไม่มี id — ไม่งั้นทุกชิ้นได้ key เดียวกันแล้วเหลือชิ้นเดียว
+  const mergeKey = x => (x && x.id !== undefined) ? x.id : (x && x.trashId);
+  (baseArr||[]).forEach(x=>bm[mergeKey(x)]=x);
+  (oursArr||[]).forEach(x=>om[mergeKey(x)]=x);
+  (theirsArr||[]).forEach(x=>tm[mergeKey(x)]=x);`, 'maps');
+  rep(`  (oursArr||[]).forEach(x=>{ if(!seen.has(x.id)){orderIds.push(x.id);seen.add(x.id);} });
+  (theirsArr||[]).forEach(x=>{ if(!seen.has(x.id)){orderIds.push(x.id);seen.add(x.id);} });`,
+`  (oursArr||[]).forEach(x=>{ const k = mergeKey(x); if(!seen.has(k)){orderIds.push(k);seen.add(k);} });
+  (theirsArr||[]).forEach(x=>{ const k = mergeKey(x); if(!seen.has(k)){orderIds.push(k);seen.add(k);} });`, 'order');
+});
+
 // ================= ตรวจก่อนเขียน =================
 group = 'ตรวจท้าย';
 if (s.includes('drive.google.com/drive/folders/')) throw new Error('ยังมีลิงก์ Drive จริงในไฟล์ — SEED ไม่ถูกตัด?');
