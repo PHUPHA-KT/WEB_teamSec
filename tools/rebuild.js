@@ -1881,6 +1881,96 @@ step('A3 เซฟแบบเช็คเวอร์ชัน (updated_at)', '
     }`, 'persistDataNow CAS loop');
 }, { staging: true });
 
+// ================= 48) กำหนดการ: โน้ตทีมด้านขวา (แก้ได้ ใช้ร่วมกันทั้งทีม) =================
+// เก็บเป็น key แยก schedule_note (ข้อความล้วน) — เขียนทับทั้งก้อน คนแก้ล่าสุดชนะ
+step('กำหนดการ: โน้ตด้านขวา', 'function scheduleNoteHtml(', () => {
+  rep(`    container.innerHTML = html;
+    return;
+  }`,
+`    container.innerHTML = scheduleLayoutHtml(html);
+    loadScheduleNote();
+    return;
+  }`, 'empty layout');
+  rep(`  if(openedAll.length) html += section('✅ เปิดแล้ว', opened, toggle);
+
+  container.innerHTML = html;
+}`,
+`  if(openedAll.length) html += section('✅ เปิดแล้ว', opened, toggle);
+
+  container.innerHTML = scheduleLayoutHtml(html);
+  loadScheduleNote();
+}
+
+// ---- โน้ตทีมด้านขวา ----
+const SCHEDULE_NOTE_DEFAULT = 'ridi 0\\nlezhin -1\\nmr.blue 0\\ntoptoon 0';
+let scheduleNote = null;          // null = ยังไม่ได้โหลด
+let scheduleNoteEditing = false;
+let scheduleNoteDraft = null;    // ข้อความที่พิมพ์ค้าง (หน้าถูกวาดใหม่ระหว่างแก้ ก็ไม่หาย)
+function scheduleLayoutHtml(mainHtml){
+  return \`<div class="sched-layout"><div class="sched-main">\${mainHtml}</div>\${scheduleNoteHtml()}</div>\`;
+}
+function scheduleNoteHtml(){
+  const text = scheduleNote === null ? SCHEDULE_NOTE_DEFAULT : scheduleNote;
+  return \`<aside class="sched-note-box" id="schedNoteBox">
+    <div class="sched-note-head"><span>📝 โน้ต</span>
+      \${scheduleNoteEditing ? '' : '<button type="button" class="icon-btn" onclick="editScheduleNote()" title="แก้ไขโน้ต" aria-label="แก้ไขโน้ต">✎</button>'}
+    </div>
+    \${scheduleNoteEditing
+      ? \`<textarea id="schedNoteInput" rows="8" oninput="scheduleNoteDraft=this.value">\${esc(scheduleNoteDraft !== null ? scheduleNoteDraft : text)}</textarea>
+         <div class="sched-note-actions">
+           <button type="button" class="btn btn-ghost" onclick="cancelScheduleNote()">ยกเลิก</button>
+           <button type="button" class="btn btn-primary" onclick="saveScheduleNote()">บันทึก</button>
+         </div>\`
+      : \`<div class="sched-note-body" ondblclick="editScheduleNote()" title="ดับเบิลคลิกเพื่อแก้ไข">\${text.trim() ? esc(text) : '<span style="color:var(--ink-soft)">(ว่าง — กด ✎ เพื่อเขียน)</span>'}</div>\`}
+  </aside>\`;
+}
+function redrawScheduleNote(){
+  const box = document.getElementById('schedNoteBox');
+  if(box) box.outerHTML = scheduleNoteHtml();
+}
+async function loadScheduleNote(){
+  if(scheduleNoteEditing) return;
+  try{
+    const r = await window.storage.get('schedule_note', true);
+    const v = r && typeof r.value === 'string' ? r.value : null;
+    if(v !== scheduleNote){ scheduleNote = v; if(!scheduleNoteEditing) redrawScheduleNote(); }
+  }catch(e){}
+}
+function editScheduleNote(){
+  scheduleNoteEditing = true;
+  redrawScheduleNote();
+  const t = document.getElementById('schedNoteInput');
+  if(t){ t.focus(); t.selectionStart = t.selectionEnd = t.value.length; }
+}
+function cancelScheduleNote(){ scheduleNoteEditing = false; scheduleNoteDraft = null; redrawScheduleNote(); loadScheduleNote(); }
+async function saveScheduleNote(){
+  const t = document.getElementById('schedNoteInput');
+  if(!t) return;
+  const text = t.value.replace(/\\s+$/, '');
+  try{
+    await window.storage.set('schedule_note', text, true);
+  }catch(e){ showToast('บันทึกโน้ตไม่สำเร็จ — ลองใหม่'); return; }
+  scheduleNote = text;
+  scheduleNoteEditing = false;
+  scheduleNoteDraft = null;
+  logActivity('แก้โน้ตกำหนดการ');
+  redrawScheduleNote();
+  showToast('บันทึกโน้ตแล้ว');
+}`, 'note functions');
+  rep('</style>', `  /* โน้ตด้านขวาของกำหนดการ */
+  .sched-layout{ display:grid; grid-template-columns:minmax(0,1fr) 240px; gap:16px; align-items:start; }
+  .sched-note-box{ position:sticky; top:12px; background:#fffbea; border:1px solid #f0e2a8; border-radius:12px; padding:10px 12px 12px; }
+  .sched-note-head{ display:flex; justify-content:space-between; align-items:center; font-weight:800; font-size:13.5px; margin-bottom:6px; color:#7a6200; }
+  .sched-note-body{ white-space:pre-wrap; font-size:14px; line-height:1.6; font-family:inherit; min-height:40px; cursor:text; color:var(--ink); }
+  .sched-note-box textarea{ width:100%; box-sizing:border-box; font:inherit; font-size:14px; line-height:1.6; padding:8px; border:1px solid var(--line); border-radius:8px; resize:vertical; background:var(--card); color:var(--ink); }
+  .sched-note-actions{ display:flex; justify-content:flex-end; gap:6px; margin-top:8px; }
+  .sched-note-actions .btn{ padding:6px 12px; font-size:12.5px; }
+  body.dark .sched-note-box{ background:#2e2a17; border-color:#5a4f22; }
+  body.dark .sched-note-head{ color:#e3cc6b; }
+  @media(max-width:900px){ .sched-layout{ grid-template-columns:1fr; } .sched-note-box{ position:static; order:-1; } }
+</style>`, 'css');
+}, { staging: true });
+
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
 step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {
