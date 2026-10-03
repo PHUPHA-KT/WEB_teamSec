@@ -1477,6 +1477,73 @@ async function pollOnce(){
   startRealtimeSync();`, 'load');
 }, { staging: true });
 
+// ================= 42) B1: แถบ "ผ่านวันแล้วยังไม่ได้ทำ" บนงานประจำ =================
+step('B1 แถบผ่านวันแล้วยังไม่ทำ', 'function missedStripHtml(', () => {
+  const js = fs.readFileSync(path.join(__dirname, 'missed.js'), 'utf8').replace(/\n$/, '');
+  rep(`function pendingEpCount(item){`, js + `\n\nfunction pendingEpCount(item){`, 'helpers');
+  rep(`    \${dayLinksBarHtml()}
+    \${filterToggleHtml()}`,
+`    \${dayLinksBarHtml()}
+    \${missedStripHtml()}
+    \${filterToggleHtml()}`, 'strip');
+  rep('</style>', `  /* B1 ผ่านวันแล้วยังไม่ทำ */
+  .missed-strip{ border:1px solid #f0d9a8; background:#fdf6e7; border-radius:12px; margin:0 0 12px; overflow:hidden; }
+  .missed-head{ display:flex; justify-content:space-between; align-items:center; gap:8px; padding:9px 14px; cursor:pointer; font-size:13.5px; color:#8a5a00; }
+  .missed-toggle{ font-size:12px; white-space:nowrap; }
+  .missed-list{ border-top:1px solid #f0d9a8; background:var(--card); }
+  .missed-row{ display:flex; align-items:center; gap:8px; padding:7px 12px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .missed-row:last-child{ border-bottom:none; }
+  .missed-name{ flex:1; min-width:140px; font-size:13px; }
+  .missed-name small{ margin-left:6px; color:var(--ink-soft); font-size:11.5px; }
+  body.dark .missed-strip{ background:#3a2d14; border-color:#5a4720; }
+  body.dark .missed-head{ color:#e3b463; }
+</style>`, 'css');
+}, { staging: true });
+
+// ================= 43) B2: ประวัติครบขึ้น + ถามก่อนติ๊กแทนคนอื่น =================
+step('B2 ลงประวัติตอนค้าง/ติ๊ก/ลิงก์ + ถามก่อนติ๊กแทน', '// B2: ติ๊กแทนคนอื่น', () => {
+  rep(`  bumpLastEp(item, eps[i]);
+  eps.splice(i, 1);
+  item.pendingEpisodes = eps;`,
+`  bumpLastEp(item, eps[i]);
+  logActivity(\`ทำตอนค้าง "\${displayName(item) || item.code}" \${epLabel(eps[i])} แล้ว\`);
+  eps.splice(i, 1);
+  item.pendingEpisodes = eps;`, 'removeEpisodeAt');
+  rep(`  eps.forEach(e=>{ if(!have.has(epKey(e))) have.set(epKey(e), e); });
+  item.pendingEpisodes = sortEpisodes([...have.values()]);
+  document.getElementById('epAddInput').value = '';`,
+`  const added = eps.filter(e=>!have.has(epKey(e)));
+  eps.forEach(e=>{ if(!have.has(epKey(e))) have.set(epKey(e), e); });
+  item.pendingEpisodes = sortEpisodes([...have.values()]);
+  if(added.length) logActivity(\`ใส่ตอนค้าง "\${displayName(item) || item.code}" \${added.map(epLabel).join(', ')}\`);
+  document.getElementById('epAddInput').value = '';`, 'addEpisodes');
+  rep(`  if(!await uiConfirm('ทำครบทุกตอนแล้ว เอาตอนที่ค้างออกทั้งหมด?', 'เคลียร์ทุกตอน')) return;
+  bumpLastEp(item, item.pendingEpisodes);`,
+`  if(!await uiConfirm('ทำครบทุกตอนแล้ว เอาตอนที่ค้างออกทั้งหมด?', 'เคลียร์ทุกตอน')) return;
+  logActivity(\`เคลียร์ตอนค้าง "\${displayName(item) || item.code}" ทั้งหมด (\${sortEpisodes(item.pendingEpisodes).map(epLabel).join(', ')})\`);
+  bumpLastEp(item, item.pendingEpisodes);`, 'clearAllEpisodes');
+  rep(`  item.link = url;
+  renderRecurring();`,
+`  item.link = url;
+  logActivity(\`ใส่ลิงก์ต้นทาง "\${displayName(item) || item.code}"\`);
+  renderRecurring();`, 'promptLink');
+  rep(`  item.gdrive = url;
+  renderRecurring();`,
+`  item.gdrive = url;
+  logActivity(\`ใส่ลิงก์ Drive "\${displayName(item) || item.code}"\`);
+  renderRecurring();`, 'promptDriveLink');
+  rep(`  item.contrib = item.contrib || {};
+  item.contrib[person] = !item.contrib[person];`,
+`  item.contrib = item.contrib || {};
+  // B2: ติ๊กแทนคนอื่น -> ถามก่อน (กันกดผิดช่อง)
+  if(myPerson && person !== myPerson
+     && !await uiConfirm(\`\${item.contrib[person] ? 'เอาติ๊กของ' : 'ติ๊กแทน'} \${person} ใน "\${item.code}"?\`, item.contrib[person] ? 'เอาออก' : 'ติ๊กแทน')){
+    renderNewStories(); return;
+  }
+  item.contrib[person] = !item.contrib[person];
+  logActivity(\`\${item.contrib[person] ? 'ติ๊ก' : 'เอาติ๊กออก'} "\${item.code}" ช่อง \${person}\${myPerson && person !== myPerson ? ' (แทน)' : ''}\`);`, 'toggleContrib');
+}, { staging: true });
+
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
 step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {

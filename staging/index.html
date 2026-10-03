@@ -428,6 +428,17 @@
   .sched-first{ font-size:11.5px; color:#6a3fb3; font-weight:700; }
   .sched-act-first{ color:#6a3fb3; border-color:#6a3fb3; }
   .sched-sent{ font-size:12px; color:var(--green); font-weight:700; margin-right:6px; white-space:nowrap; }
+  /* B1 ผ่านวันแล้วยังไม่ทำ */
+  .missed-strip{ border:1px solid #f0d9a8; background:#fdf6e7; border-radius:12px; margin:0 0 12px; overflow:hidden; }
+  .missed-head{ display:flex; justify-content:space-between; align-items:center; gap:8px; padding:9px 14px; cursor:pointer; font-size:13.5px; color:#8a5a00; }
+  .missed-toggle{ font-size:12px; white-space:nowrap; }
+  .missed-list{ border-top:1px solid #f0d9a8; background:var(--card); }
+  .missed-row{ display:flex; align-items:center; gap:8px; padding:7px 12px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .missed-row:last-child{ border-bottom:none; }
+  .missed-name{ flex:1; min-width:140px; font-size:13px; }
+  .missed-name small{ margin-left:6px; color:var(--ink-soft); font-size:11.5px; }
+  body.dark .missed-strip{ background:#3a2d14; border-color:#5a4720; }
+  body.dark .missed-head{ color:#e3b463; }
   .staging-bar{ position:sticky; top:0; z-index:9000; background:#6a3fb3; color:#fff; text-align:center; font-size:12.5px; font-weight:700; padding:6px 12px; }
 </style>
 </head>
@@ -1415,6 +1426,70 @@ async function markLcFound(id){
   renderAllStories(); renderStats();
   await persistRecurring(false);
   showToast('ดรอปแล้ว: ' + DROP_META.lc.label);
+}
+
+// ===== B1: วันผ่านไปแล้วแต่ยัง "ยังไม่ทำ" — แถบเตือนบนงานประจำ =====
+// ไล่ทุกวันที่ผ่านไปแล้วในสัปดาห์นี้ (นับวันใหม่ตอน 2 ทุ่ม) ที่สถานะของวันนั้นยังเป็น pending
+// ต่อแถว: ✓ ทำแล้ว (สถานะวันนั้น = done) / ＋ ค้าง (ใส่ตอนเข้าตอนค้าง แล้วตั้งวันนั้นเป็น เลื่อน)
+// เคารพตัวกรองคน (งานของฉัน) · ไม่รวมเรื่องที่ดรอปจริง · ยุบไว้ได้
+let missedOpen = false;
+
+function missedRows(){
+  const rows = [];
+  recurring.forEach(item=>{
+    if(isEffectivelyDropped(item)) return;
+    if(personFilter !== 'ทั้งหมด' && !isPersonInvolved(item, personFilter)) return;
+    itemDays(item).forEach(day=>{
+      if(dayHasPassed(day) && dayStatus(item, day) === 'pending') rows.push({ item, day });
+    });
+  });
+  rows.sort((a,b)=> WEEKDAY_ONLY.indexOf(a.day) - WEEKDAY_ONLY.indexOf(b.day));
+  return rows;
+}
+// ตอนถัดไปที่เดาได้: ตอนล่าสุด / ตอนค้างสูงสุด + 1 (ข้อความ เช่น พิเศษ เดาไม่ได้ = ว่าง)
+function guessNextEp(item){
+  const nums = [item.lastEp, ...(item.pendingEpisodes || [])].map(e=>typeof e === 'number' ? e : parseFloat(e)).filter(n=>!isNaN(n));
+  return nums.length ? Math.floor(Math.max(...nums)) + 1 : '';
+}
+function missedStripHtml(){
+  if(showDropped) return '';
+  const rows = missedRows();
+  if(!rows.length) return '';
+  const who = personFilter !== 'ทั้งหมด' ? ' ของ' + esc(personFilter) : '';
+  return `<div class="missed-strip">
+    <div class="missed-head" onclick="missedOpen=!missedOpen;renderRecurring()">
+      <span>🕗 ผ่านวันแล้วยังไม่ได้ทำ${who} <b>${rows.length}</b> รายการ</span>
+      <span class="missed-toggle">${missedOpen ? 'ซ่อน ▴' : 'ดู ▾'}</span>
+    </div>
+    ${missedOpen ? `<div class="missed-list">${rows.map(({item, day})=>`
+      <div class="missed-row">
+        <span class="day-pill" style="${dayPillStyle(day)}">${day}</span>
+        <span class="missed-name">${item.code ? esc(item.code) + ' · ' : ''}${esc(displayName(item) || '(ไม่มีชื่อ)')}<small>${esc(item.person || '')}</small></span>
+        <button type="button" class="lc-btn lc-btn-ok" onclick="missedDone('${item.id}','${day}')">✓ ทำแล้ว</button>
+        <button type="button" class="lc-btn" onclick="missedToBacklog('${item.id}','${day}')" title="ยังไม่ได้ทำตอนนี้ — ใส่เข้าตอนค้าง แล้วตั้งวันนั้นเป็น เลื่อน">＋ ค้าง</button>
+      </div>`).join('')}
+    </div>` : ''}
+  </div>`;
+}
+async function missedDone(id, day){
+  await updateStatus(id, 'done', day);
+}
+async function missedToBacklog(id, day){
+  const item = recurring.find(r=>r.id===id);
+  if(!item) return;
+  const raw = await uiPrompt(`"${displayName(item) || item.code}" (${day}) ตอนที่ยังไม่ได้ทำ — ใส่เข้าตอนค้าง`, { value: String(guessNextEp(item)), placeholder: 'เช่น 24, 9.5, พิเศษ' });
+  if(raw === null || raw === undefined) return;
+  const eps = parseEpisodeInput(raw);
+  if(!eps.length){ showToast('ใส่เลขตอน หรือชื่อตอน เช่น 24, 9.5, พิเศษ'); return; }
+  const have = new Map((item.pendingEpisodes || []).map(e=>[epKey(e), e]));
+  eps.forEach(e=>{ if(!have.has(epKey(e))) have.set(epKey(e), e); });
+  item.pendingEpisodes = sortEpisodes([...have.values()]);
+  setDayStatus(item, day, 'delayed');
+  item.pendingSinceDate = null;
+  logActivity(`ใส่ตอนค้าง "${displayName(item) || item.code}" ${eps.map(epLabel).join(', ')} (ยังไม่ได้ทำ${isMultiDay(item) ? ' ' + day : ''})`);
+  renderRecurring(); renderStats();
+  await persistRecurring(false);
+  showToast('ใส่ตอนค้างแล้ว — ' + eps.map(epLabel).join(', '));
 }
 
 function pendingEpCount(item){
@@ -2466,6 +2541,7 @@ function renderRecurring(){
       <button class="btn btn-ghost" onclick="resetDailyDone()">รีเซ็ตสถานะที่ทำ/งด/เลื่อนแล้ว</button>
     </div>
     ${dayLinksBarHtml()}
+    ${missedStripHtml()}
     ${filterToggleHtml()}
     <div class="filter-panel${filtersOpen?' open':''}">
     ${workloadPanelHtml()}
@@ -2988,6 +3064,7 @@ async function removeEpisodeAt(i){
   const eps = sortEpisodes(item.pendingEpisodes);
   if(i < 0 || i >= eps.length) return;
   bumpLastEp(item, eps[i]);
+  logActivity(`ทำตอนค้าง "${displayName(item) || item.code}" ${epLabel(eps[i])} แล้ว`);
   eps.splice(i, 1);
   item.pendingEpisodes = eps;
   clearPendingOwnerIfDone(item);
@@ -3006,8 +3083,10 @@ async function addEpisodes(){
   const eps = parseEpisodeInput(raw);
   if(!eps.length){ showToast('ใส่เลขตอน หรือชื่อตอน เช่น 12, 9.5, พิเศษ'); return; }
   const have = new Map((item.pendingEpisodes || []).map(e=>[epKey(e), e]));
+  const added = eps.filter(e=>!have.has(epKey(e)));
   eps.forEach(e=>{ if(!have.has(epKey(e))) have.set(epKey(e), e); });
   item.pendingEpisodes = sortEpisodes([...have.values()]);
+  if(added.length) logActivity(`ใส่ตอนค้าง "${displayName(item) || item.code}" ${added.map(epLabel).join(', ')}`);
   document.getElementById('epAddInput').value = '';
   renderEpChips();
   renderRecurring(); renderStats();
@@ -3017,6 +3096,7 @@ async function clearAllEpisodes(){
   const item = recurring.find(r=>r.id===epManagerId);
   if(!item || !(item.pendingEpisodes||[]).length) return;
   if(!await uiConfirm('ทำครบทุกตอนแล้ว เอาตอนที่ค้างออกทั้งหมด?', 'เคลียร์ทุกตอน')) return;
+  logActivity(`เคลียร์ตอนค้าง "${displayName(item) || item.code}" ทั้งหมด (${sortEpisodes(item.pendingEpisodes).map(epLabel).join(', ')})`);
   bumpLastEp(item, item.pendingEpisodes);
   item.pendingEpisodes = [];
   clearPendingOwnerIfDone(item);
@@ -3035,6 +3115,7 @@ async function promptLink(id){
   const item = recurring.find(r=>r.id===id);
   if(!item) return;
   item.link = url;
+  logActivity(`ใส่ลิงก์ต้นทาง "${displayName(item) || item.code}"`);
   renderRecurring();
   await persistRecurring();
 }
@@ -3044,6 +3125,7 @@ async function promptDriveLink(id){
   const item = recurring.find(r=>r.id===id);
   if(!item) return;
   item.gdrive = url;
+  logActivity(`ใส่ลิงก์ Drive "${displayName(item) || item.code}"`);
   renderRecurring();
   await persistRecurring();
 }
@@ -3283,7 +3365,13 @@ async function toggleContrib(id, person){
   const item = newStories.find(n=>n.id===id);
   if(!item) return;
   item.contrib = item.contrib || {};
+  // B2: ติ๊กแทนคนอื่น -> ถามก่อน (กันกดผิดช่อง)
+  if(myPerson && person !== myPerson
+     && !await uiConfirm(`${item.contrib[person] ? 'เอาติ๊กของ' : 'ติ๊กแทน'} ${person} ใน "${item.code}"?`, item.contrib[person] ? 'เอาออก' : 'ติ๊กแทน')){
+    renderNewStories(); return;
+  }
   item.contrib[person] = !item.contrib[person];
+  logActivity(`${item.contrib[person] ? 'ติ๊ก' : 'เอาติ๊กออก'} "${item.code}" ช่อง ${person}${myPerson && person !== myPerson ? ' (แทน)' : ''}`);
   // อยู่ในงานประจำแล้ว + คนสุดท้ายติ๊ก -> การ์ดลงถังขยะเอง
   if(promotedTarget(item) && !newStoryProgress(item).missing.length){
     await moveToTrash('newstories', item);
