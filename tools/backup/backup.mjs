@@ -97,3 +97,17 @@ console.log((changed ? 'changed' : 'unchanged') + ' ' + stamp + ' ' + JSON.strin
 if (process.env.GITHUB_OUTPUT) {
   writeFileSync(process.env.GITHUB_OUTPUT, 'changed=' + changed + '\nsummary=' + JSON.stringify(counts) + '\n', { flag: 'a' });
 }
+
+// 4) บอกหน้าเว็บว่า backup ล่าสุดสำเร็จเมื่อไหร่ (เว็บเตือนทีมถ้าเกิน 36 ชม.)
+//    เขียนทั้งเว็บหลัก (backup_status) และเว็บทดลอง (stg_backup_status) — ล้มก็ไม่ทำให้ backup ล้ม
+try {
+  const status = JSON.stringify({ at: now.toISOString(), counts });
+  const res = await fetch(URL_ + '/rest/v1/app_kv?on_conflict=scope,key', {
+    method: 'POST',
+    headers: { apikey: ANON, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify(['backup_status', 'stg_backup_status'].map(key => ({ scope: 'global', key, value: status, updated_at: now.toISOString() }))),
+  });
+  if (!res.ok) console.error('warn: backup_status not written: HTTP ' + res.status + ' ' + (await res.text()).slice(0, 200));
+} catch (e) {
+  console.error('warn: backup_status not written: ' + e.message);
+}

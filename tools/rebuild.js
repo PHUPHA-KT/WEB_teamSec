@@ -1440,6 +1440,43 @@ async function pollOnce(){
   if(localPending) persistData(false);`, 'pollOnce merge');
 }, { staging: true });
 
+// ================= 41) A5: เตือนทีมเมื่อ backup อัตโนมัติไม่ได้รันนานเกิน 36 ชม. =================
+// สคริปต์ backup เขียน key backup_status = {at, counts} ทุกครั้งที่สำเร็จ
+step('A5 เตือน backup ไม่ได้รัน', 'function backupStaleChip(', () => {
+  rep(`async function pollOnce(){`,
+`// ===== สถานะ backup อัตโนมัติ (สคริปต์ backup เขียน backup_status ทุกครั้งที่สำเร็จ) =====
+const BACKUP_STALE_HOURS = 36;
+let backupStatusAt = null, backupCheckedAt = 0;
+async function refreshBackupStatus(){
+  backupCheckedAt = Date.now();
+  try{
+    const r = await window.storage.get('backup_status', true);
+    const v = r && r.value ? JSON.parse(r.value) : null;
+    const at = v && v.at ? Date.parse(v.at) : NaN;
+    const next = isNaN(at) ? null : at;
+    if(next !== backupStatusAt){ backupStatusAt = next; renderStats(); }
+  }catch(e){}   // อ่านไม่ได้ = ไม่เตือน (ไม่อยากให้เตือนผิดตอนเน็ตหลุด)
+}
+function backupStaleChip(){
+  if(!backupStatusAt) return '';
+  const h = (Date.now() - backupStatusAt) / 3600000;
+  if(h < BACKUP_STALE_HOURS) return '';
+  const label = h < 48 ? Math.floor(h) + ' ชม.' : Math.floor(h / 24) + ' วัน';
+  return \`<div class="stat-chip" style="background:rgba(224,64,58,.45);" title="สคริปต์ backup ในเครื่องที่ตั้งไว้ไม่ได้รันมา \${label} — เปิดเครื่องนั้น หรือดู backup.log">⚠ backup ล่าสุด \${label}ก่อน</div>\`;
+}
+
+async function pollOnce(){
+  if(Date.now() - backupCheckedAt > 30 * 60000) refreshBackupStatus();`, 'poll + helpers');
+  rep(`    <div class="stat-chip stat-min"><b>\${totalSpent.toLocaleString('th-TH')}</b> บาทที่ใช้ไป</div>`,
+`    <div class="stat-chip stat-min"><b>\${totalSpent.toLocaleString('th-TH')}</b> บาทที่ใช้ไป</div>
+    \${backupStaleChip()}`, 'stat chip');
+  rep(`  render();
+  startRealtimeSync();`,
+`  render();
+  refreshBackupStatus();
+  startRealtimeSync();`, 'load');
+}, { staging: true });
+
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
 step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {

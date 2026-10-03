@@ -1689,6 +1689,7 @@ async function loadAll(){
   // บันทึกครั้งเดียวถ้ามีการ seed/migrate/reset (เขียน appdata ก้อนเดียว)
   if(needSave || migrated || weekReset) await persistData(false);
   render();
+  refreshBackupStatus();
   startRealtimeSync();
 }
 
@@ -2095,7 +2096,29 @@ async function maybeWeeklyReset(){
   }
 }
 
+// ===== สถานะ backup อัตโนมัติ (สคริปต์ backup เขียน backup_status ทุกครั้งที่สำเร็จ) =====
+const BACKUP_STALE_HOURS = 36;
+let backupStatusAt = null, backupCheckedAt = 0;
+async function refreshBackupStatus(){
+  backupCheckedAt = Date.now();
+  try{
+    const r = await window.storage.get('backup_status', true);
+    const v = r && r.value ? JSON.parse(r.value) : null;
+    const at = v && v.at ? Date.parse(v.at) : NaN;
+    const next = isNaN(at) ? null : at;
+    if(next !== backupStatusAt){ backupStatusAt = next; renderStats(); }
+  }catch(e){}   // อ่านไม่ได้ = ไม่เตือน (ไม่อยากให้เตือนผิดตอนเน็ตหลุด)
+}
+function backupStaleChip(){
+  if(!backupStatusAt) return '';
+  const h = (Date.now() - backupStatusAt) / 3600000;
+  if(h < BACKUP_STALE_HOURS) return '';
+  const label = h < 48 ? Math.floor(h) + ' ชม.' : Math.floor(h / 24) + ' วัน';
+  return `<div class="stat-chip" style="background:rgba(224,64,58,.45);" title="สคริปต์ backup ในเครื่องที่ตั้งไว้ไม่ได้รันมา ${label} — เปิดเครื่องนั้น หรือดู backup.log">⚠ backup ล่าสุด ${label}ก่อน</div>`;
+}
+
 async function pollOnce(){
+  if(Date.now() - backupCheckedAt > 30 * 60000) refreshBackupStatus();
   // มีงานรอเซฟ (debounce) หรือกำลังเซฟ -> ข้ามรอบนี้ กัน setColl() ทับการแก้ที่ยังไม่ได้ส่ง
   if(saveWaiter || saveTimer || saveInFlight) return;
   await maybeWeeklyReset();
@@ -2328,6 +2351,7 @@ function renderStats(){
     <div class="stat-chip stat-min"><b>${newStories.length}</b> เรื่องเปิดใหม่</div>
     ${upcoming ? `<div class="stat-chip stat-min"><b>${upcoming}</b> เรื่องจะเปิดเร็วๆนี้</div>` : ''}
     <div class="stat-chip stat-min"><b>${totalSpent.toLocaleString('th-TH')}</b> บาทที่ใช้ไป</div>
+    ${backupStaleChip()}
   `;
   renderPendingAlert(episodesOverdue, storiesOverdue);
 }
