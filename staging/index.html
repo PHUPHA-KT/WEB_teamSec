@@ -439,6 +439,25 @@
   .missed-name small{ margin-left:6px; color:var(--ink-soft); font-size:11.5px; }
   body.dark .missed-strip{ background:#3a2d14; border-color:#5a4720; }
   body.dark .missed-head{ color:#e3b463; }
+  /* UI: ปุ่มสถานะ / เมนู / เลิกทำ */
+  .st-ctl{ display:inline-flex; border-radius:8px; overflow:hidden; flex-shrink:0; }
+  .st-main, .st-more{ border:none; font:inherit; font-size:12px; font-weight:700; cursor:pointer; padding:6px 10px; }
+  .st-main{ min-width:78px; }
+  .st-more{ padding:6px 7px; border-left:1px solid rgba(0,0,0,.08); }
+  .st-main:hover, .st-more:hover{ filter:brightness(.94); }
+  .row-more{ font-size:18px; line-height:1; color:#6b7480; }
+  .pop-menu{ position:fixed; z-index:100000; background:var(--card); border:1px solid var(--line); border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.18); padding:4px; min-width:170px; }
+  .pop-item{ display:block; width:100%; text-align:left; border:none; background:none; font:inherit; font-size:13px; padding:8px 12px; border-radius:7px; cursor:pointer; color:var(--ink); }
+  .pop-item:hover, .pop-item:focus{ background:var(--fill); outline:none; }
+  .pop-active{ font-weight:700; }
+  .pop-danger{ color:#c0392b; }
+  .ep-chip .ep-done{ color:var(--green); font-weight:800; }
+  .undo-toast{ position:fixed; left:50%; bottom:24px; transform:translate(-50%, 20px); opacity:0; pointer-events:none; z-index:100001; display:flex; align-items:center; gap:14px; background:#1f2430; color:#fff; padding:10px 12px 10px 16px; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.25); font-size:13.5px; transition:.18s; max-width:calc(100vw - 32px); }
+  .undo-toast.show{ opacity:1; transform:translate(-50%, 0); pointer-events:auto; }
+  .undo-btn{ border:none; background:#ffd36b; color:#1f2430; font:inherit; font-weight:800; padding:6px 12px; border-radius:8px; cursor:pointer; white-space:nowrap; }
+  .cal-chip-selected{ outline:2px solid var(--blue); background:var(--blue-bg) !important; }
+  .cal-selecting .cal-items[data-person]{ cursor:copy; }
+  .cal-selecting .cal-items[data-person]:hover{ background:var(--blue-bg); }
   .staging-bar{ position:sticky; top:0; z-index:9000; background:#6a3fb3; color:#fff; text-align:center; font-size:12.5px; font-weight:700; padding:6px 12px; }
 </style>
 </head>
@@ -1409,8 +1428,10 @@ function toggleLcMode(){ allLcMode = !allLcMode; renderAllStories(); }
 async function markLcChecked(id){
   const item = recurring.find(r=>r.id===id);
   if(!item) return;
+  const undoSnap = snapItem('recurring_stories', id);
   item.lcCheck = { at: new Date().toISOString(), by: currentUserName() };
   logActivity(`เช็ค LC "${displayName(item) || item.code}" — ยังไม่มี`);
+  offerUndo(`เช็ค LC "${displayName(item) || item.code}"`, [undoSnap]);
   renderAllStories();
   await persistRecurring(false);
 }
@@ -1420,6 +1441,8 @@ async function markLcFound(id){
   const eps = pendingEpCount(item);
   const ok = await uiConfirm(`"${displayName(item) || item.code}" มี LC แล้ว — ดรอปเรื่องนี้ด้วยเหตุผล "${DROP_META.lc.label}"?` + (eps ? `\n(ยังค้าง ${eps} ตอน จะอยู่ในงานปกติจนเคลียร์หมด)` : ''), 'ดรอป (LC)');
   if(!ok) return;
+  const undoSnap = snapItem('recurring_stories', id);
+  offerUndo(`ดรอป (LC) "${displayName(item) || item.code}"`, [undoSnap]);
   item.lcCheck = { at: new Date().toISOString(), by: currentUserName(), found: true };
   item.dropped = 'lc';
   logActivity(`เช็ค LC "${displayName(item) || item.code}" — มี LC แล้ว → ดรอป (${DROP_META.lc.label})`);
@@ -1491,6 +1514,143 @@ async function missedToBacklog(id, day){
   await persistRecurring(false);
   showToast('ใส่ตอนค้างแล้ว — ' + eps.map(epLabel).join(', '));
 }
+
+// ===== UI งานประจำ: ปุ่มสถานะคลิกเดียว / เมนู ⋯ / เมนูลอย / เลิกทำ / คีย์บอร์ด =====
+
+// ---- เมนูลอย (ใช้กับ ▾ สถานะ และ ⋯ ของแถว) ----
+let popMenuEl = null;
+function closePopMenu(){
+  if(popMenuEl){ popMenuEl.remove(); popMenuEl = null; }
+  document.removeEventListener('mousedown', popMenuOutside, true);
+}
+function popMenuOutside(e){ if(popMenuEl && !popMenuEl.contains(e.target)) closePopMenu(); }
+// items: [{label, onClick, danger, active}]
+function openPopMenu(anchor, items){
+  closePopMenu();
+  const m = document.createElement('div');
+  m.className = 'pop-menu';
+  items.forEach(it=>{
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pop-item' + (it.danger ? ' pop-danger' : '') + (it.active ? ' pop-active' : '');
+    b.textContent = it.label;
+    b.addEventListener('click', ()=>{ closePopMenu(); it.onClick(); });
+    m.appendChild(b);
+  });
+  document.body.appendChild(m);
+  const r = anchor.getBoundingClientRect();
+  const w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + 'px';
+  m.style.top = (r.bottom + h + 6 > innerHeight ? r.top - h - 4 : r.bottom + 4) + 'px';
+  popMenuEl = m;
+  setTimeout(()=>document.addEventListener('mousedown', popMenuOutside, true), 0);
+  const first = m.querySelector('.pop-item'); if(first) first.focus();
+}
+
+// ---- ปุ่มสถานะ: คลิก = สลับ ทำแล้ว/ยังไม่ทำ, ▾ = เลือก งด/เลื่อน ----
+function statusCtlHtml(item, day){
+  const st = dayStatus(item, day);
+  const meta = STATUS_META[st] || STATUS_META.pending;
+  return `<span class="st-ctl">
+    <button type="button" class="st-main" style="background:${meta.bg};color:${meta.fg};" onclick="toggleDayDone('${item.id}','${day}')" title="คลิกเพื่อสลับ ทำแล้ว / ยังไม่ทำ">${st === 'done' ? '✓ ' : ''}${meta.label}</button><button type="button" class="st-more" style="background:${meta.bg};color:${meta.fg};" onclick="openStatusMenu(this,'${item.id}','${day}')" title="เลือกสถานะอื่น (งด / เลื่อน)" aria-label="เลือกสถานะอื่น">▾</button>
+  </span>`;
+}
+function toggleDayDone(id, day){
+  const item = recurring.find(r=>r.id===id);
+  if(!item) return;
+  updateStatus(id, dayStatus(item, day) === 'done' ? 'pending' : 'done', day);
+}
+function openStatusMenu(btn, id, day){
+  const item = recurring.find(r=>r.id===id);
+  if(!item) return;
+  const cur = dayStatus(item, day);
+  openPopMenu(btn, Object.keys(STATUS_META).map(k=>({
+    label: (k === cur ? '● ' : '　') + STATUS_META[k].label,
+    active: k === cur,
+    onClick: ()=>{ if(k !== cur) updateStatus(id, k, day); },
+  })));
+}
+function openRowMenu(btn, id){
+  const item = recurring.find(r=>r.id===id);
+  if(!item) return;
+  openPopMenu(btn, [
+    { label: '✎ แก้ไข', onClick: ()=>openRecurringModal(id) },
+    item.dropped
+      ? { label: '↩ ยกเลิกการรอดรอป', onClick: ()=>undropStory(id) }
+      : { label: '⏏ ดรอปเรื่อง…', onClick: ()=>openDropMenu(id) },
+    { label: '🗑 ลบเรื่อง', danger: true, onClick: ()=>deleteRecurring(id) },
+  ]);
+}
+
+// ---- เลิกทำ (5 วิ) ----
+// เก็บสำเนาของรายการก่อนแก้ แล้วคืนทั้งรายการถ้ากดเลิกทำ (รวมตอนล่าสุด/ตอนค้าง/สถานะทุกวัน)
+const UNDO_MS = 5000;
+let undoState = null;
+function snapItem(collKey, id){
+  const it = (getColl(collKey) || []).find(x=>x.id===id);
+  return { collKey, id, before: it ? JSON.parse(JSON.stringify(it)) : null };
+}
+function offerUndo(label, snaps){
+  const el = document.getElementById('undoToast') || (()=>{
+    const d = document.createElement('div');
+    d.id = 'undoToast';
+    d.className = 'undo-toast';
+    d.innerHTML = '<span class="undo-msg"></span><button type="button" class="undo-btn">เลิกทำ</button>';
+    d.querySelector('.undo-btn').addEventListener('click', runUndo);
+    document.body.appendChild(d);
+    return d;
+  })();
+  if(undoState) clearTimeout(undoState.timer);
+  undoState = { label, snaps, timer: setTimeout(hideUndo, UNDO_MS) };
+  el.querySelector('.undo-msg').textContent = label;
+  el.classList.add('show');
+}
+function hideUndo(){
+  const el = document.getElementById('undoToast');
+  if(el) el.classList.remove('show');
+  if(undoState) clearTimeout(undoState.timer);
+  undoState = null;
+}
+async function runUndo(){
+  const u = undoState;
+  hideUndo();
+  if(!u) return;
+  u.snaps.forEach(({collKey, id, before})=>{
+    const arr = (getColl(collKey) || []).slice();
+    const i = arr.findIndex(x=>x.id===id);
+    if(before){ if(i > -1) arr[i] = before; else arr.push(before); }
+    else if(i > -1) arr.splice(i, 1);
+    setColl(collKey, arr);
+    // เคยถูกย้ายลงถังขยะระหว่างทาง (เช่น ติ๊กครบ) -> เอาออกจากถัง ไม่งั้นมี 2 ที่
+    if(before) trash = trash.filter(t=>!(t.item && t.item.id === id));
+  });
+  logActivity('เลิกทำ: ' + u.label);
+  renderStats(); renderTab();
+  if(document.getElementById('modalEpisodes').classList.contains('show')) renderEpChips();
+  await persistData(false);
+  showToast('เลิกทำแล้ว');
+}
+
+// ---- คีย์บอร์ด: Esc ปิดสิ่งที่อยู่บนสุด, Enter ยืนยันกล่องถาม ----
+document.addEventListener('keydown', e=>{
+  if(e.key === 'Escape'){
+    if(popMenuEl){ closePopMenu(); e.preventDefault(); return; }
+    if(typeof calSel !== 'undefined' && calSel){ calClearSel(); e.preventDefault(); return; }
+    const open = [...document.querySelectorAll('.modal-backdrop.show')];
+    const top = open[open.length - 1];
+    if(!top || !top.id) return;                       // กล่องที่สร้างชั่วคราว (เลือกเหตุผลดรอป) จัดการเอง
+    e.preventDefault();
+    if(top.id === 'modalConfirm') document.getElementById('confirmCancel').click();
+    else if(top.id === 'modalPrompt') document.getElementById('promptCancel').click();
+    else closeModal(top.id);
+  } else if(e.key === 'Enter'){
+    const c = document.getElementById('modalConfirm');
+    if(c && c.classList.contains('show') && !(e.target && e.target.tagName === 'BUTTON')){
+      e.preventDefault();
+      document.getElementById('confirmOk').click();
+    }
+  }
+});
 
 function pendingEpCount(item){
   return (item.pendingEpisodes && item.pendingEpisodes.length) || 0;
@@ -2404,7 +2564,11 @@ document.getElementById('epAddBtn').addEventListener('click', addEpisodes);
 document.getElementById('epAddInput').addEventListener('keydown', e=>{ if(e.key==='Enter') addEpisodes(); });
 document.getElementById('epClearBtn').addEventListener('click', clearAllEpisodes);
 
-function openModal(id){ document.getElementById(id).classList.add('show'); }
+function openModal(id){
+  const m = document.getElementById(id);
+  m.classList.add('show');
+  setTimeout(()=>{ if(!m.contains(document.activeElement)){ const f = m.querySelector('input:not([type=checkbox]):not([type=hidden]), select, textarea'); if(f) f.focus(); } }, 60);
+}
 function closeModal(id){
   document.getElementById(id).classList.remove('show');
   // ถ้ามีข้อมูลจากทีมรอวาดอยู่ระหว่างเปิด modal ให้วาดทันทีที่ปิด
@@ -2611,15 +2775,8 @@ function renderRecurring(){
              onclick="${item.link?'':'event.preventDefault(); promptLink(\''+item.id+'\')'}">🔗</a>
           <a class="link-btn ${item.gdrive?'':'empty'}" href="${safeUrl(item.gdrive)}" target="_blank" title="ลิงก์ Google Drive"
              onclick="${item.gdrive?'':'event.preventDefault(); promptDriveLink(\''+item.id+'\')'}">📁</a>
-          <select class="status-select" style="background:${STATUS_META[dayStatus(item,rowDay)].bg};color:${STATUS_META[dayStatus(item,rowDay)].fg};"
-            onchange="updateStatus('${item.id}', this.value, '${rowDay}')">
-            ${Object.keys(STATUS_META).map(k=>`<option value="${k}" ${(dayStatus(item,rowDay)===k)?'selected':''}>${STATUS_META[k].label}</option>`).join('')}
-          </select>
-          ${item.dropped
-            ? `<button class="icon-btn" onclick="undropStory('${item.id}')" title="ยกเลิกการรอดรอป" style="color:#1a9c6b;">↩</button>`
-            : `<button class="icon-btn" onclick="openDropMenu('${item.id}')" title="ดรอปเรื่อง (จบซีซั่น / จบแล้ว / LC / งดไม่มีกำหนด)" style="color:#b9791b;">⏏</button>`}
-          <button class="icon-btn" onclick="openRecurringModal('${item.id}')" title="แก้ไข" style="color:#6b7480;">✎</button>
-          <button class="icon-btn" onclick="deleteRecurring('${item.id}')">✕</button>
+          ${statusCtlHtml(item, rowDay)}
+          <button type="button" class="icon-btn row-more" onclick="openRowMenu(this,'${item.id}')" title="แก้ไข / ดรอป / ลบ" aria-label="เมนูเรื่องนี้">⋯</button>
         `}
       </div>`;
     });
@@ -3012,6 +3169,7 @@ async function undropStory(id){
 async function updateStatus(id, value, day){
   const item = recurring.find(r=>r.id===id);
   if(!item || !STATUS_META[value]) return;
+  const undoSnap = snapItem('recurring_stories', id);
   day = day && itemDays(item).includes(day) ? day : itemDays(item)[0];
   setDayStatus(item, day, value);
   if(value === 'pending' && dayHasPassed(day)){
@@ -3020,6 +3178,7 @@ async function updateStatus(id, value, day){
     item.pendingSinceDate = null;
   }
   logActivity(`เปลี่ยนสถานะ "${item.name||item.code}"${isMultiDay(item)?' ('+day+')':''} เป็น ${STATUS_META[value].label}`);
+  offerUndo(`"${displayName(item) || item.code}" → ${STATUS_META[value].label}`, [undoSnap]);
   renderRecurring(); renderStats();
   await persistRecurring(false);
 }
@@ -3047,7 +3206,7 @@ function renderEpChips(){
   }
   if(clearWrap) clearWrap.style.display = '';
   item.pendingEpisodes = sortEpisodes(item.pendingEpisodes);   // เก็บแบบเรียงแล้ว ให้ index ตรงกับที่โชว์
-  wrap.innerHTML = item.pendingEpisodes.map((ep, i)=>`<span class="ep-chip">${esc(epLabel(ep))}<button onclick="removeEpisodeAt(${i})" title="ทำเสร็จแล้ว">✕</button></span>`).join('');
+  wrap.innerHTML = item.pendingEpisodes.map((ep, i)=>`<span class="ep-chip">${esc(epLabel(ep))}<button class="ep-done" onclick="removeEpisodeAt(${i})" title="ทำตอนนี้เสร็จแล้ว" aria-label="ทำตอนนี้เสร็จแล้ว">✓</button></span>`).join('');
 }
 function openEpisodeManager(id){
   epManagerId = id;
@@ -3063,8 +3222,10 @@ async function removeEpisodeAt(i){
   if(!item){ renderEpChips(); return; }
   const eps = sortEpisodes(item.pendingEpisodes);
   if(i < 0 || i >= eps.length) return;
+  const undoSnap = snapItem('recurring_stories', item.id);
   bumpLastEp(item, eps[i]);
   logActivity(`ทำตอนค้าง "${displayName(item) || item.code}" ${epLabel(eps[i])} แล้ว`);
+  offerUndo(`ทำ${epLabel(eps[i])} "${displayName(item) || item.code}" แล้ว`, [undoSnap]);
   eps.splice(i, 1);
   item.pendingEpisodes = eps;
   clearPendingOwnerIfDone(item);
@@ -3370,7 +3531,9 @@ async function toggleContrib(id, person){
      && !await uiConfirm(`${item.contrib[person] ? 'เอาติ๊กของ' : 'ติ๊กแทน'} ${person} ใน "${item.code}"?`, item.contrib[person] ? 'เอาออก' : 'ติ๊กแทน')){
     renderNewStories(); return;
   }
+  const undoSnap = snapItem('new_stories', id);
   item.contrib[person] = !item.contrib[person];
+  offerUndo(`${item.contrib[person] ? 'ติ๊ก' : 'เอาติ๊กออก'} ${person} "${item.code}"`, [undoSnap]);
   logActivity(`${item.contrib[person] ? 'ติ๊ก' : 'เอาติ๊กออก'} "${item.code}" ช่อง ${person}${myPerson && person !== myPerson ? ' (แทน)' : ''}`);
   // อยู่ในงานประจำแล้ว + คนสุดท้ายติ๊ก -> การ์ดลงถังขยะเอง
   if(promotedTarget(item) && !newStoryProgress(item).missing.length){
@@ -3983,7 +4146,23 @@ function render(){
 const CAL_DAYS = ['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์','ไม่ระบุวัน','จบแล้ว'];
 const CAL_DAY_LABEL = { 'จันทร์':'วันจันทร์','อังคาร':'วันอังคาร','พุธ':'วันพุธ','พฤหัสบดี':'วันพฤหัสบดี','ศุกร์':'วันศุกร์','เสาร์':'วันเสาร์','อาทิตย์':'วันอาทิตย์','ไม่ระบุวัน':'ไม่ระบุวัน','จบแล้ว':'จบแล้ว' };
 
+// คลิกเลือกเรื่องในปฏิทิน แล้วคลิกช่องปลายทาง (แทนการลากด้วยเมาส์)
+let calSel = null, calJustDragged = false;
+function calClearSel(){
+  calSel = null;
+  document.querySelectorAll('.cal-chip-selected').forEach(c=>c.classList.remove('cal-chip-selected'));
+  const g = document.getElementById('calCapture'); if(g) g.classList.remove('cal-selecting');
+}
+function calSelectChip(chip){
+  const same = calSel && calSel.id === chip.dataset.id && calSel.from === chip.dataset.from;
+  calClearSel();
+  if(same) return;
+  calSel = { id: chip.dataset.id, from: chip.dataset.from };
+  chip.classList.add('cal-chip-selected');
+  const g = document.getElementById('calCapture'); if(g) g.classList.add('cal-selecting');
+}
 function renderCalendar(){
+  calSel = null;
   const container = document.getElementById('mainContent');
   const active = recurring.filter(r=>!isEffectivelyDropped(r));
 
@@ -4014,7 +4193,7 @@ function renderCalendar(){
   html += `</div>`;
 
   container.innerHTML = `<div class="toolbar" style="justify-content:space-between;">
-      <span style="font-size:13px;color:var(--ink-soft);">ลากเรื่องไปวางช่องอื่นเพื่อย้ายวัน/ย้ายคน · มือถือแตะค้างแล้วลาก (ไม่รวมเรื่องที่ดรอป)</span>
+      <span style="font-size:13px;color:var(--ink-soft);">ลากเรื่องไปวางช่องอื่น หรือคลิกเรื่องแล้วคลิกช่องที่จะย้ายไป (Esc ยกเลิก) · มือถือแตะค้างแล้วลาก (ไม่รวมเรื่องที่ดรอป)</span>
       <button class="btn btn-primary" onclick="exportCalendarImage()">📷 บันทึกเป็นรูป</button>
     </div>
     <div id="calCapture">${html}</div>`;
@@ -4044,6 +4223,7 @@ async function moveCalendarItem(id, person, day, fromDay){
     collapse = true;
   }
   const from = `${item.person||'ไม่ระบุ'} / ${collapse ? days.join(', ') : (fromDay||'ไม่ระบุวัน')}`;
+  const undoSnap = snapItem('recurring_stories', id);
   // ย้ายคนทั้งที่มีตอนค้าง -> ถามว่าหนี้เก่าให้ใครเคลียร์ (ปิดกล่อง = ยกเลิกการย้าย)
   if(person !== item.person && !(await resolveBacklogOnReassign(item, person))){ renderCalendar(); return; }
   item.person = person;
@@ -4060,6 +4240,7 @@ async function moveCalendarItem(id, person, day, fromDay){
   const name = item.name || item.code;
   const note = hasForeignBacklog(item) ? ` (${foreignBacklogLabel(item)} เคลียร์ต่อ)` : '';
   logActivity(`ย้าย "${name}" ${from} → ${person} / ${day}${note}`);
+  offerUndo(`ย้าย "${name}" → ${person} · ${CAL_DAY_LABEL[day] || day}`, [undoSnap]);
   renderCalendar(); renderStats();
   showToast(`ย้าย "${name}" → ${person} · ${CAL_DAY_LABEL[day] || day}`);
   await persistRecurring(false);
@@ -4113,6 +4294,7 @@ function bindCalendarDrag(root){
     root.querySelectorAll('.cal-chip-dragging').forEach(c=>c.classList.remove('cal-chip-dragging'));
     clearHover();
     drag = null;
+    if(started) calJustDragged = true;
     if(!started || cancelled) return;
     const cell = cellAt(x, y);
     if(cell) moveCalendarItem(id, cell.dataset.person, cell.dataset.day, from);
@@ -4123,8 +4305,7 @@ function bindCalendarDrag(root){
     if(!chip || e.button !== 0) return;
     drag = { id: chip.dataset.id, from: chip.dataset.from, chip, startX: e.clientX, startY: e.clientY, started: false, pointerId: e.pointerId };
     if(e.pointerType === 'mouse'){
-      start(chip, e.clientX, e.clientY);
-      e.preventDefault();
+      e.preventDefault();   // เริ่มลากเมื่อขยับเกิน 5px — คลิกเฉยๆ = เลือกเรื่อง (ดู click ด้านล่าง)
     } else {
       // ทัช: รอกดค้าง — ถ้าเลื่อนนิ้วก่อนครบเวลา = ผู้ใช้ตั้งใจ scroll ไม่ใช่ลาก
       drag.holdTimer = setTimeout(()=>{ if(drag && !drag.started){ start(chip, drag.startX, drag.startY); if(navigator.vibrate) navigator.vibrate(20); } }, HOLD_MS);
@@ -4133,14 +4314,22 @@ function bindCalendarDrag(root){
   root.addEventListener('pointermove', e=>{
     if(!drag) return;
     if(!drag.started){
-      if(Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) > 10){ clearTimeout(drag.holdTimer); drag = null; }
-      return;
+      const dist = Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY);
+      if(e.pointerType === 'mouse'){ if(dist <= 5) return; calClearSel(); start(drag.chip, e.clientX, e.clientY); }
+      else { if(dist > 10){ clearTimeout(drag.holdTimer); drag = null; } return; }
     }
     e.preventDefault();
     place(e.clientX, e.clientY);
   }, { passive:false });
   root.addEventListener('pointerup', e=>end(e.clientX, e.clientY, false));
   root.addEventListener('pointercancel', e=>end(e.clientX, e.clientY, true));
+  root.addEventListener('click', e=>{
+    if(calJustDragged){ calJustDragged = false; return; }
+    const chip = e.target.closest('.cal-chip');
+    if(chip){ calSelectChip(chip); return; }
+    const cell = e.target.closest('.cal-items[data-person]');
+    if(cell && calSel){ const s = calSel; calClearSel(); moveCalendarItem(s.id, cell.dataset.person, cell.dataset.day, s.from); }
+  });
   // ถ้ากำลังลากอยู่ ห้ามหน้าเลื่อนตาม (มือถือ)
   root.addEventListener('touchmove', e=>{ if(drag && drag.started) e.preventDefault(); }, { passive:false });
 }

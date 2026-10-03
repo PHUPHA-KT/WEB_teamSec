@@ -1544,6 +1544,150 @@ step('B2 ลงประวัติตอนค้าง/ติ๊ก/ลิง
   logActivity(\`\${item.contrib[person] ? 'ติ๊ก' : 'เอาติ๊กออก'} "\${item.code}" ช่อง \${person}\${myPerson && person !== myPerson ? ' (แทน)' : ''}\`);`, 'toggleContrib');
 }, { staging: true });
 
+// ================= 44) UI งานประจำ: ✓ คลิกเดียว + ⋯ + เลิกทำ + คีย์บอร์ด + ปฏิทินคลิกย้าย =================
+step('UI: สถานะคลิกเดียว / เมนู ⋯ / เลิกทำ / Esc-Enter / ปฏิทินคลิกย้าย', 'function statusCtlHtml(', () => {
+  const js = fs.readFileSync(path.join(__dirname, 'uiux.js'), 'utf8').replace(/\n$/, '');
+  rep(`function pendingEpCount(item){`, js + `\n\nfunction pendingEpCount(item){`, 'helpers');
+
+  // แถว: select สถานะ + ⏏ ✎ ✕ -> ปุ่มสถานะ + ⋯
+  rep(`          <select class="status-select" style="background:\${STATUS_META[dayStatus(item,rowDay)].bg};color:\${STATUS_META[dayStatus(item,rowDay)].fg};"
+            onchange="updateStatus('\${item.id}', this.value, '\${rowDay}')">
+            \${Object.keys(STATUS_META).map(k=>\`<option value="\${k}" \${(dayStatus(item,rowDay)===k)?'selected':''}>\${STATUS_META[k].label}</option>\`).join('')}
+          </select>
+          \${item.dropped
+            ? \`<button class="icon-btn" onclick="undropStory('\${item.id}')" title="ยกเลิกการรอดรอป" style="color:#1a9c6b;">↩</button>\`
+            : \`<button class="icon-btn" onclick="openDropMenu('\${item.id}')" title="ดรอปเรื่อง (จบซีซั่น / จบแล้ว / LC / งดไม่มีกำหนด)" style="color:#b9791b;">⏏</button>\`}
+          <button class="icon-btn" onclick="openRecurringModal('\${item.id}')" title="แก้ไข" style="color:#6b7480;">✎</button>
+          <button class="icon-btn" onclick="deleteRecurring('\${item.id}')">✕</button>`,
+`          \${statusCtlHtml(item, rowDay)}
+          <button type="button" class="icon-btn row-more" onclick="openRowMenu(this,'\${item.id}')" title="แก้ไข / ดรอป / ลบ" aria-label="เมนูเรื่องนี้">⋯</button>`, 'row controls');
+
+  // ตอนค้าง: ✕ (ที่จริงแปลว่าทำเสร็จ) -> ✓
+  rep(`<button onclick="removeEpisodeAt(\${i})" title="ทำเสร็จแล้ว">✕</button>`,
+      `<button class="ep-done" onclick="removeEpisodeAt(\${i})" title="ทำตอนนี้เสร็จแล้ว" aria-label="ทำตอนนี้เสร็จแล้ว">✓</button>`, 'ep chip');
+
+  // ---- เลิกทำ ----
+  rep(`  if(!item || !STATUS_META[value]) return;
+  day = day && itemDays(item).includes(day) ? day : itemDays(item)[0];`,
+`  if(!item || !STATUS_META[value]) return;
+  const undoSnap = snapItem('recurring_stories', id);
+  day = day && itemDays(item).includes(day) ? day : itemDays(item)[0];`, 'updateStatus snap');
+  rep(`  logActivity(\`เปลี่ยนสถานะ "\${item.name||item.code}"\${isMultiDay(item)?' ('+day+')':''} เป็น \${STATUS_META[value].label}\`);`,
+`  logActivity(\`เปลี่ยนสถานะ "\${item.name||item.code}"\${isMultiDay(item)?' ('+day+')':''} เป็น \${STATUS_META[value].label}\`);
+  offerUndo(\`"\${displayName(item) || item.code}" → \${STATUS_META[value].label}\`, [undoSnap]);`, 'updateStatus undo');
+  rep(`  bumpLastEp(item, eps[i]);
+  logActivity(\`ทำตอนค้าง "\${displayName(item) || item.code}" \${epLabel(eps[i])} แล้ว\`);`,
+`  const undoSnap = snapItem('recurring_stories', item.id);
+  bumpLastEp(item, eps[i]);
+  logActivity(\`ทำตอนค้าง "\${displayName(item) || item.code}" \${epLabel(eps[i])} แล้ว\`);
+  offerUndo(\`ทำ\${epLabel(eps[i])} "\${displayName(item) || item.code}" แล้ว\`, [undoSnap]);`, 'removeEpisodeAt undo');
+  rep(`  item.contrib[person] = !item.contrib[person];
+  logActivity(`,
+`  const undoSnap = snapItem('new_stories', id);
+  item.contrib[person] = !item.contrib[person];
+  offerUndo(\`\${item.contrib[person] ? 'ติ๊ก' : 'เอาติ๊กออก'} \${person} "\${item.code}"\`, [undoSnap]);
+  logActivity(`, 'toggleContrib undo');
+  rep(`  item.lcCheck = { at: new Date().toISOString(), by: currentUserName() };
+  logActivity(\`เช็ค LC "\${displayName(item) || item.code}" — ยังไม่มี\`);`,
+`  const undoSnap = snapItem('recurring_stories', id);
+  item.lcCheck = { at: new Date().toISOString(), by: currentUserName() };
+  logActivity(\`เช็ค LC "\${displayName(item) || item.code}" — ยังไม่มี\`);
+  offerUndo(\`เช็ค LC "\${displayName(item) || item.code}"\`, [undoSnap]);`, 'markLcChecked undo');
+  rep(`  item.lcCheck = { at: new Date().toISOString(), by: currentUserName(), found: true };`,
+`  const undoSnap = snapItem('recurring_stories', id);
+  offerUndo(\`ดรอป (LC) "\${displayName(item) || item.code}"\`, [undoSnap]);
+  item.lcCheck = { at: new Date().toISOString(), by: currentUserName(), found: true };`, 'markLcFound undo');
+
+  // ---- ปฏิทิน: คลิกเรื่อง แล้วคลิกช่อง = ย้าย (ลากยังใช้ได้) + เลิกทำ ----
+  rep(`function renderCalendar(){
+  const container = document.getElementById('mainContent');`,
+`// คลิกเลือกเรื่องในปฏิทิน แล้วคลิกช่องปลายทาง (แทนการลากด้วยเมาส์)
+let calSel = null, calJustDragged = false;
+function calClearSel(){
+  calSel = null;
+  document.querySelectorAll('.cal-chip-selected').forEach(c=>c.classList.remove('cal-chip-selected'));
+  const g = document.getElementById('calCapture'); if(g) g.classList.remove('cal-selecting');
+}
+function calSelectChip(chip){
+  const same = calSel && calSel.id === chip.dataset.id && calSel.from === chip.dataset.from;
+  calClearSel();
+  if(same) return;
+  calSel = { id: chip.dataset.id, from: chip.dataset.from };
+  chip.classList.add('cal-chip-selected');
+  const g = document.getElementById('calCapture'); if(g) g.classList.add('cal-selecting');
+}
+function renderCalendar(){
+  calSel = null;
+  const container = document.getElementById('mainContent');`, 'calendar select helpers');
+  rep(`ลากเรื่องไปวางช่องอื่นเพื่อย้ายวัน/ย้ายคน · มือถือแตะค้างแล้วลาก`,
+      `ลากเรื่องไปวางช่องอื่น หรือคลิกเรื่องแล้วคลิกช่องที่จะย้ายไป (Esc ยกเลิก) · มือถือแตะค้างแล้วลาก`, 'calendar hint');
+  rep(`    if(e.pointerType === 'mouse'){
+      start(chip, e.clientX, e.clientY);
+      e.preventDefault();
+    } else {`,
+`    if(e.pointerType === 'mouse'){
+      e.preventDefault();   // เริ่มลากเมื่อขยับเกิน 5px — คลิกเฉยๆ = เลือกเรื่อง (ดู click ด้านล่าง)
+    } else {`, 'mouse no instant drag');
+  rep(`    if(!drag.started){
+      if(Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) > 10){ clearTimeout(drag.holdTimer); drag = null; }
+      return;
+    }`,
+`    if(!drag.started){
+      const dist = Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY);
+      if(e.pointerType === 'mouse'){ if(dist <= 5) return; calClearSel(); start(drag.chip, e.clientX, e.clientY); }
+      else { if(dist > 10){ clearTimeout(drag.holdTimer); drag = null; } return; }
+    }`, 'mouse drag threshold');
+  rep(`    drag = null;
+    if(!started || cancelled) return;`,
+`    drag = null;
+    if(started) calJustDragged = true;
+    if(!started || cancelled) return;`, 'mark dragged');
+  rep(`  // ถ้ากำลังลากอยู่ ห้ามหน้าเลื่อนตาม (มือถือ)`,
+`  root.addEventListener('click', e=>{
+    if(calJustDragged){ calJustDragged = false; return; }
+    const chip = e.target.closest('.cal-chip');
+    if(chip){ calSelectChip(chip); return; }
+    const cell = e.target.closest('.cal-items[data-person]');
+    if(cell && calSel){ const s = calSel; calClearSel(); moveCalendarItem(s.id, cell.dataset.person, cell.dataset.day, s.from); }
+  });
+  // ถ้ากำลังลากอยู่ ห้ามหน้าเลื่อนตาม (มือถือ)`, 'click to move');
+  rep(`  const from = \`\${item.person||'ไม่ระบุ'} / \${collapse ? days.join(', ') : (fromDay||'ไม่ระบุวัน')}\`;`,
+`  const from = \`\${item.person||'ไม่ระบุ'} / \${collapse ? days.join(', ') : (fromDay||'ไม่ระบุวัน')}\`;
+  const undoSnap = snapItem('recurring_stories', id);`, 'calendar snap');
+  rep(`  logActivity(\`ย้าย "\${name}" \${from} → \${person} / \${day}\${note}\`);`,
+`  logActivity(\`ย้าย "\${name}" \${from} → \${person} / \${day}\${note}\`);
+  offerUndo(\`ย้าย "\${name}" → \${person} · \${CAL_DAY_LABEL[day] || day}\`, [undoSnap]);`, 'calendar undo');
+
+  // modal เปิดแล้ว เคอร์เซอร์ไปช่องแรก
+  rep(`function openModal(id){ document.getElementById(id).classList.add('show'); }`,
+`function openModal(id){
+  const m = document.getElementById(id);
+  m.classList.add('show');
+  setTimeout(()=>{ if(!m.contains(document.activeElement)){ const f = m.querySelector('input:not([type=checkbox]):not([type=hidden]), select, textarea'); if(f) f.focus(); } }, 60);
+}`, 'openModal focus');
+
+  rep('</style>', `  /* UI: ปุ่มสถานะ / เมนู / เลิกทำ */
+  .st-ctl{ display:inline-flex; border-radius:8px; overflow:hidden; flex-shrink:0; }
+  .st-main, .st-more{ border:none; font:inherit; font-size:12px; font-weight:700; cursor:pointer; padding:6px 10px; }
+  .st-main{ min-width:78px; }
+  .st-more{ padding:6px 7px; border-left:1px solid rgba(0,0,0,.08); }
+  .st-main:hover, .st-more:hover{ filter:brightness(.94); }
+  .row-more{ font-size:18px; line-height:1; color:#6b7480; }
+  .pop-menu{ position:fixed; z-index:100000; background:var(--card); border:1px solid var(--line); border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.18); padding:4px; min-width:170px; }
+  .pop-item{ display:block; width:100%; text-align:left; border:none; background:none; font:inherit; font-size:13px; padding:8px 12px; border-radius:7px; cursor:pointer; color:var(--ink); }
+  .pop-item:hover, .pop-item:focus{ background:var(--fill); outline:none; }
+  .pop-active{ font-weight:700; }
+  .pop-danger{ color:#c0392b; }
+  .ep-chip .ep-done{ color:var(--green); font-weight:800; }
+  .undo-toast{ position:fixed; left:50%; bottom:24px; transform:translate(-50%, 20px); opacity:0; pointer-events:none; z-index:100001; display:flex; align-items:center; gap:14px; background:#1f2430; color:#fff; padding:10px 12px 10px 16px; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.25); font-size:13.5px; transition:.18s; max-width:calc(100vw - 32px); }
+  .undo-toast.show{ opacity:1; transform:translate(-50%, 0); pointer-events:auto; }
+  .undo-btn{ border:none; background:#ffd36b; color:#1f2430; font:inherit; font-weight:800; padding:6px 12px; border-radius:8px; cursor:pointer; white-space:nowrap; }
+  .cal-chip-selected{ outline:2px solid var(--blue); background:var(--blue-bg) !important; }
+  .cal-selecting .cal-items[data-person]{ cursor:copy; }
+  .cal-selecting .cal-items[data-person]:hover{ background:var(--blue-bg); }
+</style>`, 'css');
+}, { staging: true });
+
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
 step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {
