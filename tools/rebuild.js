@@ -1688,6 +1688,49 @@ function renderCalendar(){
 </style>`, 'css');
 }, { staging: true });
 
+// ================= 45) ตอนค้างในแถว: กด ✕ ข้างเลขตอน = ทำตอนนั้นเสร็จ (ไม่ต้องเปิดหน้าต่าง) =================
+step('ตอนค้างในแถวกด ✕ ได้เลย', 'async function finishEpInline(', () => {
+  rep(`  const list = eps.map(e=>typeof e==='number' ? e : e).join(', ');
+  return \`<div class="ep-line">\`
+    + \`<span class="overdue-badge" style="background:\${bg}">ค้าง \${eps.length} ตอน\${hasForeignBacklog(item) ? ' · ' + esc(foreignBacklogLabel(item)) : ''}</span>\`
+    + \` <span class="ep-list">ตอน \${esc(list)}</span></div>\`;
+}`,
+`  // แต่ละตอนเป็นชิป กด ✕ = ทำตอนนั้นเสร็จ (ตอนของคนอื่นบอกชื่อคนเคลียร์ใน title)
+  const chips = eps.map((e, i)=>{
+    const owner = epOwner(item, e);
+    const tip = 'ทำ' + epLabel(e) + ' เสร็จแล้ว' + (owner && owner !== item.person ? ' (ของ ' + owner + ')' : '');
+    return \`<span class="ep-inline">\${esc(typeof e === 'number' ? String(e) : e)}<button type="button" onclick="finishEpInline('\${item.id}', \${i})" title="\${esc(tip)}" aria-label="\${esc(tip)}">✕</button></span>\`;
+  }).join('');
+  return \`<div class="ep-line">\`
+    + \`<span class="overdue-badge" style="background:\${bg}">ค้าง \${eps.length} ตอน\${hasForeignBacklog(item) ? ' · ' + esc(foreignBacklogLabel(item)) : ''}</span>\`
+    + \` <span class="ep-list">ตอน</span>\${chips}</div>\`;
+}
+// กด ✕ ข้างเลขตอนในแถว = ทำตอนนั้นเสร็จ (เหมือนกด ✓ ในหน้าต่างตอนค้าง) + เลิกทำได้ 5 วิ
+async function finishEpInline(id, i){
+  const item = recurring.find(r=>r.id===id);
+  if(!item) return;
+  const eps = sortEpisodes(item.pendingEpisodes);
+  if(i < 0 || i >= eps.length) return;
+  const undoSnap = snapItem('recurring_stories', id);
+  const ep = eps[i];
+  bumpLastEp(item, ep);
+  eps.splice(i, 1);
+  item.pendingEpisodes = eps;
+  clearPendingOwnerIfDone(item);
+  logActivity(\`ทำตอนค้าง "\${displayName(item) || item.code}" \${epLabel(ep)} แล้ว\`);
+  offerUndo(\`ทำ\${epLabel(ep)} "\${displayName(item) || item.code}" แล้ว\`, [undoSnap]);
+  renderRecurring(); renderStats();
+  await persistRecurring(false);
+  if(item.dropped && pendingEpCount(item) === 0) showToast(\`เคลียร์ตอนค้างหมดแล้ว — ย้าย "\${displayName(item) || item.code}" เข้าดรอป/จบให้เรียบร้อย\`);
+}`, 'overdue badge chips');
+  rep('</style>', `  .ep-inline{ display:inline-flex; align-items:center; gap:2px; padding:0 2px 0 7px; border:1px solid #f3c4bf; background:#fdecec; color:#c0392b; border-radius:999px; font-size:12px; font-weight:700; line-height:20px; }
+  .ep-inline button{ border:none; background:none; color:#c0392b; cursor:pointer; font-size:11px; line-height:1; padding:2px 5px; border-radius:999px; }
+  .ep-inline button:hover{ background:#c0392b; color:#fff; }
+  body.dark .ep-inline{ background:#3a1f1d; border-color:#6b2d27; color:#f08a80; }
+  body.dark .ep-inline button{ color:#f08a80; }
+</style>`, 'css');
+}, { staging: true });
+
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
 step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {
