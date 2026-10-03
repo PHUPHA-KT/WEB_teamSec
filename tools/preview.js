@@ -19,6 +19,7 @@ const PORT = 8010;
 
 // ---- storage จำลองฝั่ง server ----
 const KV = Object.create(null);   // 'g:<key>' / 'u:<key>' -> string
+const VER = Object.create(null);  // key -> เลขเวอร์ชัน (เพิ่มทุกครั้งที่เขียน)
 const argi = process.argv.indexOf('--data');
 const DATA = argi > 0 ? process.argv[argi + 1] : process.env.PREVIEW_DATA;
 if (DATA) {
@@ -47,9 +48,19 @@ function build(file) {
   const stub = `<script>
 (function(){
   const q = k => '/__kv?k=' + encodeURIComponent(k);
+  const ver = {};   // เวอร์ชันล่าสุดที่หน้านี้เห็นของแต่ละ key (จำลอง updated_at ของ Supabase)
+  async function rawSet(key, v){ const r = await fetch(q(key), { method:'PUT', body:String(v) }); ver[key] = r.headers.get('X-Ver'); return true; }
   window.storage = {
-    async get(k, sh){ const r = await fetch(q((sh?'g:':'u:')+k)); if(r.status === 404) return null; return { value: await r.text() }; },
-    async set(k, v, sh){ await fetch(q((sh?'g:':'u:')+k), { method:'PUT', body:String(v) }); return true; },
+    async get(k, sh){ const key = (sh?'g:':'u:')+k; const r = await fetch(q(key)); if(r.status === 404){ delete ver[key]; return null; } ver[key] = r.headers.get('X-Ver'); return { value: await r.text() }; },
+    async set(k, v, sh){ return rawSet((sh?'g:':'u:')+k, v); },
+    async setIfUnchanged(k, v, sh){
+      const key = (sh?'g:':'u:')+k;
+      if(!(key in ver)) return rawSet(key, v);   // ไม่เรียก this.set — เว็บทดลองครอบ set ไว้ (เติม stg_ ซ้ำ)
+      const r = await fetch(q(key), { method:'PUT', body:String(v), headers:{ 'If-Ver': ver[key] } });
+      if(r.status === 409) return false;
+      ver[key] = r.headers.get('X-Ver');
+      return true;
+    },
     subscribe(){ return { status:'preview', eventsSeen:0, lastEventAt:0, alive(){ return false; } }; },
     realtimeInfo(){ return 'preview mode — ไม่มี realtime'; },
     currentUser(){ return { id:'preview', email:'preview@local', name: window.__previewName || 'เหนือ' }; }   // จำลองคนล็อกอิน
@@ -79,11 +90,17 @@ http.createServer((req, res) => {
       if (req.method === 'PUT') {
         let body = '';
         req.on('data', c => body += c);
-        req.on('end', () => { KV[k] = body; res.writeHead(204); res.end(); });
+        req.on('end', () => {
+          // If-Ver = เขียนเฉพาะเมื่อเวอร์ชันยังตรง (จำลอง update ... where updated_at = ?)
+          const want = req.headers['if-ver'];
+          if (want !== undefined && String(VER[k] || 0) !== want) { res.writeHead(409); res.end(); return; }
+          KV[k] = body; VER[k] = (VER[k] || 0) + 1;
+          res.writeHead(204, { 'X-Ver': String(VER[k]) }); res.end();
+        });
         return;
       }
       if (!(k in KV)) { res.writeHead(404); res.end(); return; }
-      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', 'X-Ver': String(VER[k] || 0) });
       res.end(KV[k]);
       return;
     }

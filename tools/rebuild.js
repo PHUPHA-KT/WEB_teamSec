@@ -1760,6 +1760,127 @@ step('ปฏิทินดับเบิลคลิกแก้ไข', "root
   if(activeTab !== 'recurring' && !wasEdit) switchTab('recurring'); else renderTab();`, 'stay on tab after edit');
 }, { staging: true });
 
+// ================= 47) A3: เซฟแบบเช็คเวอร์ชัน — มีคนเขียนแทรกระหว่างอ่าน-เขียน = อ่านใหม่ merge ใหม่ =================
+// เดิม: อ่าน -> merge -> upsert ทับ ถ้า 2 เครื่องอ่านเวอร์ชันเดียวกันแล้วเขียนห่างกันไม่ถึงวิ ของคนแรกหาย
+step('A3 เซฟแบบเช็คเวอร์ชัน (updated_at)', 'async setIfUnchanged(', () => {
+  rep(`      return true;
+    }
+  };
+
+  // ---------- realtime ----------`,
+`      return true;
+    },
+
+    // เขียนเฉพาะเมื่อแถวยังเป็นเวอร์ชันที่อ่านล่าสุด (updated_at ตรงกับแคช)
+    // คืน false = มีคนเขียนแทรกตั้งแต่เราอ่าน (ผู้เรียกต้องอ่านใหม่ merge ใหม่)
+    async setIfUnchanged(key, value, shared){
+      await ready;
+      const scope = scopeOf(shared);
+      const ck = scope + '|' + key;
+      const hit = cache[ck];
+      const val = String(value);
+      const stamp = new Date().toISOString();
+      if(!hit){
+        // ยังไม่เคยเห็นแถวนี้ (แถวใหม่) = เขียนแบบเดิม
+        const r0 = await sb.from(TABLE).upsert({ scope: scope, key: key, value: val, updated_at: stamp }, { onConflict: 'scope,key' }).select('updated_at').maybeSingle();
+        if(r0.error){ delete cache[ck]; throw new Error(r0.error.message); }
+        cache[ck] = { updated_at: (r0.data && r0.data.updated_at) ? r0.data.updated_at : stamp, value: val };
+        return true;
+      }
+      const r = await sb.from(TABLE).update({ value: val, updated_at: stamp })
+        .eq('scope', scope).eq('key', key).eq('updated_at', hit.updated_at)
+        .select('updated_at');
+      if(r.error){ delete cache[ck]; throw new Error(r.error.message); }
+      if(!r.data || !r.data.length) return false;
+      cache[ck] = { updated_at: r.data[0].updated_at || stamp, value: val };
+      return true;
+    }
+  };
+
+  // ---------- realtime ----------`, 'shim setIfUnchanged');
+
+  rep(`    let remote = null;
+    let readFailed = false;
+    try{
+      const res = await window.storage.get('appdata', true);
+      if(res && res.value) remote = JSON.parse(res.value);
+    }catch(e){ readFailed = true; }
+    // อ่านของปัจจุบันไม่ได้ = ไม่รู้ว่ากำลังจะทับอะไร -> ไม่เขียน เก็บงานไว้ในเครื่องแล้วลองใหม่
+    if(readFailed){
+      showToast('เชื่อมต่อไม่ได้ ยังไม่ได้บันทึก — จะลองใหม่ให้เอง');
+      scheduleSaveRetry();
+      return;
+    }
+    let pulledExternal = false;
+    const full = {};
+    for(const k of DATA_KEYS){
+      const ours = getColl(k) || [];
+      const theirs = remote && Array.isArray(remote[k]) ? remote[k] : null;
+      let merged = ours;
+      if(theirs){
+        const base = lastSeen[k] ? JSON.parse(lastSeen[k]) : theirs;
+        merged = mergeById(base, ours, theirs);
+        if(JSON.stringify(merged) !== JSON.stringify(ours)) pulledExternal = true;
+      }
+      setColl(k, merged);
+      full[k] = merged;
+    }
+    // เขียน 1 ครั้ง — ล้มเหลวลองซ้ำเอง 1 ที (กัน rate limit ชั่วคราว)
+    const s = JSON.stringify(full);
+    try{
+      await window.storage.set('appdata', s, true);
+    }catch(e1){
+      await new Promise(r=>setTimeout(r, 900));
+      await window.storage.set('appdata', s, true);
+    }`,
+`    let pulledExternal = false;
+    let full = null;
+    // ฐานของ merge: รอบแรก = ที่เห็นล่าสุด / ถ้าเขียนชน = remote ที่เพิ่ง merge ไปแล้ว (ของเราเทียบกับมัน = งานเราล้วนๆ)
+    const bases = {};
+    for(const k of DATA_KEYS) bases[k] = lastSeen[k] || null;
+    for(let attempt = 0; ; attempt++){
+      let remote = null;
+      let readFailed = false;
+      try{
+        const res = await window.storage.get('appdata', true);
+        if(res && res.value) remote = JSON.parse(res.value);
+      }catch(e){ readFailed = true; }
+      // อ่านของปัจจุบันไม่ได้ = ไม่รู้ว่ากำลังจะทับอะไร -> ไม่เขียน เก็บงานไว้ในเครื่องแล้วลองใหม่
+      if(readFailed){
+        showToast('เชื่อมต่อไม่ได้ ยังไม่ได้บันทึก — จะลองใหม่ให้เอง');
+        scheduleSaveRetry();
+        return;
+      }
+      full = {};
+      for(const k of DATA_KEYS){
+        const ours = getColl(k) || [];
+        const theirs = remote && Array.isArray(remote[k]) ? remote[k] : null;
+        let merged = ours;
+        if(theirs){
+          const base = bases[k] ? JSON.parse(bases[k]) : theirs;
+          merged = mergeById(base, ours, theirs);
+          if(JSON.stringify(merged) !== JSON.stringify(ours)) pulledExternal = true;
+          bases[k] = JSON.stringify(theirs);
+        }
+        setColl(k, merged);
+        full[k] = merged;
+      }
+      const s = JSON.stringify(full);
+      // A3: เขียนเฉพาะเมื่อไม่มีใครเขียนแทรกตั้งแต่อ่าน — ชน = วนอ่านใหม่ merge ใหม่
+      // ชนเกิน 3 รอบ (หรือไม่มี setIfUnchanged) = เขียนแบบเดิม ไม่ปล่อยงานค้างไม่ได้เซฟ
+      const careful = attempt < 3 && typeof window.storage.setIfUnchanged === 'function';
+      const write = () => careful ? window.storage.setIfUnchanged('appdata', s, true) : window.storage.set('appdata', s, true).then(()=>true);
+      let wrote;
+      try{ wrote = await write(); }
+      catch(e1){ await new Promise(r=>setTimeout(r, 900)); wrote = await write(); }   // ล้มเหลวลองซ้ำ 1 ที (rate limit ชั่วคราว)
+      if(wrote) break;
+      if(attempt === 2){
+        console.warn('save: เขียนชนติดกัน 3 รอบ — เขียนแบบไม่เช็คเวอร์ชัน');
+        showToast('⚠ บันทึกแบบเช็คเวอร์ชันไม่สำเร็จ 3 รอบ — บันทึกแบบเดิมแล้ว (ถ้าขึ้นบ่อย แจ้งผู้ดูแล)');
+      }
+    }`, 'persistDataNow CAS loop');
+}, { staging: true });
+
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
 step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {
@@ -1773,6 +1894,7 @@ const STAGING_KEY_PREFIX = 'stg_';
   st.get = (key, shared) => get(STAGING_KEY_PREFIX + key, shared);
   st.set = (key, value, shared) => set(STAGING_KEY_PREFIX + key, value, shared);
   if(sub) st.subscribe = (key, shared, cb) => sub(STAGING_KEY_PREFIX + key, shared, cb);
+  if(st.setIfUnchanged){ const siu = st.setIfUnchanged.bind(st); st.setIfUnchanged = (key, value, shared) => siu(STAGING_KEY_PREFIX + key, value, shared); }
   const bar = document.createElement('div');
   bar.className = 'staging-bar';
   bar.textContent = '🧪 เว็บทดลอง — ข้อมูลแยกจากเว็บหลัก แก้อะไรที่นี่ไม่กระทบงานจริง';
