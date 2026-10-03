@@ -1731,6 +1731,35 @@ async function finishEpInline(id, i){
 </style>`, 'css');
 }, { staging: true });
 
+// ================= 46) ปฏิทิน: ดับเบิลคลิกเรื่อง = แก้ไข =================
+step('ปฏิทินดับเบิลคลิกแก้ไข', "root.addEventListener('dblclick'", () => {
+  rep(`  // ถ้ากำลังลากอยู่ ห้ามหน้าเลื่อนตาม (มือถือ)`,
+`  // ดับเบิลคลิกเรื่อง = เปิดหน้าต่างแก้ไข (2 คลิกแรกเลือก/ยกเลิกเลือกไปแล้ว — ล้างให้ก่อน)
+  root.addEventListener('dblclick', e=>{
+    const chip = e.target.closest('.cal-chip');
+    if(!chip) return;
+    calClearSel();
+    openRecurringModal(chip.dataset.id);
+  });
+  // ถ้ากำลังลากอยู่ ห้ามหน้าเลื่อนตาม (มือถือ)`, 'dblclick');
+  rep(`ลากเรื่องไปวางช่องอื่น หรือคลิกเรื่องแล้วคลิกช่องที่จะย้ายไป (Esc ยกเลิก)`,
+      `ลากเรื่องไปวางช่องอื่น หรือคลิกเรื่องแล้วคลิกช่องที่จะย้ายไป (Esc ยกเลิก) · ดับเบิลคลิกเพื่อแก้ไข`, 'hint');
+  rep(`title="ลากเพื่อย้ายวัน/ย้ายคน\${isMultiDay(r)?' (ย้ายเฉพาะวันนี้)':''}"`,
+      `title="ลากหรือคลิกเพื่อย้ายวัน/ย้ายคน\${isMultiDay(r)?' (ย้ายเฉพาะวันนี้)':''} · ดับเบิลคลิกเพื่อแก้ไข"`, 'chip title');
+  // แก้ไขจากแท็บไหน บันทึกแล้วอยู่แท็บนั้น (เดิมพาไปงานประจำเสมอ — ตั้งใจไว้สำหรับย้ายจากเรื่องเปิดใหม่)
+  rep(`  promoteFromNewId = null;
+  editingRecurringId = null;
+  closeModal('modalRecurring');
+  // ย้ายมาจากแท็บอื่น -> พาไปดูที่งานประจำ (แท็บเดิมไม่ต้องสลับ จะได้ไม่ล้างคำค้น)
+  if(activeTab !== 'recurring') switchTab('recurring'); else renderRecurring();`,
+`  const wasEdit = !!editingRecurringId;
+  promoteFromNewId = null;
+  editingRecurringId = null;
+  closeModal('modalRecurring');
+  // เพิ่ม/ย้ายมาจากแท็บอื่น -> พาไปดูที่งานประจำ · แก้ไขเรื่องเดิม -> อยู่แท็บเดิม (เช่น แก้จากปฏิทิน)
+  if(activeTab !== 'recurring' && !wasEdit) switchTab('recurring'); else renderTab();`, 'stay on tab after edit');
+}, { staging: true });
+
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
 step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {

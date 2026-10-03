@@ -3391,11 +3391,12 @@ async function saveNewRecurring(){
       }
     }
   }
+  const wasEdit = !!editingRecurringId;
   promoteFromNewId = null;
   editingRecurringId = null;
   closeModal('modalRecurring');
-  // ย้ายมาจากแท็บอื่น -> พาไปดูที่งานประจำ (แท็บเดิมไม่ต้องสลับ จะได้ไม่ล้างคำค้น)
-  if(activeTab !== 'recurring') switchTab('recurring'); else renderRecurring();
+  // เพิ่ม/ย้ายมาจากแท็บอื่น -> พาไปดูที่งานประจำ · แก้ไขเรื่องเดิม -> อยู่แท็บเดิม (เช่น แก้จากปฏิทิน)
+  if(activeTab !== 'recurring' && !wasEdit) switchTab('recurring'); else renderTab();
   renderStats();
   await persistRecurring();
 }
@@ -4208,7 +4209,7 @@ function renderCalendar(){
             const by = pendingEpsByPerson(r);
             const owner = hasForeignBacklog(r) ? ' · ' + esc(Object.keys(by).filter(p=>p!==r.person).map(p=>p+' '+by[p]).join(', ')) : '';
             const badge = eps ? ` <span class="cal-chip-eps">(ค้าง ${eps}${owner})</span>` : '';
-            return `<span class="cal-chip" data-id="${r.id}" data-from="${esc(d)}" title="ลากเพื่อย้ายวัน/ย้ายคน${isMultiDay(r)?' (ย้ายเฉพาะวันนี้)':''}">${esc((r.code?r.code+'-':'') + displayName(r))}${badge}</span>`;
+            return `<span class="cal-chip" data-id="${r.id}" data-from="${esc(d)}" title="ลากหรือคลิกเพื่อย้ายวัน/ย้ายคน${isMultiDay(r)?' (ย้ายเฉพาะวันนี้)':''} · ดับเบิลคลิกเพื่อแก้ไข">${esc((r.code?r.code+'-':'') + displayName(r))}${badge}</span>`;
           }).join('');
           return `<tr>
             <td class="cal-day">${CAL_DAY_LABEL[d]}</td>
@@ -4221,7 +4222,7 @@ function renderCalendar(){
   html += `</div>`;
 
   container.innerHTML = `<div class="toolbar" style="justify-content:space-between;">
-      <span style="font-size:13px;color:var(--ink-soft);">ลากเรื่องไปวางช่องอื่น หรือคลิกเรื่องแล้วคลิกช่องที่จะย้ายไป (Esc ยกเลิก) · มือถือแตะค้างแล้วลาก (ไม่รวมเรื่องที่ดรอป)</span>
+      <span style="font-size:13px;color:var(--ink-soft);">ลากเรื่องไปวางช่องอื่น หรือคลิกเรื่องแล้วคลิกช่องที่จะย้ายไป (Esc ยกเลิก) · ดับเบิลคลิกเพื่อแก้ไข · มือถือแตะค้างแล้วลาก (ไม่รวมเรื่องที่ดรอป)</span>
       <button class="btn btn-primary" onclick="exportCalendarImage()">📷 บันทึกเป็นรูป</button>
     </div>
     <div id="calCapture">${html}</div>`;
@@ -4357,6 +4358,13 @@ function bindCalendarDrag(root){
     if(chip){ calSelectChip(chip); return; }
     const cell = e.target.closest('.cal-items[data-person]');
     if(cell && calSel){ const s = calSel; calClearSel(); moveCalendarItem(s.id, cell.dataset.person, cell.dataset.day, s.from); }
+  });
+  // ดับเบิลคลิกเรื่อง = เปิดหน้าต่างแก้ไข (2 คลิกแรกเลือก/ยกเลิกเลือกไปแล้ว — ล้างให้ก่อน)
+  root.addEventListener('dblclick', e=>{
+    const chip = e.target.closest('.cal-chip');
+    if(!chip) return;
+    calClearSel();
+    openRecurringModal(chip.dataset.id);
   });
   // ถ้ากำลังลากอยู่ ห้ามหน้าเลื่อนตาม (มือถือ)
   root.addEventListener('touchmove', e=>{ if(drag && drag.started) e.preventDefault(); }, { passive:false });
