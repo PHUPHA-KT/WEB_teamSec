@@ -428,6 +428,52 @@
   .sched-first{ font-size:11.5px; color:#6a3fb3; font-weight:700; }
   .sched-act-first{ color:#6a3fb3; border-color:#6a3fb3; }
   .sched-sent{ font-size:12px; color:var(--green); font-weight:700; margin-right:6px; white-space:nowrap; }
+  /* B1 ผ่านวันแล้วยังไม่ทำ */
+  .missed-strip{ border:1px solid #f0d9a8; background:#fdf6e7; border-radius:12px; margin:0 0 12px; overflow:hidden; }
+  .missed-head{ display:flex; justify-content:space-between; align-items:center; gap:8px; padding:9px 14px; cursor:pointer; font-size:13.5px; color:#8a5a00; }
+  .missed-toggle{ font-size:12px; white-space:nowrap; }
+  .missed-list{ border-top:1px solid #f0d9a8; background:var(--card); }
+  .missed-row{ display:flex; align-items:center; gap:8px; padding:7px 12px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .missed-row:last-child{ border-bottom:none; }
+  .missed-name{ flex:1; min-width:140px; font-size:13px; }
+  .missed-name small{ margin-left:6px; color:var(--ink-soft); font-size:11.5px; }
+  body.dark .missed-strip{ background:#3a2d14; border-color:#5a4720; }
+  body.dark .missed-head{ color:#e3b463; }
+  /* UI: ปุ่มสถานะ / เมนู / เลิกทำ */
+  .st-ctl{ display:inline-flex; border-radius:8px; overflow:hidden; flex-shrink:0; }
+  .st-main, .st-more{ border:none; font:inherit; font-size:12px; font-weight:700; cursor:pointer; padding:6px 10px; }
+  .st-main{ min-width:78px; }
+  .st-more{ padding:6px 7px; border-left:1px solid rgba(0,0,0,.08); }
+  .st-main:hover, .st-more:hover{ filter:brightness(.94); }
+  .row-more{ font-size:18px; line-height:1; color:#6b7480; }
+  .pop-menu{ position:fixed; z-index:100000; background:var(--card); border:1px solid var(--line); border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.18); padding:4px; min-width:170px; }
+  .pop-item{ display:block; width:100%; text-align:left; border:none; background:none; font:inherit; font-size:13px; padding:8px 12px; border-radius:7px; cursor:pointer; color:var(--ink); }
+  .pop-item:hover, .pop-item:focus{ background:var(--fill); outline:none; }
+  .pop-active{ font-weight:700; }
+  .pop-danger{ color:#c0392b; }
+  .ep-chip .ep-done{ color:var(--green); font-weight:800; }
+  .undo-toast{ position:fixed; left:50%; bottom:24px; transform:translate(-50%, 20px); opacity:0; pointer-events:none; z-index:100001; display:flex; align-items:center; gap:14px; background:#1f2430; color:#fff; padding:10px 12px 10px 16px; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.25); font-size:13.5px; transition:.18s; max-width:calc(100vw - 32px); }
+  .undo-toast.show{ opacity:1; transform:translate(-50%, 0); pointer-events:auto; }
+  .undo-btn{ border:none; background:#ffd36b; color:#1f2430; font:inherit; font-weight:800; padding:6px 12px; border-radius:8px; cursor:pointer; white-space:nowrap; }
+  .cal-chip-selected{ outline:2px solid var(--blue); background:var(--blue-bg) !important; }
+  .cal-selecting .cal-items[data-person]{ cursor:copy; }
+  .cal-selecting .cal-items[data-person]:hover{ background:var(--blue-bg); }
+  .ep-inline{ display:inline-flex; align-items:center; gap:2px; padding:0 2px 0 7px; border:1px solid #f3c4bf; background:#fdecec; color:#c0392b; border-radius:999px; font-size:12px; font-weight:700; line-height:20px; }
+  .ep-inline button{ border:none; background:none; color:#c0392b; cursor:pointer; font-size:11px; line-height:1; padding:2px 5px; border-radius:999px; }
+  .ep-inline button:hover{ background:#c0392b; color:#fff; }
+  body.dark .ep-inline{ background:#3a1f1d; border-color:#6b2d27; color:#f08a80; }
+  body.dark .ep-inline button{ color:#f08a80; }
+  /* โน้ตด้านขวาของกำหนดการ */
+  .sched-layout{ display:grid; grid-template-columns:minmax(0,1fr) 240px; gap:16px; align-items:start; }
+  .sched-note-box{ position:sticky; top:12px; background:#fffbea; border:1px solid #f0e2a8; border-radius:12px; padding:10px 12px 12px; }
+  .sched-note-head{ display:flex; justify-content:space-between; align-items:center; font-weight:800; font-size:13.5px; margin-bottom:6px; color:#7a6200; }
+  .sched-note-body{ white-space:pre-wrap; font-size:14px; line-height:1.6; font-family:inherit; min-height:40px; cursor:text; color:var(--ink); }
+  .sched-note-box textarea{ width:100%; box-sizing:border-box; font:inherit; font-size:14px; line-height:1.6; padding:8px; border:1px solid var(--line); border-radius:8px; resize:vertical; background:var(--card); color:var(--ink); }
+  .sched-note-actions{ display:flex; justify-content:flex-end; gap:6px; margin-top:8px; }
+  .sched-note-actions .btn{ padding:6px 12px; font-size:12.5px; }
+  body.dark .sched-note-box{ background:#2e2a17; border-color:#5a4f22; }
+  body.dark .sched-note-head{ color:#e3cc6b; }
+  @media(max-width:900px){ .sched-layout{ grid-template-columns:1fr; } .sched-note-box{ position:static; order:-1; } }
 </style>
 </head>
 <body>
@@ -922,6 +968,31 @@
         value: val
       };
       return true;
+    },
+
+    // เขียนเฉพาะเมื่อแถวยังเป็นเวอร์ชันที่อ่านล่าสุด (updated_at ตรงกับแคช)
+    // คืน false = มีคนเขียนแทรกตั้งแต่เราอ่าน (ผู้เรียกต้องอ่านใหม่ merge ใหม่)
+    async setIfUnchanged(key, value, shared){
+      await ready;
+      const scope = scopeOf(shared);
+      const ck = scope + '|' + key;
+      const hit = cache[ck];
+      const val = String(value);
+      const stamp = new Date().toISOString();
+      if(!hit){
+        // ยังไม่เคยเห็นแถวนี้ (แถวใหม่) = เขียนแบบเดิม
+        const r0 = await sb.from(TABLE).upsert({ scope: scope, key: key, value: val, updated_at: stamp }, { onConflict: 'scope,key' }).select('updated_at').maybeSingle();
+        if(r0.error){ delete cache[ck]; throw new Error(r0.error.message); }
+        cache[ck] = { updated_at: (r0.data && r0.data.updated_at) ? r0.data.updated_at : stamp, value: val };
+        return true;
+      }
+      const r = await sb.from(TABLE).update({ value: val, updated_at: stamp })
+        .eq('scope', scope).eq('key', key).eq('updated_at', hit.updated_at)
+        .select('updated_at');
+      if(r.error){ delete cache[ck]; throw new Error(r.error.message); }
+      if(!r.data || !r.data.length) return false;
+      cache[ck] = { updated_at: r.data[0].updated_at || stamp, value: val };
+      return true;
     }
   };
 
@@ -1397,8 +1468,10 @@ function toggleLcMode(){ allLcMode = !allLcMode; renderAllStories(); }
 async function markLcChecked(id){
   const item = recurring.find(r=>r.id===id);
   if(!item) return;
+  const undoSnap = snapItem('recurring_stories', id);
   item.lcCheck = { at: new Date().toISOString(), by: currentUserName() };
   logActivity(`เช็ค LC "${displayName(item) || item.code}" — ยังไม่มี`);
+  offerUndo(`เช็ค LC "${displayName(item) || item.code}"`, [undoSnap]);
   renderAllStories();
   await persistRecurring(false);
 }
@@ -1408,6 +1481,8 @@ async function markLcFound(id){
   const eps = pendingEpCount(item);
   const ok = await uiConfirm(`"${displayName(item) || item.code}" มี LC แล้ว — ดรอปเรื่องนี้ด้วยเหตุผล "${DROP_META.lc.label}"?` + (eps ? `\n(ยังค้าง ${eps} ตอน จะอยู่ในงานปกติจนเคลียร์หมด)` : ''), 'ดรอป (LC)');
   if(!ok) return;
+  const undoSnap = snapItem('recurring_stories', id);
+  offerUndo(`ดรอป (LC) "${displayName(item) || item.code}"`, [undoSnap]);
   item.lcCheck = { at: new Date().toISOString(), by: currentUserName(), found: true };
   item.dropped = 'lc';
   logActivity(`เช็ค LC "${displayName(item) || item.code}" — มี LC แล้ว → ดรอป (${DROP_META.lc.label})`);
@@ -1415,6 +1490,207 @@ async function markLcFound(id){
   await persistRecurring(false);
   showToast('ดรอปแล้ว: ' + DROP_META.lc.label);
 }
+
+// ===== B1: วันผ่านไปแล้วแต่ยัง "ยังไม่ทำ" — แถบเตือนบนงานประจำ =====
+// ไล่ทุกวันที่ผ่านไปแล้วในสัปดาห์นี้ (นับวันใหม่ตอน 2 ทุ่ม) ที่สถานะของวันนั้นยังเป็น pending
+// ต่อแถว: ✓ ทำแล้ว (สถานะวันนั้น = done) / ＋ ค้าง (ใส่ตอนเข้าตอนค้าง แล้วตั้งวันนั้นเป็น เลื่อน)
+// เคารพตัวกรองคน (งานของฉัน) · ไม่รวมเรื่องที่ดรอปจริง · ยุบไว้ได้
+let missedOpen = false;
+
+function missedRows(){
+  const rows = [];
+  recurring.forEach(item=>{
+    if(isEffectivelyDropped(item)) return;
+    if(personFilter !== 'ทั้งหมด' && !isPersonInvolved(item, personFilter)) return;
+    itemDays(item).forEach(day=>{
+      if(dayHasPassed(day) && dayStatus(item, day) === 'pending') rows.push({ item, day });
+    });
+  });
+  rows.sort((a,b)=> WEEKDAY_ONLY.indexOf(a.day) - WEEKDAY_ONLY.indexOf(b.day));
+  return rows;
+}
+// ตอนถัดไปที่เดาได้: ตอนล่าสุด / ตอนค้างสูงสุด + 1 (ข้อความ เช่น พิเศษ เดาไม่ได้ = ว่าง)
+function guessNextEp(item){
+  const nums = [item.lastEp, ...(item.pendingEpisodes || [])].map(e=>typeof e === 'number' ? e : parseFloat(e)).filter(n=>!isNaN(n));
+  return nums.length ? Math.floor(Math.max(...nums)) + 1 : '';
+}
+function missedStripHtml(){
+  if(showDropped) return '';
+  const rows = missedRows();
+  if(!rows.length) return '';
+  const who = personFilter !== 'ทั้งหมด' ? ' ของ' + esc(personFilter) : '';
+  return `<div class="missed-strip">
+    <div class="missed-head" onclick="missedOpen=!missedOpen;renderRecurring()">
+      <span>🕗 ผ่านวันแล้วยังไม่ได้ทำ${who} <b>${rows.length}</b> รายการ</span>
+      <span class="missed-toggle">${missedOpen ? 'ซ่อน ▴' : 'ดู ▾'}</span>
+    </div>
+    ${missedOpen ? `<div class="missed-list">${rows.map(({item, day})=>`
+      <div class="missed-row">
+        <span class="day-pill" style="${dayPillStyle(day)}">${day}</span>
+        <span class="missed-name">${item.code ? esc(item.code) + ' · ' : ''}${esc(displayName(item) || '(ไม่มีชื่อ)')}<small>${esc(item.person || '')}</small></span>
+        <button type="button" class="lc-btn lc-btn-ok" onclick="missedDone('${item.id}','${day}')">✓ ทำแล้ว</button>
+        <button type="button" class="lc-btn" onclick="missedToBacklog('${item.id}','${day}')" title="ยังไม่ได้ทำตอนนี้ — ใส่เข้าตอนค้าง แล้วตั้งวันนั้นเป็น เลื่อน">＋ ค้าง</button>
+      </div>`).join('')}
+    </div>` : ''}
+  </div>`;
+}
+async function missedDone(id, day){
+  await updateStatus(id, 'done', day);
+}
+async function missedToBacklog(id, day){
+  const item = recurring.find(r=>r.id===id);
+  if(!item) return;
+  const raw = await uiPrompt(`"${displayName(item) || item.code}" (${day}) ตอนที่ยังไม่ได้ทำ — ใส่เข้าตอนค้าง`, { value: String(guessNextEp(item)), placeholder: 'เช่น 24, 9.5, พิเศษ' });
+  if(raw === null || raw === undefined) return;
+  const eps = parseEpisodeInput(raw);
+  if(!eps.length){ showToast('ใส่เลขตอน หรือชื่อตอน เช่น 24, 9.5, พิเศษ'); return; }
+  const have = new Map((item.pendingEpisodes || []).map(e=>[epKey(e), e]));
+  eps.forEach(e=>{ if(!have.has(epKey(e))) have.set(epKey(e), e); });
+  item.pendingEpisodes = sortEpisodes([...have.values()]);
+  setDayStatus(item, day, 'delayed');
+  item.pendingSinceDate = null;
+  logActivity(`ใส่ตอนค้าง "${displayName(item) || item.code}" ${eps.map(epLabel).join(', ')} (ยังไม่ได้ทำ${isMultiDay(item) ? ' ' + day : ''})`);
+  renderRecurring(); renderStats();
+  await persistRecurring(false);
+  showToast('ใส่ตอนค้างแล้ว — ' + eps.map(epLabel).join(', '));
+}
+
+// ===== UI งานประจำ: ปุ่มสถานะคลิกเดียว / เมนู ⋯ / เมนูลอย / เลิกทำ / คีย์บอร์ด =====
+
+// ---- เมนูลอย (ใช้กับ ▾ สถานะ และ ⋯ ของแถว) ----
+let popMenuEl = null;
+function closePopMenu(){
+  if(popMenuEl){ popMenuEl.remove(); popMenuEl = null; }
+  document.removeEventListener('mousedown', popMenuOutside, true);
+}
+function popMenuOutside(e){ if(popMenuEl && !popMenuEl.contains(e.target)) closePopMenu(); }
+// items: [{label, onClick, danger, active}]
+function openPopMenu(anchor, items){
+  closePopMenu();
+  const m = document.createElement('div');
+  m.className = 'pop-menu';
+  items.forEach(it=>{
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pop-item' + (it.danger ? ' pop-danger' : '') + (it.active ? ' pop-active' : '');
+    b.textContent = it.label;
+    b.addEventListener('click', ()=>{ closePopMenu(); it.onClick(); });
+    m.appendChild(b);
+  });
+  document.body.appendChild(m);
+  const r = anchor.getBoundingClientRect();
+  const w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + 'px';
+  m.style.top = (r.bottom + h + 6 > innerHeight ? r.top - h - 4 : r.bottom + 4) + 'px';
+  popMenuEl = m;
+  setTimeout(()=>document.addEventListener('mousedown', popMenuOutside, true), 0);
+  const first = m.querySelector('.pop-item'); if(first) first.focus();
+}
+
+// ---- ปุ่มสถานะ: คลิก = สลับ ทำแล้ว/ยังไม่ทำ, ▾ = เลือก งด/เลื่อน ----
+function statusCtlHtml(item, day){
+  const st = dayStatus(item, day);
+  const meta = STATUS_META[st] || STATUS_META.pending;
+  return `<span class="st-ctl">
+    <button type="button" class="st-main" style="background:${meta.bg};color:${meta.fg};" onclick="toggleDayDone('${item.id}','${day}')" title="คลิกเพื่อสลับ ทำแล้ว / ยังไม่ทำ">${st === 'done' ? '✓ ' : ''}${meta.label}</button><button type="button" class="st-more" style="background:${meta.bg};color:${meta.fg};" onclick="openStatusMenu(this,'${item.id}','${day}')" title="เลือกสถานะอื่น (งด / เลื่อน)" aria-label="เลือกสถานะอื่น">▾</button>
+  </span>`;
+}
+function toggleDayDone(id, day){
+  const item = recurring.find(r=>r.id===id);
+  if(!item) return;
+  updateStatus(id, dayStatus(item, day) === 'done' ? 'pending' : 'done', day);
+}
+function openStatusMenu(btn, id, day){
+  const item = recurring.find(r=>r.id===id);
+  if(!item) return;
+  const cur = dayStatus(item, day);
+  openPopMenu(btn, Object.keys(STATUS_META).map(k=>({
+    label: (k === cur ? '● ' : '　') + STATUS_META[k].label,
+    active: k === cur,
+    onClick: ()=>{ if(k !== cur) updateStatus(id, k, day); },
+  })));
+}
+function openRowMenu(btn, id){
+  const item = recurring.find(r=>r.id===id);
+  if(!item) return;
+  openPopMenu(btn, [
+    { label: '✎ แก้ไข', onClick: ()=>openRecurringModal(id) },
+    item.dropped
+      ? { label: '↩ ยกเลิกการรอดรอป', onClick: ()=>undropStory(id) }
+      : { label: '⏏ ดรอปเรื่อง…', onClick: ()=>openDropMenu(id) },
+    { label: '🗑 ลบเรื่อง', danger: true, onClick: ()=>deleteRecurring(id) },
+  ]);
+}
+
+// ---- เลิกทำ (5 วิ) ----
+// เก็บสำเนาของรายการก่อนแก้ แล้วคืนทั้งรายการถ้ากดเลิกทำ (รวมตอนล่าสุด/ตอนค้าง/สถานะทุกวัน)
+const UNDO_MS = 5000;
+let undoState = null;
+function snapItem(collKey, id){
+  const it = (getColl(collKey) || []).find(x=>x.id===id);
+  return { collKey, id, before: it ? JSON.parse(JSON.stringify(it)) : null };
+}
+function offerUndo(label, snaps){
+  const el = document.getElementById('undoToast') || (()=>{
+    const d = document.createElement('div');
+    d.id = 'undoToast';
+    d.className = 'undo-toast';
+    d.innerHTML = '<span class="undo-msg"></span><button type="button" class="undo-btn">เลิกทำ</button>';
+    d.querySelector('.undo-btn').addEventListener('click', runUndo);
+    document.body.appendChild(d);
+    return d;
+  })();
+  if(undoState) clearTimeout(undoState.timer);
+  undoState = { label, snaps, timer: setTimeout(hideUndo, UNDO_MS) };
+  el.querySelector('.undo-msg').textContent = label;
+  el.classList.add('show');
+}
+function hideUndo(){
+  const el = document.getElementById('undoToast');
+  if(el) el.classList.remove('show');
+  if(undoState) clearTimeout(undoState.timer);
+  undoState = null;
+}
+async function runUndo(){
+  const u = undoState;
+  hideUndo();
+  if(!u) return;
+  u.snaps.forEach(({collKey, id, before})=>{
+    const arr = (getColl(collKey) || []).slice();
+    const i = arr.findIndex(x=>x.id===id);
+    if(before){ if(i > -1) arr[i] = before; else arr.push(before); }
+    else if(i > -1) arr.splice(i, 1);
+    setColl(collKey, arr);
+    // เคยถูกย้ายลงถังขยะระหว่างทาง (เช่น ติ๊กครบ) -> เอาออกจากถัง ไม่งั้นมี 2 ที่
+    if(before) trash = trash.filter(t=>!(t.item && t.item.id === id));
+  });
+  logActivity('เลิกทำ: ' + u.label);
+  renderStats(); renderTab();
+  if(document.getElementById('modalEpisodes').classList.contains('show')) renderEpChips();
+  await persistData(false);
+  showToast('เลิกทำแล้ว');
+}
+
+// ---- คีย์บอร์ด: Esc ปิดสิ่งที่อยู่บนสุด, Enter ยืนยันกล่องถาม ----
+document.addEventListener('keydown', e=>{
+  if(e.key === 'Escape'){
+    if(popMenuEl){ closePopMenu(); e.preventDefault(); return; }
+    if(typeof calSel !== 'undefined' && calSel){ calClearSel(); e.preventDefault(); return; }
+    const open = [...document.querySelectorAll('.modal-backdrop.show')];
+    const top = open[open.length - 1];
+    if(!top || !top.id) return;                       // กล่องที่สร้างชั่วคราว (เลือกเหตุผลดรอป) จัดการเอง
+    e.preventDefault();
+    if(top.id === 'modalConfirm') document.getElementById('confirmCancel').click();
+    else if(top.id === 'modalPrompt') document.getElementById('promptCancel').click();
+    else closeModal(top.id);
+  } else if(e.key === 'Enter'){
+    const c = document.getElementById('modalConfirm');
+    if(c && c.classList.contains('show') && !(e.target && e.target.tagName === 'BUTTON')){
+      e.preventDefault();
+      document.getElementById('confirmOk').click();
+    }
+  }
+});
 
 function pendingEpCount(item){
   return (item.pendingEpisodes && item.pendingEpisodes.length) || 0;
@@ -1436,10 +1712,33 @@ function overdueBadgeHtml(item){
   const eps = sortEpisodes(item.pendingEpisodes);
   if(!eps.length) return '';
   const bg = pendingEpColor(eps.length);
-  const list = eps.map(e=>typeof e==='number' ? e : e).join(', ');
+  // แต่ละตอนเป็นชิป กด ✕ = ทำตอนนั้นเสร็จ (ตอนของคนอื่นบอกชื่อคนเคลียร์ใน title)
+  const chips = eps.map((e, i)=>{
+    const owner = epOwner(item, e);
+    const tip = 'ทำ' + epLabel(e) + ' เสร็จแล้ว' + (owner && owner !== item.person ? ' (ของ ' + owner + ')' : '');
+    return `<span class="ep-inline">${esc(typeof e === 'number' ? String(e) : e)}<button type="button" onclick="finishEpInline('${item.id}', ${i})" title="${esc(tip)}" aria-label="${esc(tip)}">✕</button></span>`;
+  }).join('');
   return `<div class="ep-line">`
     + `<span class="overdue-badge" style="background:${bg}">ค้าง ${eps.length} ตอน${hasForeignBacklog(item) ? ' · ' + esc(foreignBacklogLabel(item)) : ''}</span>`
-    + ` <span class="ep-list">ตอน ${esc(list)}</span></div>`;
+    + ` <span class="ep-list">ตอน</span>${chips}</div>`;
+}
+// กด ✕ ข้างเลขตอนในแถว = ทำตอนนั้นเสร็จ (เหมือนกด ✓ ในหน้าต่างตอนค้าง) + เลิกทำได้ 5 วิ
+async function finishEpInline(id, i){
+  const item = recurring.find(r=>r.id===id);
+  if(!item) return;
+  const eps = sortEpisodes(item.pendingEpisodes);
+  if(i < 0 || i >= eps.length) return;
+  const undoSnap = snapItem('recurring_stories', id);
+  const ep = eps[i];
+  bumpLastEp(item, ep);
+  eps.splice(i, 1);
+  item.pendingEpisodes = eps;
+  clearPendingOwnerIfDone(item);
+  logActivity(`ทำตอนค้าง "${displayName(item) || item.code}" ${epLabel(ep)} แล้ว`);
+  offerUndo(`ทำ${epLabel(ep)} "${displayName(item) || item.code}" แล้ว`, [undoSnap]);
+  renderRecurring(); renderStats();
+  await persistRecurring(false);
+  if(item.dropped && pendingEpCount(item) === 0) showToast(`เคลียร์ตอนค้างหมดแล้ว — ย้าย "${displayName(item) || item.code}" เข้าดรอป/จบให้เรียบร้อย`);
 }
 function currentWeekMondayStr(){
   const now = effectiveNow();      // สัปดาห์ใหม่เริ่มจันทร์ 2 ทุ่ม ให้ตรงกับนิยาม "วันนี้"
@@ -1620,6 +1919,9 @@ async function loadAll(){
   if(!newStories){ newStories = SEED_NEW; needSave = true; }
   if(!expenses){ expenses = SEED_EXPENSES; needSave = true; }
   if(!scheduleEntries){ scheduleEntries = SEED_SCHEDULE; needSave = true; }
+  // lastSeen = ค่าจาก remote ก่อนแปลงใดๆ — migration/รีเซ็ตด้านล่างจะได้นับเป็นการแก้ของเรา
+  // (ถ้า snapshot หลังแก้ merge ตอนเซฟจะเห็นว่าเราไม่ได้แก้ แล้วเอาค่าเก่าจาก remote กลับมาทับ)
+  snapshotAll();
 
   // migration: backfill Google Drive links + ตอนค้าง สำหรับข้อมูลที่บันทึกก่อนมีฟิลด์นี้
   let migrated = false;
@@ -1655,6 +1957,7 @@ async function loadAll(){
     lastResetWeek = w ? w.value : null;
   }catch(e){ lastResetWeek = null; }
   const thisWeekMonday = currentWeekMondayStr();
+  weekCheckedFor = thisWeekMonday;
   let weekReset = false;
   if(lastResetWeek !== thisWeekMonday){
     if(resetNonPendingToPending(recurring)) weekReset = true;
@@ -1681,10 +1984,10 @@ async function loadAll(){
   }catch(e){ autoTodayFilter = true; }
   applyTodayFilter();
 
-  snapshotAll();
   // บันทึกครั้งเดียวถ้ามีการ seed/migrate/reset (เขียน appdata ก้อนเดียว)
   if(needSave || migrated || weekReset) await persistData(false);
   render();
+  refreshBackupStatus();
   startRealtimeSync();
 }
 
@@ -1874,39 +2177,51 @@ function renderTab(){
 }
 async function persistDataNow(toast){
   try{
-    let remote = null;
-    let readFailed = false;
-    try{
-      const res = await window.storage.get('appdata', true);
-      if(res && res.value) remote = JSON.parse(res.value);
-    }catch(e){ readFailed = true; }
-    // อ่านของปัจจุบันไม่ได้ = ไม่รู้ว่ากำลังจะทับอะไร -> ไม่เขียน เก็บงานไว้ในเครื่องแล้วลองใหม่
-    if(readFailed){
-      showToast('เชื่อมต่อไม่ได้ ยังไม่ได้บันทึก — จะลองใหม่ให้เอง');
-      scheduleSaveRetry();
-      return;
-    }
     let pulledExternal = false;
-    const full = {};
-    for(const k of DATA_KEYS){
-      const ours = getColl(k) || [];
-      const theirs = remote && Array.isArray(remote[k]) ? remote[k] : null;
-      let merged = ours;
-      if(theirs){
-        const base = lastSeen[k] ? JSON.parse(lastSeen[k]) : theirs;
-        merged = mergeById(base, ours, theirs);
-        if(JSON.stringify(merged) !== JSON.stringify(ours)) pulledExternal = true;
+    let full = null;
+    // ฐานของ merge: รอบแรก = ที่เห็นล่าสุด / ถ้าเขียนชน = remote ที่เพิ่ง merge ไปแล้ว (ของเราเทียบกับมัน = งานเราล้วนๆ)
+    const bases = {};
+    for(const k of DATA_KEYS) bases[k] = lastSeen[k] || null;
+    for(let attempt = 0; ; attempt++){
+      let remote = null;
+      let readFailed = false;
+      try{
+        const res = await window.storage.get('appdata', true);
+        if(res && res.value) remote = JSON.parse(res.value);
+      }catch(e){ readFailed = true; }
+      // อ่านของปัจจุบันไม่ได้ = ไม่รู้ว่ากำลังจะทับอะไร -> ไม่เขียน เก็บงานไว้ในเครื่องแล้วลองใหม่
+      if(readFailed){
+        showToast('เชื่อมต่อไม่ได้ ยังไม่ได้บันทึก — จะลองใหม่ให้เอง');
+        scheduleSaveRetry();
+        return;
       }
-      setColl(k, merged);
-      full[k] = merged;
-    }
-    // เขียน 1 ครั้ง — ล้มเหลวลองซ้ำเอง 1 ที (กัน rate limit ชั่วคราว)
-    const s = JSON.stringify(full);
-    try{
-      await window.storage.set('appdata', s, true);
-    }catch(e1){
-      await new Promise(r=>setTimeout(r, 900));
-      await window.storage.set('appdata', s, true);
+      full = {};
+      for(const k of DATA_KEYS){
+        const ours = getColl(k) || [];
+        const theirs = remote && Array.isArray(remote[k]) ? remote[k] : null;
+        let merged = ours;
+        if(theirs){
+          const base = bases[k] ? JSON.parse(bases[k]) : theirs;
+          merged = mergeById(base, ours, theirs);
+          if(JSON.stringify(merged) !== JSON.stringify(ours)) pulledExternal = true;
+          bases[k] = JSON.stringify(theirs);
+        }
+        setColl(k, merged);
+        full[k] = merged;
+      }
+      const s = JSON.stringify(full);
+      // A3: เขียนเฉพาะเมื่อไม่มีใครเขียนแทรกตั้งแต่อ่าน — ชน = วนอ่านใหม่ merge ใหม่
+      // ชนเกิน 3 รอบ (หรือไม่มี setIfUnchanged) = เขียนแบบเดิม ไม่ปล่อยงานค้างไม่ได้เซฟ
+      const careful = attempt < 3 && typeof window.storage.setIfUnchanged === 'function';
+      const write = () => careful ? window.storage.setIfUnchanged('appdata', s, true) : window.storage.set('appdata', s, true).then(()=>true);
+      let wrote;
+      try{ wrote = await write(); }
+      catch(e1){ await new Promise(r=>setTimeout(r, 900)); wrote = await write(); }   // ล้มเหลวลองซ้ำ 1 ที (rate limit ชั่วคราว)
+      if(wrote) break;
+      if(attempt === 2){
+        console.warn('save: เขียนชนติดกัน 3 รอบ — เขียนแบบไม่เช็คเวอร์ชัน');
+        showToast('⚠ บันทึกแบบเช็คเวอร์ชันไม่สำเร็จ 3 รอบ — บันทึกแบบเดิมแล้ว (ถ้าขึ้นบ่อย แจ้งผู้ดูแล)');
+      }
     }
     // อัปเดตฐานหลังเขียนสำเร็จเท่านั้น — ถ้าเขียนล้มเหลว ฐานยังเป็นค่าเก่า poll รอบหน้าจะ merge ใหม่ไม่ทับงานเรา
     for(const k of DATA_KEYS) lastSeen[k] = JSON.stringify(full[k]);
@@ -2071,8 +2386,52 @@ function isBusyEditing(){
   });
 }
 
+// A6: เปิดเว็บค้างข้ามจันทร์ 2 ทุ่ม -> รีเซ็ตสถานะให้เลย ไม่ต้องรอใครรีโหลด
+// เช็ค storage ทีเดียวต่อสัปดาห์ (weekCheckedFor) — เครื่องอื่นรีเซ็ตไปแล้วก็แค่จำไว้
+let weekCheckedFor = null;
+async function maybeWeeklyReset(){
+  const wk = currentWeekMondayStr();
+  if(weekCheckedFor === wk) return;
+  let last;
+  try{ const w = await window.storage.get('last_reset_week', true); last = w ? w.value : null; }
+  catch(e){ return; }                                   // อ่านไม่ได้ = ลองรอบหน้า
+  if(saveWaiter || saveTimer || saveInFlight) return;   // มีงานค้างเซฟ = ลองรอบหน้า
+  weekCheckedFor = wk;
+  if(last === wk) return;
+  try{ await window.storage.set('last_reset_week', wk, true); }catch(e){ weekCheckedFor = null; return; }
+  if(resetNonPendingToPending(recurring)){
+    pendingExternalRender = true;
+    showToast('ขึ้นสัปดาห์ใหม่ — รีเซ็ตสถานะที่ทำ/งด/เลื่อนแล้วให้อัตโนมัติ');
+    await persistData(false);
+  }
+}
+
+// ===== สถานะ backup อัตโนมัติ (สคริปต์ backup เขียน backup_status ทุกครั้งที่สำเร็จ) =====
+const BACKUP_STALE_HOURS = 36;
+let backupStatusAt = null, backupCheckedAt = 0;
+async function refreshBackupStatus(){
+  backupCheckedAt = Date.now();
+  try{
+    const r = await window.storage.get('backup_status', true);
+    const v = r && r.value ? JSON.parse(r.value) : null;
+    const at = v && v.at ? Date.parse(v.at) : NaN;
+    const next = isNaN(at) ? null : at;
+    if(next !== backupStatusAt){ backupStatusAt = next; renderStats(); }
+  }catch(e){}   // อ่านไม่ได้ = ไม่เตือน (ไม่อยากให้เตือนผิดตอนเน็ตหลุด)
+}
+function backupStaleChip(){
+  if(!backupStatusAt) return '';
+  const h = (Date.now() - backupStatusAt) / 3600000;
+  if(h < BACKUP_STALE_HOURS) return '';
+  const label = h < 48 ? Math.floor(h) + ' ชม.' : Math.floor(h / 24) + ' วัน';
+  return `<div class="stat-chip" style="background:rgba(224,64,58,.45);" title="สคริปต์ backup ในเครื่องที่ตั้งไว้ไม่ได้รันมา ${label} — เปิดเครื่องนั้น หรือดู backup.log">⚠ backup ล่าสุด ${label}ก่อน</div>`;
+}
+
 async function pollOnce(){
+  if(Date.now() - backupCheckedAt > 30 * 60000) refreshBackupStatus();
   // มีงานรอเซฟ (debounce) หรือกำลังเซฟ -> ข้ามรอบนี้ กัน setColl() ทับการแก้ที่ยังไม่ได้ส่ง
+  if(saveWaiter || saveTimer || saveInFlight) return;
+  await maybeWeeklyReset();
   if(saveWaiter || saveTimer || saveInFlight) return;
   let changed = false;
   // ถ้าเปิดเว็บค้างไว้แล้วข้ามเวลา 2 ทุ่ม (หรือข้ามวัน) ให้เลื่อนตัวกรองไปวันใหม่อัตโนมัติ
@@ -2092,17 +2451,29 @@ async function pollOnce(){
       if(res && res.value) remote = JSON.parse(res.value);
     }catch(e){ remote = null; }
   }
-  if(remote && typeof remote==='object' && !saveInFlight){
+  // A2: ระหว่างรอ remote ผู้ใช้อาจกดอะไรไปแล้ว -> มีงานรอเซฟ = ปล่อยให้เซฟรอบนั้น merge เอง
+  if(saveWaiter || saveTimer || saveInFlight) remote = null;
+  let localPending = false;
+  if(remote && typeof remote==='object'){
     for(const k of DATA_KEYS){
       if(!Array.isArray(remote[k])) continue;
       const val = JSON.stringify(remote[k]);
       if(val !== lastSeen[k]){
-        setColl(k, remote[k]);
+        const local = getColl(k) || [];
+        if(JSON.stringify(local) !== lastSeen[k]){
+          // ในเครื่องมีการแก้ที่ยังไม่ได้เซฟ (เช่นเซฟล้มแล้วรอ retry) -> รวม ไม่ทับ แล้วเซฟผลรวม
+          const base = lastSeen[k] ? JSON.parse(lastSeen[k]) : remote[k];
+          setColl(k, mergeById(base, local, remote[k]));
+          localPending = true;
+        } else {
+          setColl(k, remote[k]);
+        }
         lastSeen[k] = val;
         changed = true;
       }
     }
   }
+  if(localPending) persistData(false);
   if(changed) pendingExternalRender = true;
 
   // วาดใหม่เฉพาะตอนที่ปลอดภัย (ไม่ได้พิมพ์/แก้อะไรค้างอยู่)
@@ -2268,7 +2639,11 @@ document.getElementById('epAddBtn').addEventListener('click', addEpisodes);
 document.getElementById('epAddInput').addEventListener('keydown', e=>{ if(e.key==='Enter') addEpisodes(); });
 document.getElementById('epClearBtn').addEventListener('click', clearAllEpisodes);
 
-function openModal(id){ document.getElementById(id).classList.add('show'); }
+function openModal(id){
+  const m = document.getElementById(id);
+  m.classList.add('show');
+  setTimeout(()=>{ if(!m.contains(document.activeElement)){ const f = m.querySelector('input:not([type=checkbox]):not([type=hidden]), select, textarea'); if(f) f.focus(); } }, 60);
+}
 function closeModal(id){
   document.getElementById(id).classList.remove('show');
   // ถ้ามีข้อมูลจากทีมรอวาดอยู่ระหว่างเปิด modal ให้วาดทันทีที่ปิด
@@ -2290,6 +2665,7 @@ function renderStats(){
     <div class="stat-chip stat-min"><b>${newStories.length}</b> เรื่องเปิดใหม่</div>
     ${upcoming ? `<div class="stat-chip stat-min"><b>${upcoming}</b> เรื่องจะเปิดเร็วๆนี้</div>` : ''}
     <div class="stat-chip stat-min"><b>${totalSpent.toLocaleString('th-TH')}</b> บาทที่ใช้ไป</div>
+    ${backupStaleChip()}
   `;
   renderPendingAlert(episodesOverdue, storiesOverdue);
 }
@@ -2404,6 +2780,7 @@ function renderRecurring(){
       <button class="btn btn-ghost" onclick="resetDailyDone()">รีเซ็ตสถานะที่ทำ/งด/เลื่อนแล้ว</button>
     </div>
     ${dayLinksBarHtml()}
+    ${missedStripHtml()}
     ${filterToggleHtml()}
     <div class="filter-panel${filtersOpen?' open':''}">
     ${workloadPanelHtml()}
@@ -2473,15 +2850,8 @@ function renderRecurring(){
              onclick="${item.link?'':'event.preventDefault(); promptLink(\''+item.id+'\')'}">🔗</a>
           <a class="link-btn ${item.gdrive?'':'empty'}" href="${safeUrl(item.gdrive)}" target="_blank" title="ลิงก์ Google Drive"
              onclick="${item.gdrive?'':'event.preventDefault(); promptDriveLink(\''+item.id+'\')'}">📁</a>
-          <select class="status-select" style="background:${STATUS_META[dayStatus(item,rowDay)].bg};color:${STATUS_META[dayStatus(item,rowDay)].fg};"
-            onchange="updateStatus('${item.id}', this.value, '${rowDay}')">
-            ${Object.keys(STATUS_META).map(k=>`<option value="${k}" ${(dayStatus(item,rowDay)===k)?'selected':''}>${STATUS_META[k].label}</option>`).join('')}
-          </select>
-          ${item.dropped
-            ? `<button class="icon-btn" onclick="undropStory('${item.id}')" title="ยกเลิกการรอดรอป" style="color:#1a9c6b;">↩</button>`
-            : `<button class="icon-btn" onclick="openDropMenu('${item.id}')" title="ดรอปเรื่อง (จบซีซั่น / จบแล้ว / LC / งดไม่มีกำหนด)" style="color:#b9791b;">⏏</button>`}
-          <button class="icon-btn" onclick="openRecurringModal('${item.id}')" title="แก้ไข" style="color:#6b7480;">✎</button>
-          <button class="icon-btn" onclick="deleteRecurring('${item.id}')">✕</button>
+          ${statusCtlHtml(item, rowDay)}
+          <button type="button" class="icon-btn row-more" onclick="openRowMenu(this,'${item.id}')" title="แก้ไข / ดรอป / ลบ" aria-label="เมนูเรื่องนี้">⋯</button>
         `}
       </div>`;
     });
@@ -2874,6 +3244,7 @@ async function undropStory(id){
 async function updateStatus(id, value, day){
   const item = recurring.find(r=>r.id===id);
   if(!item || !STATUS_META[value]) return;
+  const undoSnap = snapItem('recurring_stories', id);
   day = day && itemDays(item).includes(day) ? day : itemDays(item)[0];
   setDayStatus(item, day, value);
   if(value === 'pending' && dayHasPassed(day)){
@@ -2882,6 +3253,7 @@ async function updateStatus(id, value, day){
     item.pendingSinceDate = null;
   }
   logActivity(`เปลี่ยนสถานะ "${item.name||item.code}"${isMultiDay(item)?' ('+day+')':''} เป็น ${STATUS_META[value].label}`);
+  offerUndo(`"${displayName(item) || item.code}" → ${STATUS_META[value].label}`, [undoSnap]);
   renderRecurring(); renderStats();
   await persistRecurring(false);
 }
@@ -2909,7 +3281,7 @@ function renderEpChips(){
   }
   if(clearWrap) clearWrap.style.display = '';
   item.pendingEpisodes = sortEpisodes(item.pendingEpisodes);   // เก็บแบบเรียงแล้ว ให้ index ตรงกับที่โชว์
-  wrap.innerHTML = item.pendingEpisodes.map((ep, i)=>`<span class="ep-chip">${esc(epLabel(ep))}<button onclick="removeEpisodeAt(${i})" title="ทำเสร็จแล้ว">✕</button></span>`).join('');
+  wrap.innerHTML = item.pendingEpisodes.map((ep, i)=>`<span class="ep-chip">${esc(epLabel(ep))}<button class="ep-done" onclick="removeEpisodeAt(${i})" title="ทำตอนนี้เสร็จแล้ว" aria-label="ทำตอนนี้เสร็จแล้ว">✓</button></span>`).join('');
 }
 function openEpisodeManager(id){
   epManagerId = id;
@@ -2925,7 +3297,10 @@ async function removeEpisodeAt(i){
   if(!item){ renderEpChips(); return; }
   const eps = sortEpisodes(item.pendingEpisodes);
   if(i < 0 || i >= eps.length) return;
+  const undoSnap = snapItem('recurring_stories', item.id);
   bumpLastEp(item, eps[i]);
+  logActivity(`ทำตอนค้าง "${displayName(item) || item.code}" ${epLabel(eps[i])} แล้ว`);
+  offerUndo(`ทำ${epLabel(eps[i])} "${displayName(item) || item.code}" แล้ว`, [undoSnap]);
   eps.splice(i, 1);
   item.pendingEpisodes = eps;
   clearPendingOwnerIfDone(item);
@@ -2944,8 +3319,10 @@ async function addEpisodes(){
   const eps = parseEpisodeInput(raw);
   if(!eps.length){ showToast('ใส่เลขตอน หรือชื่อตอน เช่น 12, 9.5, พิเศษ'); return; }
   const have = new Map((item.pendingEpisodes || []).map(e=>[epKey(e), e]));
+  const added = eps.filter(e=>!have.has(epKey(e)));
   eps.forEach(e=>{ if(!have.has(epKey(e))) have.set(epKey(e), e); });
   item.pendingEpisodes = sortEpisodes([...have.values()]);
+  if(added.length) logActivity(`ใส่ตอนค้าง "${displayName(item) || item.code}" ${added.map(epLabel).join(', ')}`);
   document.getElementById('epAddInput').value = '';
   renderEpChips();
   renderRecurring(); renderStats();
@@ -2955,6 +3332,7 @@ async function clearAllEpisodes(){
   const item = recurring.find(r=>r.id===epManagerId);
   if(!item || !(item.pendingEpisodes||[]).length) return;
   if(!await uiConfirm('ทำครบทุกตอนแล้ว เอาตอนที่ค้างออกทั้งหมด?', 'เคลียร์ทุกตอน')) return;
+  logActivity(`เคลียร์ตอนค้าง "${displayName(item) || item.code}" ทั้งหมด (${sortEpisodes(item.pendingEpisodes).map(epLabel).join(', ')})`);
   bumpLastEp(item, item.pendingEpisodes);
   item.pendingEpisodes = [];
   clearPendingOwnerIfDone(item);
@@ -2973,6 +3351,7 @@ async function promptLink(id){
   const item = recurring.find(r=>r.id===id);
   if(!item) return;
   item.link = url;
+  logActivity(`ใส่ลิงก์ต้นทาง "${displayName(item) || item.code}"`);
   renderRecurring();
   await persistRecurring();
 }
@@ -2982,6 +3361,7 @@ async function promptDriveLink(id){
   const item = recurring.find(r=>r.id===id);
   if(!item) return;
   item.gdrive = url;
+  logActivity(`ใส่ลิงก์ Drive "${displayName(item) || item.code}"`);
   renderRecurring();
   await persistRecurring();
 }
@@ -3058,11 +3438,12 @@ async function saveNewRecurring(){
       }
     }
   }
+  const wasEdit = !!editingRecurringId;
   promoteFromNewId = null;
   editingRecurringId = null;
   closeModal('modalRecurring');
-  // ย้ายมาจากแท็บอื่น -> พาไปดูที่งานประจำ (แท็บเดิมไม่ต้องสลับ จะได้ไม่ล้างคำค้น)
-  if(activeTab !== 'recurring') switchTab('recurring'); else renderRecurring();
+  // เพิ่ม/ย้ายมาจากแท็บอื่น -> พาไปดูที่งานประจำ · แก้ไขเรื่องเดิม -> อยู่แท็บเดิม (เช่น แก้จากปฏิทิน)
+  if(activeTab !== 'recurring' && !wasEdit) switchTab('recurring'); else renderTab();
   renderStats();
   await persistRecurring();
 }
@@ -3221,7 +3602,15 @@ async function toggleContrib(id, person){
   const item = newStories.find(n=>n.id===id);
   if(!item) return;
   item.contrib = item.contrib || {};
+  // B2: ติ๊กแทนคนอื่น -> ถามก่อน (กันกดผิดช่อง)
+  if(myPerson && person !== myPerson
+     && !await uiConfirm(`${item.contrib[person] ? 'เอาติ๊กของ' : 'ติ๊กแทน'} ${person} ใน "${item.code}"?`, item.contrib[person] ? 'เอาออก' : 'ติ๊กแทน')){
+    renderNewStories(); return;
+  }
+  const undoSnap = snapItem('new_stories', id);
   item.contrib[person] = !item.contrib[person];
+  offerUndo(`${item.contrib[person] ? 'ติ๊ก' : 'เอาติ๊กออก'} ${person} "${item.code}"`, [undoSnap]);
+  logActivity(`${item.contrib[person] ? 'ติ๊ก' : 'เอาติ๊กออก'} "${item.code}" ช่อง ${person}${myPerson && person !== myPerson ? ' (แทน)' : ''}`);
   // อยู่ในงานประจำแล้ว + คนสุดท้ายติ๊ก -> การ์ดลงถังขยะเอง
   if(promotedTarget(item) && !newStoryProgress(item).missing.length){
     await moveToTrash('newstories', item);
@@ -3672,7 +4061,8 @@ function renderSchedule(){
   `;
   if(!scheduleEntries.length){
     html += `<div class="empty-state">ยังไม่มีกำหนดการเปิดเรื่อง — กดปุ่ม "+ เพิ่มกำหนดการ" เพื่อวางแผนล่วงหน้า</div>`;
-    container.innerHTML = html;
+    container.innerHTML = scheduleLayoutHtml(html);
+    loadScheduleNote();
     return;
   }
 
@@ -3729,7 +4119,65 @@ function renderSchedule(){
     : (showAllOpened && openedAll.length ? `<button class="btn btn-ghost" style="font-size:12px;padding:5px 10px;" onclick="showAllOpened=false;renderSchedule()">ซ่อนที่เก่ากว่า ${SCHEDULE_OPENED_KEEP_DAYS} วัน</button>` : '');
   if(openedAll.length) html += section('✅ เปิดแล้ว', opened, toggle);
 
-  container.innerHTML = html;
+  container.innerHTML = scheduleLayoutHtml(html);
+  loadScheduleNote();
+}
+
+// ---- โน้ตทีมด้านขวา ----
+const SCHEDULE_NOTE_DEFAULT = 'ridi 0\nlezhin -1\nmr.blue 0\ntoptoon 0';
+let scheduleNote = null;          // null = ยังไม่ได้โหลด
+let scheduleNoteEditing = false;
+let scheduleNoteDraft = null;    // ข้อความที่พิมพ์ค้าง (หน้าถูกวาดใหม่ระหว่างแก้ ก็ไม่หาย)
+function scheduleLayoutHtml(mainHtml){
+  return `<div class="sched-layout"><div class="sched-main">${mainHtml}</div>${scheduleNoteHtml()}</div>`;
+}
+function scheduleNoteHtml(){
+  const text = scheduleNote === null ? SCHEDULE_NOTE_DEFAULT : scheduleNote;
+  return `<aside class="sched-note-box" id="schedNoteBox">
+    <div class="sched-note-head"><span>📝 โน้ต</span>
+      ${scheduleNoteEditing ? '' : '<button type="button" class="icon-btn" onclick="editScheduleNote()" title="แก้ไขโน้ต" aria-label="แก้ไขโน้ต">✎</button>'}
+    </div>
+    ${scheduleNoteEditing
+      ? `<textarea id="schedNoteInput" rows="8" oninput="scheduleNoteDraft=this.value">${esc(scheduleNoteDraft !== null ? scheduleNoteDraft : text)}</textarea>
+         <div class="sched-note-actions">
+           <button type="button" class="btn btn-ghost" onclick="cancelScheduleNote()">ยกเลิก</button>
+           <button type="button" class="btn btn-primary" onclick="saveScheduleNote()">บันทึก</button>
+         </div>`
+      : `<div class="sched-note-body" ondblclick="editScheduleNote()" title="ดับเบิลคลิกเพื่อแก้ไข">${text.trim() ? esc(text) : '<span style="color:var(--ink-soft)">(ว่าง — กด ✎ เพื่อเขียน)</span>'}</div>`}
+  </aside>`;
+}
+function redrawScheduleNote(){
+  const box = document.getElementById('schedNoteBox');
+  if(box) box.outerHTML = scheduleNoteHtml();
+}
+async function loadScheduleNote(){
+  if(scheduleNoteEditing) return;
+  try{
+    const r = await window.storage.get('schedule_note', true);
+    const v = r && typeof r.value === 'string' ? r.value : null;
+    if(v !== scheduleNote){ scheduleNote = v; if(!scheduleNoteEditing) redrawScheduleNote(); }
+  }catch(e){}
+}
+function editScheduleNote(){
+  scheduleNoteEditing = true;
+  redrawScheduleNote();
+  const t = document.getElementById('schedNoteInput');
+  if(t){ t.focus(); t.selectionStart = t.selectionEnd = t.value.length; }
+}
+function cancelScheduleNote(){ scheduleNoteEditing = false; scheduleNoteDraft = null; redrawScheduleNote(); loadScheduleNote(); }
+async function saveScheduleNote(){
+  const t = document.getElementById('schedNoteInput');
+  if(!t) return;
+  const text = t.value.replace(/\s+$/, '');
+  try{
+    await window.storage.set('schedule_note', text, true);
+  }catch(e){ showToast('บันทึกโน้ตไม่สำเร็จ — ลองใหม่'); return; }
+  scheduleNote = text;
+  scheduleNoteEditing = false;
+  scheduleNoteDraft = null;
+  logActivity('แก้โน้ตกำหนดการ');
+  redrawScheduleNote();
+  showToast('บันทึกโน้ตแล้ว');
 }
 
 async function markScheduleOpened(id){
@@ -3833,7 +4281,23 @@ function render(){
 const CAL_DAYS = ['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์','ไม่ระบุวัน','จบแล้ว'];
 const CAL_DAY_LABEL = { 'จันทร์':'วันจันทร์','อังคาร':'วันอังคาร','พุธ':'วันพุธ','พฤหัสบดี':'วันพฤหัสบดี','ศุกร์':'วันศุกร์','เสาร์':'วันเสาร์','อาทิตย์':'วันอาทิตย์','ไม่ระบุวัน':'ไม่ระบุวัน','จบแล้ว':'จบแล้ว' };
 
+// คลิกเลือกเรื่องในปฏิทิน แล้วคลิกช่องปลายทาง (แทนการลากด้วยเมาส์)
+let calSel = null, calJustDragged = false;
+function calClearSel(){
+  calSel = null;
+  document.querySelectorAll('.cal-chip-selected').forEach(c=>c.classList.remove('cal-chip-selected'));
+  const g = document.getElementById('calCapture'); if(g) g.classList.remove('cal-selecting');
+}
+function calSelectChip(chip){
+  const same = calSel && calSel.id === chip.dataset.id && calSel.from === chip.dataset.from;
+  calClearSel();
+  if(same) return;
+  calSel = { id: chip.dataset.id, from: chip.dataset.from };
+  chip.classList.add('cal-chip-selected');
+  const g = document.getElementById('calCapture'); if(g) g.classList.add('cal-selecting');
+}
 function renderCalendar(){
+  calSel = null;
   const container = document.getElementById('mainContent');
   const active = recurring.filter(r=>!isEffectivelyDropped(r));
 
@@ -3851,7 +4315,7 @@ function renderCalendar(){
             const by = pendingEpsByPerson(r);
             const owner = hasForeignBacklog(r) ? ' · ' + esc(Object.keys(by).filter(p=>p!==r.person).map(p=>p+' '+by[p]).join(', ')) : '';
             const badge = eps ? ` <span class="cal-chip-eps">(ค้าง ${eps}${owner})</span>` : '';
-            return `<span class="cal-chip" data-id="${r.id}" data-from="${esc(d)}" title="ลากเพื่อย้ายวัน/ย้ายคน${isMultiDay(r)?' (ย้ายเฉพาะวันนี้)':''}">${esc((r.code?r.code+'-':'') + displayName(r))}${badge}</span>`;
+            return `<span class="cal-chip" data-id="${r.id}" data-from="${esc(d)}" title="ลากหรือคลิกเพื่อย้ายวัน/ย้ายคน${isMultiDay(r)?' (ย้ายเฉพาะวันนี้)':''} · ดับเบิลคลิกเพื่อแก้ไข">${esc((r.code?r.code+'-':'') + displayName(r))}${badge}</span>`;
           }).join('');
           return `<tr>
             <td class="cal-day">${CAL_DAY_LABEL[d]}</td>
@@ -3864,7 +4328,7 @@ function renderCalendar(){
   html += `</div>`;
 
   container.innerHTML = `<div class="toolbar" style="justify-content:space-between;">
-      <span style="font-size:13px;color:var(--ink-soft);">ลากเรื่องไปวางช่องอื่นเพื่อย้ายวัน/ย้ายคน · มือถือแตะค้างแล้วลาก (ไม่รวมเรื่องที่ดรอป)</span>
+      <span style="font-size:13px;color:var(--ink-soft);">ลากเรื่องไปวางช่องอื่น หรือคลิกเรื่องแล้วคลิกช่องที่จะย้ายไป (Esc ยกเลิก) · ดับเบิลคลิกเพื่อแก้ไข · มือถือแตะค้างแล้วลาก (ไม่รวมเรื่องที่ดรอป)</span>
       <button class="btn btn-primary" onclick="exportCalendarImage()">📷 บันทึกเป็นรูป</button>
     </div>
     <div id="calCapture">${html}</div>`;
@@ -3894,6 +4358,7 @@ async function moveCalendarItem(id, person, day, fromDay){
     collapse = true;
   }
   const from = `${item.person||'ไม่ระบุ'} / ${collapse ? days.join(', ') : (fromDay||'ไม่ระบุวัน')}`;
+  const undoSnap = snapItem('recurring_stories', id);
   // ย้ายคนทั้งที่มีตอนค้าง -> ถามว่าหนี้เก่าให้ใครเคลียร์ (ปิดกล่อง = ยกเลิกการย้าย)
   if(person !== item.person && !(await resolveBacklogOnReassign(item, person))){ renderCalendar(); return; }
   item.person = person;
@@ -3910,6 +4375,7 @@ async function moveCalendarItem(id, person, day, fromDay){
   const name = item.name || item.code;
   const note = hasForeignBacklog(item) ? ` (${foreignBacklogLabel(item)} เคลียร์ต่อ)` : '';
   logActivity(`ย้าย "${name}" ${from} → ${person} / ${day}${note}`);
+  offerUndo(`ย้าย "${name}" → ${person} · ${CAL_DAY_LABEL[day] || day}`, [undoSnap]);
   renderCalendar(); renderStats();
   showToast(`ย้าย "${name}" → ${person} · ${CAL_DAY_LABEL[day] || day}`);
   await persistRecurring(false);
@@ -3963,6 +4429,7 @@ function bindCalendarDrag(root){
     root.querySelectorAll('.cal-chip-dragging').forEach(c=>c.classList.remove('cal-chip-dragging'));
     clearHover();
     drag = null;
+    if(started) calJustDragged = true;
     if(!started || cancelled) return;
     const cell = cellAt(x, y);
     if(cell) moveCalendarItem(id, cell.dataset.person, cell.dataset.day, from);
@@ -3973,8 +4440,7 @@ function bindCalendarDrag(root){
     if(!chip || e.button !== 0) return;
     drag = { id: chip.dataset.id, from: chip.dataset.from, chip, startX: e.clientX, startY: e.clientY, started: false, pointerId: e.pointerId };
     if(e.pointerType === 'mouse'){
-      start(chip, e.clientX, e.clientY);
-      e.preventDefault();
+      e.preventDefault();   // เริ่มลากเมื่อขยับเกิน 5px — คลิกเฉยๆ = เลือกเรื่อง (ดู click ด้านล่าง)
     } else {
       // ทัช: รอกดค้าง — ถ้าเลื่อนนิ้วก่อนครบเวลา = ผู้ใช้ตั้งใจ scroll ไม่ใช่ลาก
       drag.holdTimer = setTimeout(()=>{ if(drag && !drag.started){ start(chip, drag.startX, drag.startY); if(navigator.vibrate) navigator.vibrate(20); } }, HOLD_MS);
@@ -3983,14 +4449,29 @@ function bindCalendarDrag(root){
   root.addEventListener('pointermove', e=>{
     if(!drag) return;
     if(!drag.started){
-      if(Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) > 10){ clearTimeout(drag.holdTimer); drag = null; }
-      return;
+      const dist = Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY);
+      if(e.pointerType === 'mouse'){ if(dist <= 5) return; calClearSel(); start(drag.chip, e.clientX, e.clientY); }
+      else { if(dist > 10){ clearTimeout(drag.holdTimer); drag = null; } return; }
     }
     e.preventDefault();
     place(e.clientX, e.clientY);
   }, { passive:false });
   root.addEventListener('pointerup', e=>end(e.clientX, e.clientY, false));
   root.addEventListener('pointercancel', e=>end(e.clientX, e.clientY, true));
+  root.addEventListener('click', e=>{
+    if(calJustDragged){ calJustDragged = false; return; }
+    const chip = e.target.closest('.cal-chip');
+    if(chip){ calSelectChip(chip); return; }
+    const cell = e.target.closest('.cal-items[data-person]');
+    if(cell && calSel){ const s = calSel; calClearSel(); moveCalendarItem(s.id, cell.dataset.person, cell.dataset.day, s.from); }
+  });
+  // ดับเบิลคลิกเรื่อง = เปิดหน้าต่างแก้ไข (2 คลิกแรกเลือก/ยกเลิกเลือกไปแล้ว — ล้างให้ก่อน)
+  root.addEventListener('dblclick', e=>{
+    const chip = e.target.closest('.cal-chip');
+    if(!chip) return;
+    calClearSel();
+    openRecurringModal(chip.dataset.id);
+  });
   // ถ้ากำลังลากอยู่ ห้ามหน้าเลื่อนตาม (มือถือ)
   root.addEventListener('touchmove', e=>{ if(drag && drag.started) e.preventDefault(); }, { passive:false });
 }

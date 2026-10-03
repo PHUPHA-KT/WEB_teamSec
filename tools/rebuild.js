@@ -1371,7 +1371,7 @@ step('A1 snapshot ก่อนรีเซ็ต/migration ตอนโหลด
 `  const thisWeekMonday = currentWeekMondayStr();
   weekCheckedFor = thisWeekMonday;
   let weekReset = false;`, 'mark week checked');
-}, { staging: true });
+});
 
 // ================= 40) A2 + A6: poll ไม่ทับงานในเครื่อง + รีเซ็ตรายสัปดาห์โดยไม่ต้องรีโหลด =================
 step('A2 poll รวมกับงานในเครื่อง + A6 รีเซ็ตสัปดาห์ระหว่างเปิดค้าง', 'async function maybeWeeklyReset(', () => {
@@ -1438,7 +1438,7 @@ async function pollOnce(){
     }
   }
   if(localPending) persistData(false);`, 'pollOnce merge');
-}, { staging: true });
+});
 
 // ================= 41) A5: เตือนทีมเมื่อ backup อัตโนมัติไม่ได้รันนานเกิน 36 ชม. =================
 // สคริปต์ backup เขียน key backup_status = {at, counts} ทุกครั้งที่สำเร็จ
@@ -1475,7 +1475,7 @@ async function pollOnce(){
 `  render();
   refreshBackupStatus();
   startRealtimeSync();`, 'load');
-}, { staging: true });
+});
 
 // ================= 42) B1: แถบ "ผ่านวันแล้วยังไม่ได้ทำ" บนงานประจำ =================
 step('B1 แถบผ่านวันแล้วยังไม่ทำ', 'function missedStripHtml(', () => {
@@ -1498,7 +1498,7 @@ step('B1 แถบผ่านวันแล้วยังไม่ทำ', 'f
   body.dark .missed-strip{ background:#3a2d14; border-color:#5a4720; }
   body.dark .missed-head{ color:#e3b463; }
 </style>`, 'css');
-}, { staging: true });
+});
 
 // ================= 43) B2: ประวัติครบขึ้น + ถามก่อนติ๊กแทนคนอื่น =================
 step('B2 ลงประวัติตอนค้าง/ติ๊ก/ลิงก์ + ถามก่อนติ๊กแทน', '// B2: ติ๊กแทนคนอื่น', () => {
@@ -1542,7 +1542,7 @@ step('B2 ลงประวัติตอนค้าง/ติ๊ก/ลิง
   }
   item.contrib[person] = !item.contrib[person];
   logActivity(\`\${item.contrib[person] ? 'ติ๊ก' : 'เอาติ๊กออก'} "\${item.code}" ช่อง \${person}\${myPerson && person !== myPerson ? ' (แทน)' : ''}\`);`, 'toggleContrib');
-}, { staging: true });
+});
 
 // ================= 44) UI งานประจำ: ✓ คลิกเดียว + ⋯ + เลิกทำ + คีย์บอร์ด + ปฏิทินคลิกย้าย =================
 step('UI: สถานะคลิกเดียว / เมนู ⋯ / เลิกทำ / Esc-Enter / ปฏิทินคลิกย้าย', 'function statusCtlHtml(', () => {
@@ -1686,7 +1686,7 @@ function renderCalendar(){
   .cal-selecting .cal-items[data-person]{ cursor:copy; }
   .cal-selecting .cal-items[data-person]:hover{ background:var(--blue-bg); }
 </style>`, 'css');
-}, { staging: true });
+});
 
 // ================= 45) ตอนค้างในแถว: กด ✕ ข้างเลขตอน = ทำตอนนั้นเสร็จ (ไม่ต้องเปิดหน้าต่าง) =================
 step('ตอนค้างในแถวกด ✕ ได้เลย', 'async function finishEpInline(', () => {
@@ -1729,7 +1729,7 @@ async function finishEpInline(id, i){
   body.dark .ep-inline{ background:#3a1f1d; border-color:#6b2d27; color:#f08a80; }
   body.dark .ep-inline button{ color:#f08a80; }
 </style>`, 'css');
-}, { staging: true });
+});
 
 // ================= 46) ปฏิทิน: ดับเบิลคลิกเรื่อง = แก้ไข =================
 step('ปฏิทินดับเบิลคลิกแก้ไข', "root.addEventListener('dblclick'", () => {
@@ -1758,7 +1758,7 @@ step('ปฏิทินดับเบิลคลิกแก้ไข', "root
   closeModal('modalRecurring');
   // เพิ่ม/ย้ายมาจากแท็บอื่น -> พาไปดูที่งานประจำ · แก้ไขเรื่องเดิม -> อยู่แท็บเดิม (เช่น แก้จากปฏิทิน)
   if(activeTab !== 'recurring' && !wasEdit) switchTab('recurring'); else renderTab();`, 'stay on tab after edit');
-}, { staging: true });
+});
 
 // ================= 47) A3: เซฟแบบเช็คเวอร์ชัน — มีคนเขียนแทรกระหว่างอ่าน-เขียน = อ่านใหม่ merge ใหม่ =================
 // เดิม: อ่าน -> merge -> upsert ทับ ถ้า 2 เครื่องอ่านเวอร์ชันเดียวกันแล้วเขียนห่างกันไม่ถึงวิ ของคนแรกหาย
@@ -1798,7 +1798,11 @@ step('A3 เซฟแบบเช็คเวอร์ชัน (updated_at)', '
   };
 
   // ---------- realtime ----------`, 'shim setIfUnchanged');
+});
 
+// แยกขั้น: shim มาจาก index.html ปัจจุบัน (ขั้น 1) ซึ่งมี setIfUnchanged อยู่แล้วหลังรวมเว็บ
+// ถ้าอยู่ขั้นเดียวกัน marker ของ shim จะทำให้ข้ามส่วน persistDataNow ไปด้วย
+step('A3 เซฟวนอ่านใหม่เมื่อชน (persistDataNow)', 'const careful = attempt < 3', () => {
   rep(`    let remote = null;
     let readFailed = false;
     try{
@@ -1879,7 +1883,7 @@ step('A3 เซฟแบบเช็คเวอร์ชัน (updated_at)', '
         showToast('⚠ บันทึกแบบเช็คเวอร์ชันไม่สำเร็จ 3 รอบ — บันทึกแบบเดิมแล้ว (ถ้าขึ้นบ่อย แจ้งผู้ดูแล)');
       }
     }`, 'persistDataNow CAS loop');
-}, { staging: true });
+});
 
 // ================= 48) กำหนดการ: โน้ตทีมด้านขวา (แก้ได้ ใช้ร่วมกันทั้งทีม) =================
 // เก็บเป็น key แยก schedule_note (ข้อความล้วน) — เขียนทับทั้งก้อน คนแก้ล่าสุดชนะ
@@ -1969,7 +1973,7 @@ async function saveScheduleNote(){
   body.dark .sched-note-head{ color:#e3cc6b; }
   @media(max-width:900px){ .sched-layout{ grid-template-columns:1fr; } .sched-note-box{ position:static; order:-1; } }
 </style>`, 'css');
-}, { staging: true });
+});
 
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก

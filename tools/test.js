@@ -96,20 +96,18 @@ function suite(file, staging){
   // ---- โครงสร้างที่ต้องไม่ถอยกลับ (เช็คจากโค้ด) ----
   const loadAll = extract(html, 'loadAll') || '';
   const pollOnce = extract(html, 'pollOnce') || '';
-  if(staging){
-    ok(loadAll.indexOf('snapshotAll()') > -1 && loadAll.indexOf('snapshotAll()') < loadAll.indexOf('resetNonPendingToPending('),
-       'A1: loadAll ต้อง snapshot ก่อนรีเซ็ต (ไม่งั้นรีเซ็ตถูกย้อน)');
-    ok(pollOnce.includes('maybeWeeklyReset()'), 'A6: pollOnce ต้องเช็ครีเซ็ตรายสัปดาห์');
-    const afterAwait = pollOnce.slice(pollOnce.indexOf("storage.get('appdata'"));
-    ok(/saveWaiter \|\| saveTimer \|\| saveInFlight/.test(afterAwait), 'A2: pollOnce ต้องเช็คงานรอเซฟอีกรอบหลังรอ remote');
-    ok(afterAwait.includes('mergeById('), 'A2: pollOnce ต้อง merge กับงานในเครื่อง');
-    ok(html.includes("const STAGING_KEY_PREFIX = 'stg_'"), 'เว็บทดลองต้องใช้ key stg_');
-    const save = extract(html, 'persistDataNow') || '';
-    ok(html.includes(".eq('updated_at', hit.updated_at)"), 'A3: shim ต้องเขียนแบบเช็ค updated_at');
-    ok(save.includes('setIfUnchanged(') && /attempt < 3/.test(save), 'A3: เซฟต้องเช็คเวอร์ชันและวนอ่านใหม่เมื่อชน (มีทางออกหลัง 3 รอบ)');
-  } else {
-    ok(!html.includes('STAGING_KEY_PREFIX'), 'เว็บหลักต้องไม่มี key stg_');
-  }
+  // ตัวแก้ที่รวมเข้าเว็บหลักแล้ว — ต้องมีทั้ง 2 เว็บ
+  ok(loadAll.indexOf('snapshotAll()') > -1 && loadAll.indexOf('snapshotAll()') < loadAll.indexOf('resetNonPendingToPending('),
+     'A1: loadAll ต้อง snapshot ก่อนรีเซ็ต (ไม่งั้นรีเซ็ตถูกย้อน)');
+  ok(pollOnce.includes('maybeWeeklyReset()'), 'A6: pollOnce ต้องเช็ครีเซ็ตรายสัปดาห์');
+  const afterAwait = pollOnce.slice(pollOnce.indexOf("storage.get('appdata'"));
+  ok(/saveWaiter \|\| saveTimer \|\| saveInFlight/.test(afterAwait), 'A2: pollOnce ต้องเช็คงานรอเซฟอีกรอบหลังรอ remote');
+  ok(afterAwait.includes('mergeById('), 'A2: pollOnce ต้อง merge กับงานในเครื่อง');
+  const save = extract(html, 'persistDataNow') || '';
+  ok(html.includes(".eq('updated_at', hit.updated_at)"), 'A3: shim ต้องเขียนแบบเช็ค updated_at');
+  ok(save.includes('setIfUnchanged(') && /attempt < 3/.test(save), 'A3: เซฟต้องเช็คเวอร์ชันและวนอ่านใหม่เมื่อชน (มีทางออกหลัง 3 รอบ)');
+  if(staging) ok(html.includes("const STAGING_KEY_PREFIX = 'stg_'"), 'เว็บทดลองต้องใช้ key stg_');
+  else ok(!html.includes('STAGING_KEY_PREFIX'), 'เว็บหลักต้องไม่มี key stg_');
 }
 
 // ---- rebuild ตรงกับไฟล์ที่ commit ----
