@@ -2,8 +2,12 @@
 // ประกอบ index.html ใหม่จากไฟล์ export ของแอป (ที่ยังใช้ window.storage ของ host เดิม)
 // โดยใส่ชั้น Supabase + patch ทั้งหมดของ repo นี้กลับเข้าไป
 //
-//   node tools/rebuild.js <ไฟล์ export ใหม่.html>
+//   node tools/rebuild.js <ไฟล์ export ใหม่.html>            -> index.html (เว็บหลัก)
+//   node tools/rebuild.js <ไฟล์ export ใหม่.html> --staging  -> staging/index.html (เว็บทดลอง)
+//   เพิ่ม --check = ไม่เขียนไฟล์ แค่เทียบกับไฟล์ที่มีอยู่ (ไม่ตรง = exit 1)
 //
+// - ขั้นที่ส่ง { staging: true } เข้าเฉพาะเว็บทดลอง — ผ่านแล้วค่อยลบ flag ออกเพื่อเข้าเว็บหลัก
+// - เว็บทดลองเก็บข้อมูลแยกด้วย key ขึ้นต้น stg_ (แตะข้อมูลเว็บหลักไม่ได้)
 // - ชั้น Supabase (shim) ดึงจาก index.html ปัจจุบัน — index.html คือความจริงเสมอ
 // - ทุก patch มี "marker" ถ้าไฟล์ใหม่มีอยู่แล้ว (เช่นคุณย้าย fix ไปใส่ฝั่ง host เอง) จะข้ามให้
 // - ถ้า anchor ไม่เจอ = โครงสร้างไฟล์เปลี่ยน สคริปต์จะหยุดพร้อมบอกว่าขั้นไหน ไม่เขียนทับครึ่งๆ กลางๆ
@@ -13,9 +17,13 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const CUR = path.join(ROOT, 'index.html');
-const NEW = process.argv[2];
+const ARGS = process.argv.slice(2);
+const STAGING = ARGS.includes('--staging');
+const CHECK = ARGS.includes('--check');
+const NEW = ARGS.find(a => !a.startsWith('--'));
+const OUT = STAGING ? path.join(ROOT, 'staging', 'index.html') : CUR;
 if (!NEW || !fs.existsSync(NEW)) {
-  console.error('ใช้: node tools/rebuild.js <ไฟล์ export ใหม่.html>');
+  console.error('ใช้: node tools/rebuild.js <ไฟล์ export ใหม่.html> [--staging] [--check]');
   process.exit(1);
 }
 
@@ -29,8 +37,9 @@ function rep(a, b, label, all) {
   if (all) { while (s.includes(a)) s = s.replace(a, b); } else s = s.replace(a, b);
 }
 // ทำทั้งกลุ่ม หรือข้ามทั้งกลุ่มถ้าไฟล์มี marker อยู่แล้ว
-function step(label, marker, fn) {
+function step(label, marker, fn, opts) {
   group = label;
+  if (opts && opts.staging && !STAGING) { skipped.push(label + ' (เฉพาะเว็บทดลอง)'); return; }
   if (marker && s.includes(marker)) { skipped.push(label); return; }
   fn();
   done.push(label);
@@ -1338,14 +1347,138 @@ step('mergeById ใช้ trashId เมื่อไม่มี id (ถัง�
   (theirsArr||[]).forEach(x=>{ const k = mergeKey(x); if(!seen.has(k)){orderIds.push(k);seen.add(k);} });`, 'order');
 });
 
+// ================= 39) A1: รีเซ็ตรายสัปดาห์/migration ตอนโหลดต้องถูกนับเป็น "การแก้ของเรา" =================
+// เดิม snapshotAll() อยู่หลังรีเซ็ต -> lastSeen = ค่าหลังรีเซ็ต -> merge ตอนเซฟเห็นว่า "เราไม่ได้แก้"
+// แล้วเอาค่าเก่าจาก remote กลับมา (รีเซ็ตถูกย้อน + last_reset_week ถูกตั้งแล้วเลยไม่ลองอีก)
+step('A1 snapshot ก่อนรีเซ็ต/migration ตอนโหลด', '// lastSeen = ค่าจาก remote ก่อนแปลงใดๆ', () => {
+  rep(`  if(!scheduleEntries){ scheduleEntries = SEED_SCHEDULE; needSave = true; }
+`,
+`  if(!scheduleEntries){ scheduleEntries = SEED_SCHEDULE; needSave = true; }
+  // lastSeen = ค่าจาก remote ก่อนแปลงใดๆ — migration/รีเซ็ตด้านล่างจะได้นับเป็นการแก้ของเรา
+  // (ถ้า snapshot หลังแก้ merge ตอนเซฟจะเห็นว่าเราไม่ได้แก้ แล้วเอาค่าเก่าจาก remote กลับมาทับ)
+  snapshotAll();
+`, 'snapshot early');
+  rep(`  applyTodayFilter();
+
+  snapshotAll();
+  // บันทึกครั้งเดียว`,
+`  applyTodayFilter();
+
+  // บันทึกครั้งเดียว`, 'remove late snapshot');
+  // รู้ว่าสัปดาห์นี้เช็ครีเซ็ตแล้ว (ใช้ร่วมกับ A6)
+  rep(`  const thisWeekMonday = currentWeekMondayStr();
+  let weekReset = false;`,
+`  const thisWeekMonday = currentWeekMondayStr();
+  weekCheckedFor = thisWeekMonday;
+  let weekReset = false;`, 'mark week checked');
+}, { staging: true });
+
+// ================= 40) A2 + A6: poll ไม่ทับงานในเครื่อง + รีเซ็ตรายสัปดาห์โดยไม่ต้องรีโหลด =================
+step('A2 poll รวมกับงานในเครื่อง + A6 รีเซ็ตสัปดาห์ระหว่างเปิดค้าง', 'async function maybeWeeklyReset(', () => {
+  rep(`async function pollOnce(){
+  // มีงานรอเซฟ (debounce) หรือกำลังเซฟ -> ข้ามรอบนี้ กัน setColl() ทับการแก้ที่ยังไม่ได้ส่ง
+  if(saveWaiter || saveTimer || saveInFlight) return;`,
+`// A6: เปิดเว็บค้างข้ามจันทร์ 2 ทุ่ม -> รีเซ็ตสถานะให้เลย ไม่ต้องรอใครรีโหลด
+// เช็ค storage ทีเดียวต่อสัปดาห์ (weekCheckedFor) — เครื่องอื่นรีเซ็ตไปแล้วก็แค่จำไว้
+let weekCheckedFor = null;
+async function maybeWeeklyReset(){
+  const wk = currentWeekMondayStr();
+  if(weekCheckedFor === wk) return;
+  let last;
+  try{ const w = await window.storage.get('last_reset_week', true); last = w ? w.value : null; }
+  catch(e){ return; }                                   // อ่านไม่ได้ = ลองรอบหน้า
+  if(saveWaiter || saveTimer || saveInFlight) return;   // มีงานค้างเซฟ = ลองรอบหน้า
+  weekCheckedFor = wk;
+  if(last === wk) return;
+  try{ await window.storage.set('last_reset_week', wk, true); }catch(e){ weekCheckedFor = null; return; }
+  if(resetNonPendingToPending(recurring)){
+    pendingExternalRender = true;
+    showToast('ขึ้นสัปดาห์ใหม่ — รีเซ็ตสถานะที่ทำ/งด/เลื่อนแล้วให้อัตโนมัติ');
+    await persistData(false);
+  }
+}
+
+async function pollOnce(){
+  // มีงานรอเซฟ (debounce) หรือกำลังเซฟ -> ข้ามรอบนี้ กัน setColl() ทับการแก้ที่ยังไม่ได้ส่ง
+  if(saveWaiter || saveTimer || saveInFlight) return;
+  await maybeWeeklyReset();
+  if(saveWaiter || saveTimer || saveInFlight) return;`, 'pollOnce head');
+
+  rep(`  if(remote && typeof remote==='object' && !saveInFlight){
+    for(const k of DATA_KEYS){
+      if(!Array.isArray(remote[k])) continue;
+      const val = JSON.stringify(remote[k]);
+      if(val !== lastSeen[k]){
+        setColl(k, remote[k]);
+        lastSeen[k] = val;
+        changed = true;
+      }
+    }
+  }`,
+`  // A2: ระหว่างรอ remote ผู้ใช้อาจกดอะไรไปแล้ว -> มีงานรอเซฟ = ปล่อยให้เซฟรอบนั้น merge เอง
+  if(saveWaiter || saveTimer || saveInFlight) remote = null;
+  let localPending = false;
+  if(remote && typeof remote==='object'){
+    for(const k of DATA_KEYS){
+      if(!Array.isArray(remote[k])) continue;
+      const val = JSON.stringify(remote[k]);
+      if(val !== lastSeen[k]){
+        const local = getColl(k) || [];
+        if(JSON.stringify(local) !== lastSeen[k]){
+          // ในเครื่องมีการแก้ที่ยังไม่ได้เซฟ (เช่นเซฟล้มแล้วรอ retry) -> รวม ไม่ทับ แล้วเซฟผลรวม
+          const base = lastSeen[k] ? JSON.parse(lastSeen[k]) : remote[k];
+          setColl(k, mergeById(base, local, remote[k]));
+          localPending = true;
+        } else {
+          setColl(k, remote[k]);
+        }
+        lastSeen[k] = val;
+        changed = true;
+      }
+    }
+  }
+  if(localPending) persistData(false);`, 'pollOnce merge');
+}, { staging: true });
+
+// ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
+// ขั้นนี้ไม่มีวันเข้าเว็บหลัก
+step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {
+  rep(`\nloadAll();\n`,
+`
+// ===== เว็บทดลอง: ทุก key เก็บแยกเป็น stg_<key> — แตะข้อมูลเว็บหลักไม่ได้ =====
+const STAGING_KEY_PREFIX = 'stg_';
+(function(){
+  const st = window.storage;
+  const get = st.get.bind(st), set = st.set.bind(st), sub = st.subscribe && st.subscribe.bind(st);
+  st.get = (key, shared) => get(STAGING_KEY_PREFIX + key, shared);
+  st.set = (key, value, shared) => set(STAGING_KEY_PREFIX + key, value, shared);
+  if(sub) st.subscribe = (key, shared, cb) => sub(STAGING_KEY_PREFIX + key, shared, cb);
+  const bar = document.createElement('div');
+  bar.className = 'staging-bar';
+  bar.textContent = '🧪 เว็บทดลอง — ข้อมูลแยกจากเว็บหลัก แก้อะไรที่นี่ไม่กระทบงานจริง';
+  document.body.prepend(bar);
+  document.title = '🧪 ' + document.title;
+})();
+loadAll();
+`, 'prefix wrapper');
+  rep('</style>', `  .staging-bar{ position:sticky; top:0; z-index:9000; background:#6a3fb3; color:#fff; text-align:center; font-size:12.5px; font-weight:700; padding:6px 12px; }
+</style>`, 'css');
+}, { staging: true });
+
 // ================= ตรวจก่อนเขียน =================
 group = 'ตรวจท้าย';
 if (s.includes('drive.google.com/drive/folders/')) throw new Error('ยังมีลิงก์ Drive จริงในไฟล์ — SEED ไม่ถูกตัด?');
 if (s.includes('href="${esc(')) throw new Error('ยังมี href ที่ไม่ผ่าน safeUrl');
 
-fs.writeFileSync(CUR, s);
+if (CHECK) {
+  const prev = fs.existsSync(OUT) ? fs.readFileSync(OUT, 'utf8').replace(/\r\n/g, '\n') : null;
+  if (prev === s) { console.log('ตรงกับ ' + path.relative(ROOT, OUT) + ' ✓'); process.exit(0); }
+  console.error('ไม่ตรงกับ ' + path.relative(ROOT, OUT) + ' — ต้องรัน rebuild ใหม่'); process.exit(1);
+}
+fs.mkdirSync(path.dirname(OUT), { recursive: true });
+fs.writeFileSync(OUT, s);
 console.log('ทำ ' + done.length + ' ขั้น:');
 done.forEach((d, i) => console.log('  ' + String(i + 1).padStart(2) + '. ' + d));
 if (skipped.length) { console.log('ข้าม ' + skipped.length + ' ขั้น (ไฟล์ใหม่มีอยู่แล้ว):'); skipped.forEach(d => console.log('  - ' + d)); }
-console.log('\nเขียน index.html แล้ว (' + s.split('\n').length + ' บรรทัด)');
+console.log('\nเขียน ' + path.relative(ROOT, OUT) + ' แล้ว (' + s.split('\n').length + ' บรรทัด)');
 console.log('ต่อไป: node tools/preview.js  แล้วเปิด http://localhost:8010 ดูก่อน push');
