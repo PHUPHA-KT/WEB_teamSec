@@ -463,9 +463,8 @@
   .ep-inline button:hover{ background:#c0392b; color:#fff; }
   body.dark .ep-inline{ background:#3a1f1d; border-color:#6b2d27; color:#f08a80; }
   body.dark .ep-inline button{ color:#f08a80; }
-  /* โน้ตด้านขวาของกำหนดการ */
-  .sched-layout{ display:grid; grid-template-columns:minmax(0,1fr) 240px; gap:16px; align-items:start; }
-  .sched-note-box{ position:sticky; top:12px; background:#fffbea; border:1px solid #f0e2a8; border-radius:12px; padding:10px 12px 12px; }
+  /* โน้ตทีมในหน้าต่างเพิ่มกำหนดการ */
+  .sched-note-box{ background:#fffbea; border:1px solid #f0e2a8; border-radius:12px; padding:8px 12px 10px; margin:0 0 14px; }
   .sched-note-head{ display:flex; justify-content:space-between; align-items:center; font-weight:800; font-size:13.5px; margin-bottom:6px; color:#7a6200; }
   .sched-note-body{ white-space:pre-wrap; font-size:14px; line-height:1.6; font-family:inherit; min-height:40px; cursor:text; color:var(--ink); }
   .sched-note-box textarea{ width:100%; box-sizing:border-box; font:inherit; font-size:14px; line-height:1.6; padding:8px; border:1px solid var(--line); border-radius:8px; resize:vertical; background:var(--card); color:var(--ink); }
@@ -473,7 +472,6 @@
   .sched-note-actions .btn{ padding:6px 12px; font-size:12.5px; }
   body.dark .sched-note-box{ background:#2e2a17; border-color:#5a4f22; }
   body.dark .sched-note-head{ color:#e3cc6b; }
-  @media(max-width:900px){ .sched-layout{ grid-template-columns:1fr; } .sched-note-box{ position:static; order:-1; } }
   .staging-bar{ position:sticky; top:0; z-index:9000; background:#6a3fb3; color:#fff; text-align:center; font-size:12.5px; font-weight:700; padding:6px 12px; }
 </style>
 </head>
@@ -742,6 +740,7 @@
 <div class="modal-backdrop" id="modalSchedule">
   <div class="modal">
     <h3 id="scheduleModalTitle">เพิ่มกำหนดการเปิดเรื่อง</h3>
+    <div id="schedNoteSlot"></div>
     <div class="field"><label>วันตอนแรกออก (ไม่บังคับ — เรื่องที่ตอนแรกมาก่อน)</label><div class="date-row"><input id="sFirstDate" type="date"><button type="button" class="btn btn-ghost date-today" onclick="setDateToday('sFirstDate')">วันนี้</button></div></div>
     <div class="field"><label>วันที่จะเปิด (ตอนที่เหลือ / ทั้งเรื่อง)</label><div class="date-row"><input id="sDate" type="date"><button type="button" class="btn btn-ghost date-today" onclick="setDateToday('sDate')">วันนี้</button></div></div>
     <div class="field"><label>รหัส/ชื่อเรื่อง</label><input id="sTitle" type="text" placeholder="เช่น 18-28 หรือ ชื่อเรื่อง"></div>
@@ -1692,6 +1691,60 @@ document.addEventListener('keydown', e=>{
     }
   }
 });
+
+// ---- โน้ตทีม (ในหน้าต่างเพิ่มกำหนดการ) ----
+const SCHEDULE_NOTE_DEFAULT = 'ridi 0\nlezhin -1\nmr.blue 0\ntoptoon 0';
+let scheduleNote = null;          // null = ยังไม่ได้โหลด
+let scheduleNoteEditing = false;
+let scheduleNoteDraft = null;    // ข้อความที่พิมพ์ค้าง (วาดใหม่ระหว่างแก้ ก็ไม่หาย)
+function scheduleNoteHtml(){
+  const text = scheduleNote === null ? SCHEDULE_NOTE_DEFAULT : scheduleNote;
+  return `<aside class="sched-note-box" id="schedNoteBox">
+    <div class="sched-note-head"><span>📝 โน้ต</span>
+      ${scheduleNoteEditing ? '' : '<button type="button" class="icon-btn" onclick="editScheduleNote()" title="แก้ไขโน้ต" aria-label="แก้ไขโน้ต">✎</button>'}
+    </div>
+    ${scheduleNoteEditing
+      ? `<textarea id="schedNoteInput" rows="8" oninput="scheduleNoteDraft=this.value">${esc(scheduleNoteDraft !== null ? scheduleNoteDraft : text)}</textarea>
+         <div class="sched-note-actions">
+           <button type="button" class="btn btn-ghost" onclick="cancelScheduleNote()">ยกเลิก</button>
+           <button type="button" class="btn btn-primary" onclick="saveScheduleNote()">บันทึก</button>
+         </div>`
+      : `<div class="sched-note-body" ondblclick="editScheduleNote()" title="ดับเบิลคลิกเพื่อแก้ไข">${text.trim() ? esc(text) : '<span style="color:var(--ink-soft)">(ว่าง — กด ✎ เพื่อเขียน)</span>'}</div>`}
+  </aside>`;
+}
+function redrawScheduleNote(){
+  const box = document.getElementById('schedNoteBox');
+  if(box) box.outerHTML = scheduleNoteHtml();
+}
+async function loadScheduleNote(){
+  if(scheduleNoteEditing) return;
+  try{
+    const r = await window.storage.get('schedule_note', true);
+    const v = r && typeof r.value === 'string' ? r.value : null;
+    if(v !== scheduleNote){ scheduleNote = v; if(!scheduleNoteEditing) redrawScheduleNote(); }
+  }catch(e){}
+}
+function editScheduleNote(){
+  scheduleNoteEditing = true;
+  redrawScheduleNote();
+  const t = document.getElementById('schedNoteInput');
+  if(t){ t.focus(); t.selectionStart = t.selectionEnd = t.value.length; }
+}
+function cancelScheduleNote(){ scheduleNoteEditing = false; scheduleNoteDraft = null; redrawScheduleNote(); loadScheduleNote(); }
+async function saveScheduleNote(){
+  const t = document.getElementById('schedNoteInput');
+  if(!t) return;
+  const text = t.value.replace(/\s+$/, '');
+  try{
+    await window.storage.set('schedule_note', text, true);
+  }catch(e){ showToast('บันทึกโน้ตไม่สำเร็จ — ลองใหม่'); return; }
+  scheduleNote = text;
+  scheduleNoteEditing = false;
+  scheduleNoteDraft = null;
+  logActivity('แก้โน้ตกำหนดการ');
+  redrawScheduleNote();
+  showToast('บันทึกโน้ตแล้ว');
+}
 
 function pendingEpCount(item){
   return (item.pendingEpisodes && item.pendingEpisodes.length) || 0;
@@ -4062,8 +4115,7 @@ function renderSchedule(){
   `;
   if(!scheduleEntries.length){
     html += `<div class="empty-state">ยังไม่มีกำหนดการเปิดเรื่อง — กดปุ่ม "+ เพิ่มกำหนดการ" เพื่อวางแผนล่วงหน้า</div>`;
-    container.innerHTML = scheduleLayoutHtml(html);
-    loadScheduleNote();
+    container.innerHTML = html;
     return;
   }
 
@@ -4120,65 +4172,7 @@ function renderSchedule(){
     : (showAllOpened && openedAll.length ? `<button class="btn btn-ghost" style="font-size:12px;padding:5px 10px;" onclick="showAllOpened=false;renderSchedule()">ซ่อนที่เก่ากว่า ${SCHEDULE_OPENED_KEEP_DAYS} วัน</button>` : '');
   if(openedAll.length) html += section('✅ เปิดแล้ว', opened, toggle);
 
-  container.innerHTML = scheduleLayoutHtml(html);
-  loadScheduleNote();
-}
-
-// ---- โน้ตทีมด้านขวา ----
-const SCHEDULE_NOTE_DEFAULT = 'ridi 0\nlezhin -1\nmr.blue 0\ntoptoon 0';
-let scheduleNote = null;          // null = ยังไม่ได้โหลด
-let scheduleNoteEditing = false;
-let scheduleNoteDraft = null;    // ข้อความที่พิมพ์ค้าง (หน้าถูกวาดใหม่ระหว่างแก้ ก็ไม่หาย)
-function scheduleLayoutHtml(mainHtml){
-  return `<div class="sched-layout"><div class="sched-main">${mainHtml}</div>${scheduleNoteHtml()}</div>`;
-}
-function scheduleNoteHtml(){
-  const text = scheduleNote === null ? SCHEDULE_NOTE_DEFAULT : scheduleNote;
-  return `<aside class="sched-note-box" id="schedNoteBox">
-    <div class="sched-note-head"><span>📝 โน้ต</span>
-      ${scheduleNoteEditing ? '' : '<button type="button" class="icon-btn" onclick="editScheduleNote()" title="แก้ไขโน้ต" aria-label="แก้ไขโน้ต">✎</button>'}
-    </div>
-    ${scheduleNoteEditing
-      ? `<textarea id="schedNoteInput" rows="8" oninput="scheduleNoteDraft=this.value">${esc(scheduleNoteDraft !== null ? scheduleNoteDraft : text)}</textarea>
-         <div class="sched-note-actions">
-           <button type="button" class="btn btn-ghost" onclick="cancelScheduleNote()">ยกเลิก</button>
-           <button type="button" class="btn btn-primary" onclick="saveScheduleNote()">บันทึก</button>
-         </div>`
-      : `<div class="sched-note-body" ondblclick="editScheduleNote()" title="ดับเบิลคลิกเพื่อแก้ไข">${text.trim() ? esc(text) : '<span style="color:var(--ink-soft)">(ว่าง — กด ✎ เพื่อเขียน)</span>'}</div>`}
-  </aside>`;
-}
-function redrawScheduleNote(){
-  const box = document.getElementById('schedNoteBox');
-  if(box) box.outerHTML = scheduleNoteHtml();
-}
-async function loadScheduleNote(){
-  if(scheduleNoteEditing) return;
-  try{
-    const r = await window.storage.get('schedule_note', true);
-    const v = r && typeof r.value === 'string' ? r.value : null;
-    if(v !== scheduleNote){ scheduleNote = v; if(!scheduleNoteEditing) redrawScheduleNote(); }
-  }catch(e){}
-}
-function editScheduleNote(){
-  scheduleNoteEditing = true;
-  redrawScheduleNote();
-  const t = document.getElementById('schedNoteInput');
-  if(t){ t.focus(); t.selectionStart = t.selectionEnd = t.value.length; }
-}
-function cancelScheduleNote(){ scheduleNoteEditing = false; scheduleNoteDraft = null; redrawScheduleNote(); loadScheduleNote(); }
-async function saveScheduleNote(){
-  const t = document.getElementById('schedNoteInput');
-  if(!t) return;
-  const text = t.value.replace(/\s+$/, '');
-  try{
-    await window.storage.set('schedule_note', text, true);
-  }catch(e){ showToast('บันทึกโน้ตไม่สำเร็จ — ลองใหม่'); return; }
-  scheduleNote = text;
-  scheduleNoteEditing = false;
-  scheduleNoteDraft = null;
-  logActivity('แก้โน้ตกำหนดการ');
-  redrawScheduleNote();
-  showToast('บันทึกโน้ตแล้ว');
+  container.innerHTML = html;
 }
 
 async function markScheduleOpened(id){
@@ -4219,6 +4213,10 @@ function openScheduleModal(id){
   editingScheduleId = id || null;
   const entry = id ? scheduleEntries.find(e=>e.id===id) : null;
   document.getElementById('scheduleModalTitle').textContent = entry ? 'แก้ไขกำหนดการ' : 'เพิ่มกำหนดการเปิดเรื่อง';
+  // โน้ต: เฉพาะตอนเพิ่มใหม่
+  scheduleNoteEditing = false; scheduleNoteDraft = null;
+  document.getElementById('schedNoteSlot').innerHTML = entry ? '' : scheduleNoteHtml();
+  if(!entry) loadScheduleNote();
   document.getElementById('sDate').value = entry ? (entry.date||'') : '';
   document.getElementById('sFirstDate').value = entry ? (entry.firstDate||'') : '';
   document.getElementById('sTitle').value = entry ? (entry.title||'') : '';

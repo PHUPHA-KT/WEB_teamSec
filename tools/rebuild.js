@@ -1885,34 +1885,25 @@ step('A3 เซฟวนอ่านใหม่เมื่อชน (persistDa
     }`, 'persistDataNow CAS loop');
 });
 
-// ================= 48) กำหนดการ: โน้ตทีมด้านขวา (แก้ได้ ใช้ร่วมกันทั้งทีม) =================
+// ================= 48) กำหนดการ: โน้ตทีม (แก้ได้ ใช้ร่วมกันทั้งทีม) =================
 // เก็บเป็น key แยก schedule_note (ข้อความล้วน) — เขียนทับทั้งก้อน คนแก้ล่าสุดชนะ
-step('กำหนดการ: โน้ตด้านขวา', 'function scheduleNoteHtml(', () => {
-  rep(`    container.innerHTML = html;
-    return;
-  }`,
-`    container.innerHTML = scheduleLayoutHtml(html);
-    loadScheduleNote();
-    return;
-  }`, 'empty layout');
-  rep(`  if(openedAll.length) html += section('✅ เปิดแล้ว', opened, toggle);
-
-  container.innerHTML = html;
-}`,
-`  if(openedAll.length) html += section('✅ เปิดแล้ว', opened, toggle);
-
-  container.innerHTML = scheduleLayoutHtml(html);
-  loadScheduleNote();
-}
-
-// ---- โน้ตทีมด้านขวา ----
+// โชว์เฉพาะในหน้าต่าง "เพิ่มกำหนดการเปิดเรื่อง" (ใช้ดูตัวเลขของแต่ละเว็บตอนกรอกวันที่)
+step('กำหนดการ: โน้ตในหน้าต่างเพิ่มกำหนดการ', 'function scheduleNoteHtml(', () => {
+  rep(`    <h3 id="scheduleModalTitle">เพิ่มกำหนดการเปิดเรื่อง</h3>`,
+`    <h3 id="scheduleModalTitle">เพิ่มกำหนดการเปิดเรื่อง</h3>
+    <div id="schedNoteSlot"></div>`, 'modal slot');
+  rep(`  document.getElementById('scheduleModalTitle').textContent = entry ? 'แก้ไขกำหนดการ' : 'เพิ่มกำหนดการเปิดเรื่อง';`,
+`  document.getElementById('scheduleModalTitle').textContent = entry ? 'แก้ไขกำหนดการ' : 'เพิ่มกำหนดการเปิดเรื่อง';
+  // โน้ต: เฉพาะตอนเพิ่มใหม่
+  scheduleNoteEditing = false; scheduleNoteDraft = null;
+  document.getElementById('schedNoteSlot').innerHTML = entry ? '' : scheduleNoteHtml();
+  if(!entry) loadScheduleNote();`, 'openScheduleModal note');
+  rep(`function pendingEpCount(item){`,
+`// ---- โน้ตทีม (ในหน้าต่างเพิ่มกำหนดการ) ----
 const SCHEDULE_NOTE_DEFAULT = 'ridi 0\\nlezhin -1\\nmr.blue 0\\ntoptoon 0';
 let scheduleNote = null;          // null = ยังไม่ได้โหลด
 let scheduleNoteEditing = false;
-let scheduleNoteDraft = null;    // ข้อความที่พิมพ์ค้าง (หน้าถูกวาดใหม่ระหว่างแก้ ก็ไม่หาย)
-function scheduleLayoutHtml(mainHtml){
-  return \`<div class="sched-layout"><div class="sched-main">\${mainHtml}</div>\${scheduleNoteHtml()}</div>\`;
-}
+let scheduleNoteDraft = null;    // ข้อความที่พิมพ์ค้าง (วาดใหม่ระหว่างแก้ ก็ไม่หาย)
 function scheduleNoteHtml(){
   const text = scheduleNote === null ? SCHEDULE_NOTE_DEFAULT : scheduleNote;
   return \`<aside class="sched-note-box" id="schedNoteBox">
@@ -1960,10 +1951,11 @@ async function saveScheduleNote(){
   logActivity('แก้โน้ตกำหนดการ');
   redrawScheduleNote();
   showToast('บันทึกโน้ตแล้ว');
-}`, 'note functions');
-  rep('</style>', `  /* โน้ตด้านขวาของกำหนดการ */
-  .sched-layout{ display:grid; grid-template-columns:minmax(0,1fr) 240px; gap:16px; align-items:start; }
-  .sched-note-box{ position:sticky; top:12px; background:#fffbea; border:1px solid #f0e2a8; border-radius:12px; padding:10px 12px 12px; }
+}
+
+function pendingEpCount(item){`, 'note functions');
+  rep('</style>', `  /* โน้ตทีมในหน้าต่างเพิ่มกำหนดการ */
+  .sched-note-box{ background:#fffbea; border:1px solid #f0e2a8; border-radius:12px; padding:8px 12px 10px; margin:0 0 14px; }
   .sched-note-head{ display:flex; justify-content:space-between; align-items:center; font-weight:800; font-size:13.5px; margin-bottom:6px; color:#7a6200; }
   .sched-note-body{ white-space:pre-wrap; font-size:14px; line-height:1.6; font-family:inherit; min-height:40px; cursor:text; color:var(--ink); }
   .sched-note-box textarea{ width:100%; box-sizing:border-box; font:inherit; font-size:14px; line-height:1.6; padding:8px; border:1px solid var(--line); border-radius:8px; resize:vertical; background:var(--card); color:var(--ink); }
@@ -1971,7 +1963,6 @@ async function saveScheduleNote(){
   .sched-note-actions .btn{ padding:6px 12px; font-size:12.5px; }
   body.dark .sched-note-box{ background:#2e2a17; border-color:#5a4f22; }
   body.dark .sched-note-head{ color:#e3cc6b; }
-  @media(max-width:900px){ .sched-layout{ grid-template-columns:1fr; } .sched-note-box{ position:static; order:-1; } }
 </style>`, 'css');
 });
 
