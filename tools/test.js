@@ -45,8 +45,9 @@ function constLine(src, name){ const m = new RegExp('^const ' + name + ' = .*$',
 function load(file){
   const html = fs.readFileSync(path.join(ROOT, file), 'utf8').replace(/\r\n/g, '\n');
   const fns = ['mergeById','mergeField','isPlainObj','mergeItemFields','itemDays','isMultiDay','normalizeDays',
-    'epKey','sortEpisodes','parseEpisodeInput','weekEpCount','weekEpTotal','codeSerial','sourceInfo','pruneTrash','resetNonPendingToPending','dayStatus','setDayStatus'];
-  const code = [constLine(html,'DAY_ORDER'), constLine(html,'WEEKDAY_ONLY'), constLine(html,'TRASH_MAX'), constLine(html,'TRASH_KEEP_DAYS')]
+    'epKey','sortEpisodes','parseEpisodeInput','weekEpCount','weekEpTotal','codeSerial','sourceInfo','pruneTrash','resetNonPendingToPending','dayStatus','setDayStatus',
+    'isDateType','monthDates','parseMonthDates','ymdOf','effDateOnly','effectiveNow','currentOccurrence','nextOccurrence','isDateToday','dateOccPassed'];
+  const code = [constLine(html,'DAY_ORDER'), constLine(html,'WEEKDAY_ONLY'), constLine(html,'TRASH_MAX'), constLine(html,'TRASH_KEEP_DAYS'), constLine(html,'MONTH_DAY'), constLine(html,'DAY_ROLLOVER_HOUR')]
     .concat(fns.map(n => extract(html, n) || '')).join('\n');
   const SOURCE = /const SOURCE_ABBR = \{[\s\S]*?\n\};/.exec(html);
   const ctx = { trash: [], esc: s => s, URL };
@@ -90,6 +91,26 @@ function suite(file, staging){
   eq(items[2].pendingSinceDate, '2026-09-01', 'reset: ไม่แตะเรื่องค้าง');
   eq(items[3].statusByDay, {}, 'reset: หลายวันล้างทุกวัน');
   // รหัส
+  // ตามวันที่ของเดือน (เทียบกับวันที่สมมติ)
+  if(F.currentOccurrence){
+    const at = (y,m,d,h) => { ctx.effectiveNow = () => { const x = new Date(y, m-1, d, h||12); x.setHours(x.getHours() - 20); return x; }; };
+    const it = { days:['ตามวันที่'], monthDates:[8,18,28] };
+    at(2026,10,19); eq([F.currentOccurrence(it), F.nextOccurrence(it)], ['2026-10-18','2026-10-28'], 'monthDates: รอบปัจจุบัน/ถัดไป');
+    at(2026,10,5);  eq(F.currentOccurrence(it), '2026-09-28', 'monthDates: ต้นเดือน = รอบเดือนก่อน');
+    at(2026,10,18,19); eq(F.currentOccurrence(it), '2026-10-08', 'monthDates: ก่อน 2 ทุ่มยังไม่ถึงรอบ');
+    at(2026,10,18,21); eq(F.currentOccurrence(it), '2026-10-18', 'monthDates: หลัง 2 ทุ่มถึงรอบ');
+    at(2026,11,15); eq(F.currentOccurrence({ days:['ตามวันที่'], monthDates:[31] }), '2026-10-31', 'monthDates: ข้ามเดือนที่ไม่มีวันที่ 31');
+    eq(F.parseMonthDates('8 18, 28x 40 0 8'), [8,18,28], 'parseMonthDates');
+    at(2026,10,19);
+    const st = { days:['ตามวันที่'], monthDates:[8,18,28], status:'pending' };
+    F.setDayStatus(st, 'ตามวันที่', 'done');
+    eq([F.dayStatus(st,'ตามวันที่'), Object.keys(st.dateStatus)], ['done',['2026-10-18']], 'monthDates: สถานะต่อรอบ');
+    at(2026,10,29); eq(F.dayStatus(st,'ตามวันที่'), 'pending', 'monthDates: รอบใหม่ = ยังไม่ทำ');
+    const rs = [ { days:['ตามวันที่'], monthDates:[8], status:'done', dateStatus:{'2026-10-08':'done'} } ];
+    F.resetNonPendingToPending(rs); eq(rs[0].dateStatus, {'2026-10-08':'done'}, 'monthDates: รีเซ็ตวันจันทร์ไม่แตะ');
+    at(2026,10,30);   // 12:00 = ยังนับเป็นวันที่ 29 -> รอบ 28 ผ่านแล้ว
+    eq([F.dateOccPassed({ ...it, monthDatesSince:'2026-10-29' }), F.dateOccPassed({ ...it, monthDatesSince:'2026-10-01' })], [false, true], 'monthDates: ไม่เตือนย้อนก่อนวันตั้ง');
+  }
   if(F.codeSerial) eq(['7-18-51-x','18-27','5-11-1','งาน 46 ตอน'].map(F.codeSerial), [51,27,null,null], 'codeSerial');
   if(F.sourceInfo) eq([F.sourceInfo('https://www.lezhin.com/x').abbr, F.sourceInfo('https://a.co.kr/').abbr, F.sourceInfo('bad')], ['LZ','a',null], 'sourceInfo');
 

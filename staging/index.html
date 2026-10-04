@@ -519,6 +519,7 @@
     </div>
     <div class="field"><label>วัน</label>
       <div id="rDays" class="day-checks"></div>
+      <div id="rMonthDatesWrap" style="display:none;margin-top:8px;"><input id="rMonthDates" type="text" placeholder="วันที่ของเดือน เช่น 8, 18, 28"></div>
       <div style="font-size:11.5px;color:var(--ink-soft);margin-top:4px;">ติ๊กได้หลายวันถ้าเรื่องลงหลายวันต่อสัปดาห์ — แต่ละวันมีสถานะทำแล้ว/ยังไม่ทำแยกกัน</div>
     </div>
     <div class="field"><label>ลิงก์ต้นทาง (ไม่บังคับ)</label><input id="rLink" type="text" placeholder="https://"></div>
@@ -1085,7 +1086,7 @@ const SEED_SCHEDULE = []; // ข้อมูลจริงย้ายไป Su
 
 const PEOPLE = ['เหนือ','บิ๊ก','ยูตะ','น๊อต'];
 const PERSON_COLOR = {'เหนือ':'blue','บิ๊ก':'green','ยูตะ':'purple','น๊อต':'orange'};
-const DAY_ORDER = ['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์','ไม่ระบุวัน','จบแล้ว'];
+const DAY_ORDER = ['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์','ตามวันที่','ไม่ระบุวัน','จบแล้ว'];
 const STATUS_META = {
   pending: {label:'ยังไม่ทำ', bg:'#f1f3f6', fg:'#5b6472'},
   done:    {label:'ทำแล้ว',   bg:'#e6f7ee', fg:'#1a9c6b'},
@@ -1271,10 +1272,21 @@ function isMultiDay(item){ return itemDays(item).length > 1; }
 function weekEpCount(item){ return itemDays(item).filter(d=>d !== 'จบแล้ว').length; }
 function weekEpTotal(items){ return items.reduce((n, r)=>n + weekEpCount(r), 0); }
 function dayStatus(item, day){
+  if(isDateType(item)){ const occ = currentOccurrence(item); return (occ && (item.dateStatus || {})[occ]) || 'pending'; }
   if(!isMultiDay(item)) return item.status || 'pending';
   return (item.statusByDay || {})[day] || 'pending';
 }
 function setDayStatus(item, day, st){
+  if(isDateType(item)){
+    const occ = currentOccurrence(item);
+    item.status = st;
+    if(!occ) return;
+    item.dateStatus = item.dateStatus || {};
+    item.dateStatus[occ] = st;
+    const keys = Object.keys(item.dateStatus).sort();       // เก็บ 6 รอบล่าสุดพอ
+    keys.slice(0, Math.max(0, keys.length - 6)).forEach(k=>delete item.dateStatus[k]);
+    return;
+  }
   if(!isMultiDay(item)){ item.status = st; return; }
   item.statusByDay = item.statusByDay || {};
   item.statusByDay[day] = st;
@@ -1287,6 +1299,9 @@ function dayHasPassed(day){
 }
 // หลังแก้วันใน modal / ลากในปฏิทิน: จัด day/days/statusByDay ให้สอดคล้อง
 function normalizeDays(item){
+  // ตามวันที่: จำวันที่ตั้งค่า (กันเตือนย้อนหลัง) / เลิกใช้ = ล้างข้อมูลรอบทิ้ง
+  if(itemDays(item).includes(MONTH_DAY)){ if(!item.monthDatesSince) item.monthDatesSince = ymdOf(effDateOnly()); }
+  else { delete item.monthDates; delete item.monthDatesSince; delete item.dateStatus; }
   const seen = new Set();
   const days = itemDays(item).filter(d=>{ if(seen.has(d)) return false; seen.add(d); return true; });
   item.day = days[0];
@@ -1304,8 +1319,8 @@ function normalizeDays(item){
 }
 
 // ---- modal: ติ๊กวันได้หลายวัน ----
-const DAY_CHOICES = ['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์','ไม่ระบุวัน','จบแล้ว'];
-const DAY_EXCLUSIVE = ['ไม่ระบุวัน','จบแล้ว'];   // เลือกอันนี้แล้วเลือกวันอื่นไม่ได้
+const DAY_CHOICES = ['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์','ตามวันที่','ไม่ระบุวัน','จบแล้ว'];
+const DAY_EXCLUSIVE = ['ตามวันที่','ไม่ระบุวัน','จบแล้ว'];   // เลือกอันนี้แล้วเลือกวันอื่นไม่ได้
 function dayChecksHtml(){
   return DAY_CHOICES.map(d=>`<label class="day-check"><input type="checkbox" value="${d}" onchange="onDayCheck(this)"> ${d}</label>`).join('');
 }
@@ -1318,6 +1333,7 @@ function readDayChecks(){
   return out.length ? out : ['ไม่ระบุวัน'];
 }
 function onDayCheck(cb){
+  setTimeout(syncMonthDatesField, 0);
   if(!cb.checked) return;
   const boxes = Array.from(document.querySelectorAll('#rDays input'));
   if(DAY_EXCLUSIVE.includes(cb.value)) boxes.forEach(b=>{ if(b !== cb) b.checked = false; });
@@ -1503,7 +1519,7 @@ function missedRows(){
     if(isEffectivelyDropped(item)) return;
     if(personFilter !== 'ทั้งหมด' && !isPersonInvolved(item, personFilter)) return;
     itemDays(item).forEach(day=>{
-      if(dayHasPassed(day) && dayStatus(item, day) === 'pending') rows.push({ item, day });
+      if((day === MONTH_DAY ? dateOccPassed(item) : dayHasPassed(day)) && dayStatus(item, day) === 'pending') rows.push({ item, day });
     });
   });
   rows.sort((a,b)=> WEEKDAY_ONLY.indexOf(a.day) - WEEKDAY_ONLY.indexOf(b.day));
@@ -1526,7 +1542,7 @@ function missedStripHtml(){
     </div>
     ${missedOpen ? `<div class="missed-list">${rows.map(({item, day})=>`
       <div class="missed-row">
-        <span class="day-pill" style="${dayPillStyle(day)}">${day}</span>
+        <span class="day-pill" style="${dayPillStyle(day)}">${day === MONTH_DAY ? esc(occLabel(currentOccurrence(item))) : day}</span>
         <span class="missed-name">${item.code ? esc(item.code) + ' · ' : ''}${esc(displayName(item) || '(ไม่มีชื่อ)')}<small>${esc(item.person || '')}</small></span>
         <button type="button" class="lc-btn lc-btn-ok" onclick="missedDone('${item.id}','${day}')">✓ ทำแล้ว</button>
         <button type="button" class="lc-btn" onclick="missedToBacklog('${item.id}','${day}')" title="ยังไม่ได้ทำตอนนี้ — ใส่เข้าตอนค้าง แล้วตั้งวันนั้นเป็น เลื่อน">＋ ค้าง</button>
@@ -1746,6 +1762,71 @@ async function saveScheduleNote(){
   showToast('บันทึกโน้ตแล้ว');
 }
 
+// ===== เรื่องที่ลงตามวันที่ของเดือน (เช่น 8, 18, 28) =====
+// item.days = ['ตามวันที่']  item.monthDates = [8,18,28]
+// item.dateStatus = { '2026-10-18':'done', ... }  สถานะแยกต่อรอบ — ถึงรอบใหม่ = ยังไม่ทำ เอง (ไม่ผูกกับรีเซ็ตวันจันทร์)
+// item.monthDatesSince = วันที่ตั้งค่า — กันไม่ให้เตือน "ยังไม่ทำ" ย้อนไปรอบก่อนที่จะตั้ง
+// วันที่ไม่มีในเดือนนั้น (เช่น 31 ในเดือน 30 วัน) = ข้ามรอบนั้น · นับวันใหม่ตอน 2 ทุ่มเหมือนที่อื่น
+const MONTH_DAY = 'ตามวันที่';
+
+function isDateType(item){ return itemDays(item).includes(MONTH_DAY); }
+function monthDates(item){
+  return [...new Set((item.monthDates || []).map(Number).filter(n=>n >= 1 && n <= 31))].sort((a,b)=>a-b);
+}
+function parseMonthDates(raw){
+  return [...new Set(String(raw || '').split(/[^\d]+/).map(Number).filter(n=>n >= 1 && n <= 31))].sort((a,b)=>a-b);
+}
+function ymdOf(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function effDateOnly(){ const d = effectiveNow(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+
+// รอบล่าสุดที่ถึงแล้ว (<= วันนี้) -> 'YYYY-MM-DD' หรือ null
+function currentOccurrence(item){
+  const ds = monthDates(item);
+  if(!ds.length) return null;
+  const t = effDateOnly();
+  for(let back = 0; back < 3; back++){
+    const y = t.getFullYear(), mo = t.getMonth() - back;
+    const dim = new Date(y, mo + 1, 0).getDate();
+    for(let i = ds.length - 1; i >= 0; i--){
+      if(ds[i] > dim) continue;
+      const d = new Date(y, mo, ds[i]);
+      if(d <= t) return ymdOf(d);
+    }
+  }
+  return null;
+}
+// รอบถัดไป (> วันนี้)
+function nextOccurrence(item){
+  const ds = monthDates(item);
+  if(!ds.length) return null;
+  const t = effDateOnly();
+  for(let fwd = 0; fwd < 3; fwd++){
+    const y = t.getFullYear(), mo = t.getMonth() + fwd;
+    const dim = new Date(y, mo + 1, 0).getDate();
+    for(const n of ds){
+      if(n > dim) continue;
+      const d = new Date(y, mo, n);
+      if(d > t) return ymdOf(d);
+    }
+  }
+  return null;
+}
+function isDateToday(item){ return isDateType(item) && currentOccurrence(item) === ymdOf(effDateOnly()); }
+// รอบล่าสุดผ่านไปแล้ว (ไม่ใช่วันนี้) และอยู่หลังวันที่ตั้งค่า
+function dateOccPassed(item){
+  const occ = currentOccurrence(item);
+  return !!occ && occ < ymdOf(effDateOnly()) && (!item.monthDatesSince || occ >= item.monthDatesSince);
+}
+function monthDatesLabel(item){ const ds = monthDates(item); return ds.length ? 'วันที่ ' + ds.join('·') : 'ตามวันที่ (ยังไม่ตั้ง)'; }
+function occLabel(ymd){ return ymd ? 'วันที่ ' + Number(ymd.slice(8)) : ''; }
+
+// ---- modal: ช่องกรอกวันที่ โชว์เมื่อติ๊ก "ตามวันที่" ----
+function syncMonthDatesField(){
+  const on = !!document.querySelector('#rDays input[value="' + MONTH_DAY + '"]:checked');
+  const w = document.getElementById('rMonthDatesWrap');
+  if(w) w.style.display = on ? '' : 'none';
+}
+
 function pendingEpCount(item){
   return (item.pendingEpisodes && item.pendingEpisodes.length) || 0;
 }
@@ -1805,6 +1886,7 @@ function currentWeekMondayStr(){
 function resetNonPendingToPending(items){
   let changed = false;
   items.forEach(item=>{
+    if(isDateType(item)) return;
     if(isMultiDay(item)){
       const sb = item.statusByDay || {};
       if(itemDays(item).some(d=>(sb[d] || 'pending') !== 'pending')){ item.statusByDay = {}; item.status = 'pending'; item.pendingSinceDate = null; changed = true; }
@@ -2757,7 +2839,7 @@ function dayPillStyle(day){
   const map = {
     'จันทร์':['#fdecec','#c0392b'], 'อังคาร':['#fdf3e3','#b9791b'], 'พุธ':['#eafaf0','#1a9c6b'],
     'พฤหัสบดี':['#f1eafd','#7b3fd4'], 'ศุกร์':['#eaf2fd','#1c6fd1'], 'เสาร์':['#fdf1e6','#e07a29'],
-    'อาทิตย์':['#fdecec','#c0392b'], 'ไม่ระบุวัน':['#f1f3f6','#8a94a3'], 'จบแล้ว':['#f1f3f6','#5b6472']
+    'อาทิตย์':['#fdecec','#c0392b'], 'ตามวันที่':['#e4f5f7','#0e7c86'], 'ไม่ระบุวัน':['#f1f3f6','#8a94a3'], 'จบแล้ว':['#f1f3f6','#5b6472']
   };
   const [bg,fg] = map[day] || ['#f1f3f6','#5b6472'];
   return `background:${bg};color:${fg}`;
@@ -2769,7 +2851,7 @@ function matchesFilters(item){
   if(effDropped && !showDropped) return false;
   if(showDropped && !effDropped) return false;
   if(showOnlyPending && pendingEpCount(item)===0) return false; // โหมดดูเฉพาะงานค้าง
-  if(dayFilter!=='ทั้งหมด' && !itemDays(item).includes(dayFilter)) return false;
+  if(dayFilter!=='ทั้งหมด' && !itemDays(item).includes(dayFilter) && !(dayFilter===todayThaiDay() && isDateToday(item))) return false;
   if(personFilter!=='ทั้งหมด' && !isPersonInvolved(item, personFilter)) return false;
   if(searchText){
     const s = searchText.toLowerCase();
@@ -2871,7 +2953,7 @@ function renderRecurring(){
     any = true;
     // เรื่องหลายวัน = หลายแถว (แถวละวัน สถานะแยกกัน) — ถ้ากรองวันอยู่ โชว์เฉพาะวันนั้น
     const rows = [];
-    items.forEach(it=>itemDays(it).filter(d=>dayFilter==='ทั้งหมด' || d===dayFilter).forEach(d=>rows.push({ item: it, rowDay: d })));
+    items.forEach(it=>itemDays(it).filter(d=>dayFilter==='ทั้งหมด' || d===dayFilter || (d===MONTH_DAY && dayFilter===todayThaiDay() && isDateToday(it))).forEach(d=>rows.push({ item: it, rowDay: d })));
     rows.sort((a,b)=> DAY_ORDER.indexOf(a.rowDay) - DAY_ORDER.indexOf(b.rowDay));
     const color = person ? PERSON_COLOR[person] : 'gray';
     const label = person || 'ยังไม่ระบุคนทำ';
@@ -2893,7 +2975,7 @@ function renderRecurring(){
           <div class="ep-line">${lastEpBadgeHtml(item)}</div>
           ${overdueBadgeHtml(item)}
         </div>
-        <span class="day-pill" style="${dayPillStyle(rowDay)}">${rowDay}</span>
+        <span class="day-pill" style="${dayPillStyle(rowDay)}"${rowDay===MONTH_DAY ? ` title="รอบนี้ ${esc(occLabel(currentOccurrence(item)))} · รอบถัดไป ${esc(occLabel(nextOccurrence(item)))}"` : ''}>${rowDay===MONTH_DAY ? esc(monthDatesLabel(item)) : rowDay}</span>
         ${effDropped ? `
           <button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px;" onclick="undropStory('${item.id}')">↩ เอากลับ</button>
           <button class="icon-btn" onclick="openRecurringModal('${item.id}')" title="แก้ไข" style="color:#6b7480;">✎</button>
@@ -3445,6 +3527,8 @@ function openRecurringModal(id){
   document.getElementById('rPerson').value = item ? (item.person||'') : '';
   const rd = document.getElementById('rDays'); if(!rd.children.length) rd.innerHTML = dayChecksHtml();
   setDayChecks(item ? itemDays(item) : ['จันทร์']);
+  document.getElementById('rMonthDates').value = item && item.monthDates ? monthDates(item).join(', ') : '';
+  syncMonthDatesField();
   document.getElementById('rLink').value = item ? (item.link||'') : '';
   document.getElementById('rDrive').value = item ? (item.gdrive||'') : '';
   openModal('modalRecurring');
@@ -3453,12 +3537,16 @@ async function saveNewRecurring(){
   const name = document.getElementById('rName').value.trim();
   const origName = document.getElementById('rOrigName').value.trim();
   if(!name && !origName){ showToast('กรุณาใส่ชื่อเรื่อง (ชื่อแปลหรือต้นฉบับอย่างน้อย 1 ช่อง)'); return; }
+  const isMonthly = readDayChecks().includes(MONTH_DAY);
+  const mDates = isMonthly ? parseMonthDates(document.getElementById('rMonthDates').value) : [];
+  if(isMonthly && !mDates.length){ showToast('ใส่วันที่ของเดือน เช่น 8, 18, 28'); document.getElementById('rMonthDates').focus(); return; }
   const data = {
     code: document.getElementById('rCode').value.trim(),
     name,
     origName,
     day: readDayChecks()[0],
     days: readDayChecks(),
+    monthDates: isMonthly ? mDates : undefined,
     person: document.getElementById('rPerson').value,
     link: document.getElementById('rLink').value.trim(),
     gdrive: document.getElementById('rDrive').value.trim(),
@@ -4277,8 +4365,8 @@ function render(){
 // - แต่ละเรื่องเป็น chip ลากไปวางช่อง คน × วัน ไหนก็ได้
 // - เมาส์: กดลากได้เลย / มือถือ: แตะค้าง 0.3 วิ แล้วลาก (กันชนกับการเลื่อนหน้า)
 // - วางแล้วเปลี่ยน day (+ person ถ้าข้ามการ์ด) -> เซฟ + ลงประวัติ
-const CAL_DAYS = ['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์','ไม่ระบุวัน','จบแล้ว'];
-const CAL_DAY_LABEL = { 'จันทร์':'วันจันทร์','อังคาร':'วันอังคาร','พุธ':'วันพุธ','พฤหัสบดี':'วันพฤหัสบดี','ศุกร์':'วันศุกร์','เสาร์':'วันเสาร์','อาทิตย์':'วันอาทิตย์','ไม่ระบุวัน':'ไม่ระบุวัน','จบแล้ว':'จบแล้ว' };
+const CAL_DAYS = ['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์','ตามวันที่','ไม่ระบุวัน','จบแล้ว'];
+const CAL_DAY_LABEL = { 'จันทร์':'วันจันทร์','อังคาร':'วันอังคาร','พุธ':'วันพุธ','พฤหัสบดี':'วันพฤหัสบดี','ศุกร์':'วันศุกร์','เสาร์':'วันเสาร์','อาทิตย์':'วันอาทิตย์','ตามวันที่':'ตามวันที่','ไม่ระบุวัน':'ไม่ระบุวัน','จบแล้ว':'จบแล้ว' };
 
 // คลิกเลือกเรื่องในปฏิทิน แล้วคลิกช่องปลายทาง (แทนการลากด้วยเมาส์)
 let calSel = null, calJustDragged = false;
@@ -4340,6 +4428,10 @@ async function moveCalendarItem(id, person, day, fromDay){
   if(!item) return;
   const days = itemDays(item);
   fromDay = fromDay && days.includes(fromDay) ? fromDay : days[0];
+  if(day === MONTH_DAY && fromDay !== day && !monthDates(item).length){
+    showToast('ตั้งวันที่ของเดือนก่อน — ดับเบิลคลิกเรื่องเพื่อแก้ไข');
+    renderCalendar(); return;
+  }
   if(item.person === person && fromDay === day) return;
   // เรื่องหลายวัน: วางทับวันที่มีอยู่แล้ว = วันหาย + สถานะโดนทับ -> ไม่ย้าย
   // (ข้ามคน + วันที่มีอยู่แล้ว = ย้ายแค่คน วันคงเดิม)
