@@ -472,6 +472,16 @@
   .sched-note-actions .btn{ padding:6px 12px; font-size:12.5px; }
   body.dark .sched-note-box{ background:#2e2a17; border-color:#5a4f22; }
   body.dark .sched-note-head{ color:#e3cc6b; }
+  /* ปุ่มเลือกวัน: ซ่อน checkbox ทั้งปุ่มกดได้ */
+  .day-checks{ display:block; }
+  .day-check-group{ display:flex; flex-wrap:wrap; gap:6px; }
+  .day-check-other{ margin-top:8px; padding-top:8px; border-top:1px dashed var(--line); }
+  .day-check{ position:relative; display:inline-flex; align-items:center; justify-content:center; min-width:62px; padding:7px 12px; border:1px solid var(--line); border-radius:999px; font-size:13px; line-height:1.2; cursor:pointer; background:var(--card); color:var(--ink); user-select:none; transition:background .12s, border-color .12s; }
+  .day-check:hover{ border-color:var(--blue); }
+  .field .day-check input, .day-check input{ position:absolute; opacity:0; width:1px; height:1px; margin:0; padding:0; pointer-events:none; }
+  .day-check:has(input:checked){ background:var(--blue); border-color:var(--blue); color:#fff; font-weight:700; }
+  .day-check:has(input:checked) span::before{ content:'✓ '; }
+  .day-check:has(input:focus-visible){ outline:2px solid var(--blue); outline-offset:2px; }
 </style>
 </head>
 <body>
@@ -1306,7 +1316,10 @@ function normalizeDays(item){
 const DAY_CHOICES = ['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์','ไม่ระบุวัน','จบแล้ว'];
 const DAY_EXCLUSIVE = ['ไม่ระบุวัน','จบแล้ว'];   // เลือกอันนี้แล้วเลือกวันอื่นไม่ได้
 function dayChecksHtml(){
-  return DAY_CHOICES.map(d=>`<label class="day-check"><input type="checkbox" value="${d}" onchange="onDayCheck(this)"> ${d}</label>`).join('');
+  const pill = d => `<label class="day-check"><input type="checkbox" value="${d}" onchange="onDayCheck(this)"><span>${d}</span></label>`;
+  const week = DAY_CHOICES.filter(d=>WEEKDAY_ONLY.includes(d));
+  const other = DAY_CHOICES.filter(d=>!WEEKDAY_ONLY.includes(d));
+  return `<div class="day-check-group">${week.map(pill).join('')}</div><div class="day-check-group day-check-other">${other.map(pill).join('')}</div>`;
 }
 function setDayChecks(days){
   const set = new Set(days);

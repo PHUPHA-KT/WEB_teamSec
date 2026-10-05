@@ -2060,6 +2060,31 @@ step('เรื่องลงตามวันที่ของเดือ�
   }`, 'calendar guard');
 }, { staging: true });
 
+// ================= 50) ปุ่มเลือกวันในหน้าต่างเรื่อง: ปุ่มเม็ดกดได้ทั้งปุ่ม แบ่ง 2 แถว =================
+// เดิม .field input (width:100%) ทำให้ checkbox ขยายเต็มบรรทัด ไปซ้อนอยู่บนชื่อวัน
+step('ปุ่มเลือกวันแบบปุ่มเม็ด', 'class="day-check-group"', () => {
+  rep(`function dayChecksHtml(){
+  return DAY_CHOICES.map(d=>\`<label class="day-check"><input type="checkbox" value="\${d}" onchange="onDayCheck(this)"> \${d}</label>\`).join('');
+}`,
+`function dayChecksHtml(){
+  const pill = d => \`<label class="day-check"><input type="checkbox" value="\${d}" onchange="onDayCheck(this)"><span>\${d}</span></label>\`;
+  const week = DAY_CHOICES.filter(d=>WEEKDAY_ONLY.includes(d));
+  const other = DAY_CHOICES.filter(d=>!WEEKDAY_ONLY.includes(d));
+  return \`<div class="day-check-group">\${week.map(pill).join('')}</div><div class="day-check-group day-check-other">\${other.map(pill).join('')}</div>\`;
+}`, 'dayChecksHtml');
+  rep('</style>', `  /* ปุ่มเลือกวัน: ซ่อน checkbox ทั้งปุ่มกดได้ */
+  .day-checks{ display:block; }
+  .day-check-group{ display:flex; flex-wrap:wrap; gap:6px; }
+  .day-check-other{ margin-top:8px; padding-top:8px; border-top:1px dashed var(--line); }
+  .day-check{ position:relative; display:inline-flex; align-items:center; justify-content:center; min-width:62px; padding:7px 12px; border:1px solid var(--line); border-radius:999px; font-size:13px; line-height:1.2; cursor:pointer; background:var(--card); color:var(--ink); user-select:none; transition:background .12s, border-color .12s; }
+  .day-check:hover{ border-color:var(--blue); }
+  .field .day-check input, .day-check input{ position:absolute; opacity:0; width:1px; height:1px; margin:0; padding:0; pointer-events:none; }
+  .day-check:has(input:checked){ background:var(--blue); border-color:var(--blue); color:#fff; font-weight:700; }
+  .day-check:has(input:checked) span::before{ content:'✓ '; }
+  .day-check:has(input:focus-visible){ outline:2px solid var(--blue); outline-offset:2px; }
+</style>`, 'css');
+});
+
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
 step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {
