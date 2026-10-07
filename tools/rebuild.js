@@ -2131,7 +2131,7 @@ step('B5 เตือนรหัสซ้ำ + คนทำจากกำห�
   const fromSchedule = schedulePersonFor(item);
   if(fromSchedule) document.getElementById('rPerson').value = fromSchedule;
   document.getElementById('recurringModalTitle').textContent = 'ย้ายเข้างานประจำ — เลือกวัน' + (fromSchedule ? ' (คนทำจากกำหนดการ: ' + fromSchedule + ')' : 'และคนทำ');`, 'person from schedule');
-}, { staging: true });
+});
 
 // ================= 52) C4: ค้นหาไม่วาดใหม่ทุกตัวอักษร + ล็อก CDN ด้วย SRI =================
 step('C4 ค้นหา debounce + SRI', 'function debounceSearch(', () => {
@@ -2158,7 +2158,7 @@ function pendingEpCount(item){`, 'helper');
 `  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
   s.integrity = 'sha512-BNaRQnYJYiPSqHHDb58B0yaPfCu+Wgds8Gp/gU33kqBtgNS4tSPHuGibyoeqMV/TJlSKda6FXzoEyYGjTe+vXA==';
   s.crossOrigin = 'anonymous';`, 'html2canvas SRI');
-}, { staging: true });
+});
 
 // ================= 53) แบ่งตอนเรื่องเปิดใหม่ (น๊อตท้ายเสมอ อีก 3 คนผลัดกันได้เยอะ) =================
 step('แบ่งตอนเรื่องเปิดใหม่ (split)', 'function computeSplit(', () => {
@@ -2183,7 +2183,7 @@ step('แบ่งตอนเรื่องเปิดใหม่ (split)', 
   .split-eps{ display:block; font-size:11px; font-weight:600; color:var(--blue); margin-top:1px; }
   .contrib-item.on .split-eps{ color:inherit; opacity:.85; }
 </style>`, 'css');
-}, { staging: true });
+});
 
 // ================= 54) เลขรันรหัสชุด 11- (เพิ่มจาก 18-) ในแถบกำหนดการ =================
 step('เลขรันรหัสชุด 11-', 'const CODE_SERIES = ', () => {
@@ -2242,7 +2242,7 @@ function codeSerialBarHtml(){
     \`\${hit ? 'เลข ' + hit[0] + '-' + hit[1] : 'รหัส "' + code + '"'} มีอยู่แล้วใน\${CODE_LIST_LABEL[coll]}:\\n\``, 'confirm label');
   rep('</style>', `  .code-serial-rows{ display:flex; flex-direction:column; gap:3px; }
 </style>`, 'css');
-}, { staging: true });
+});
 
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
