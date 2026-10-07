@@ -2185,6 +2185,65 @@ step('แบ่งตอนเรื่องเปิดใหม่ (split)', 
 </style>`, 'css');
 }, { staging: true });
 
+// ================= 54) เลขรันรหัสชุด 11- (เพิ่มจาก 18-) ในแถบกำหนดการ =================
+step('เลขรันรหัสชุด 11-', 'const CODE_SERIES = ', () => {
+  rep(`function codeSerialBarHtml(){
+  const all = [
+    ...scheduleEntries.map(e=>e.title),
+    ...newStories.map(n=>n.code),
+    ...recurring.map(r=>r.code),
+  ].map(codeSerial).filter(n=>n !== null);
+  if(!all.length) return '';
+  const max = Math.max(...all);
+  const reserved = [...new Set(scheduleEntries.filter(e=>e.status !== 'opened').map(e=>codeSerial(e.title)).filter(n=>n !== null))].sort((a,b)=>a-b);
+  return \`<div class="code-serial-bar">
+    <span>รหัสล่าสุด <b>18-\${max}</b></span>
+    <span>· เลขถัดไป <button type="button" class="code-next" onclick="openScheduleWithCode('18-\${max+1}')" title="เพิ่มกำหนดการด้วยรหัสนี้">18-\${max+1} ＋</button></span>
+    \${reserved.length ? \`<span>· จองไว้ยังไม่เปิด: \${reserved.map(n=>'18-'+n).join(', ')}</span>\` : ''}
+  </div>\`;
+}`,
+`// ชุดรหัสที่มีเลขรัน: [วัน-]<ชุด>-<เลข>[-ชื่อ] — เพิ่มชุดใหม่ที่นี่ที่เดียว
+const CODE_SERIES = ['18', '11'];
+function codeSerialOf(str, series){
+  const m = String(str || '').trim().match(new RegExp('(?:^|-)' + series + '-(\\\\d+)(?!\\\\d)'));
+  return m ? Number(m[1]) : null;
+}
+function codeSerialBarHtml(){
+  const codes = [
+    ...scheduleEntries.map(e=>e.title),
+    ...newStories.map(n=>n.code),
+    ...recurring.map(r=>r.code),
+  ];
+  const rows = CODE_SERIES.map(series=>{
+    const all = codes.map(c=>codeSerialOf(c, series)).filter(n=>n !== null);
+    if(!all.length) return '';
+    const max = Math.max(...all);
+    const reserved = [...new Set(scheduleEntries.filter(e=>e.status !== 'opened').map(e=>codeSerialOf(e.title, series)).filter(n=>n !== null))].sort((a,b)=>a-b);
+    return \`<div class="code-serial-bar">
+      <span>รหัสล่าสุด <b>\${series}-\${max}</b></span>
+      <span>· เลขถัดไป <button type="button" class="code-next" onclick="openScheduleWithCode('\${series}-\${max+1}')" title="เพิ่มกำหนดการด้วยรหัสนี้">\${series}-\${max+1} ＋</button></span>
+      \${reserved.length ? \`<span>· จองไว้ยังไม่เปิด: \${reserved.map(n=>series + '-' + n).join(', ')}</span>\` : ''}
+    </div>\`;
+  }).filter(Boolean);
+  return rows.length ? \`<div class="code-serial-rows">\${rows.join('')}</div>\` : '';
+}`, 'bar');
+  // B5 เตือนรหัสซ้ำ: นับทุกชุด (18- และ 11-)
+  rep(`  const ser = codeSerial(code);
+  return codeListOf(coll).filter(x=>x.id !== excludeId && (
+    String(x.code).trim().toLowerCase() === norm || (ser !== null && codeSerial(x.code) === ser)));`,
+`  const sers = CODE_SERIES.map(s=>[s, codeSerialOf(code, s)]).filter(p=>p[1] !== null);
+  return codeListOf(coll).filter(x=>x.id !== excludeId && (
+    String(x.code).trim().toLowerCase() === norm || sers.some(p=>codeSerialOf(x.code, p[0]) === p[1])));`, 'conflicts all series');
+  rep(`  const ser = codeSerial(code);
+  return uiConfirm(
+    \`\${ser !== null ? 'เลข 18-' + ser : 'รหัส "' + code + '"'} มีอยู่แล้วใน\${CODE_LIST_LABEL[coll]}:\\n\``,
+`  const hit = CODE_SERIES.map(s=>[s, codeSerialOf(code, s)]).find(p=>p[1] !== null);
+  return uiConfirm(
+    \`\${hit ? 'เลข ' + hit[0] + '-' + hit[1] : 'รหัส "' + code + '"'} มีอยู่แล้วใน\${CODE_LIST_LABEL[coll]}:\\n\``, 'confirm label');
+  rep('</style>', `  .code-serial-rows{ display:flex; flex-direction:column; gap:3px; }
+</style>`, 'css');
+}, { staging: true });
+
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
 step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {

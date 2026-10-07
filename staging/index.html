@@ -491,6 +491,7 @@
   .split-table td:first-child, .split-table td:last-child{ white-space:nowrap; }
   .split-eps{ display:block; font-size:11px; font-weight:600; color:var(--blue); margin-top:1px; }
   .contrib-item.on .split-eps{ color:inherit; opacity:.85; }
+  .code-serial-rows{ display:flex; flex-direction:column; gap:3px; }
   .staging-bar{ position:sticky; top:0; z-index:9000; background:#6a3fb3; color:#fff; text-align:center; font-size:12.5px; font-weight:700; padding:6px 12px; }
 </style>
 </head>
@@ -1861,17 +1862,17 @@ function codeListOf(coll){
 function codeConflicts(coll, code, excludeId){
   const norm = String(code || '').trim().toLowerCase();
   if(!norm) return [];
-  const ser = codeSerial(code);
+  const sers = CODE_SERIES.map(s=>[s, codeSerialOf(code, s)]).filter(p=>p[1] !== null);
   return codeListOf(coll).filter(x=>x.id !== excludeId && (
-    String(x.code).trim().toLowerCase() === norm || (ser !== null && codeSerial(x.code) === ser)));
+    String(x.code).trim().toLowerCase() === norm || sers.some(p=>codeSerialOf(x.code, p[0]) === p[1])));
 }
 // ไม่ซ้ำ = true · ซ้ำ = ถามก่อน (ตกลง = บันทึกต่อ)
 async function confirmCodeUnique(coll, code, excludeId){
   const hits = codeConflicts(coll, code, excludeId);
   if(!hits.length) return true;
-  const ser = codeSerial(code);
+  const hit = CODE_SERIES.map(s=>[s, codeSerialOf(code, s)]).find(p=>p[1] !== null);
   return uiConfirm(
-    `${ser !== null ? 'เลข 18-' + ser : 'รหัส "' + code + '"'} มีอยู่แล้วใน${CODE_LIST_LABEL[coll]}:\n`
+    `${hit ? 'เลข ' + hit[0] + '-' + hit[1] : 'รหัส "' + code + '"'} มีอยู่แล้วใน${CODE_LIST_LABEL[coll]}:\n`
       + hits.slice(0, 5).map(h=>'• ' + h.label).join('\n') + (hits.length > 5 ? '\n• …อีก ' + (hits.length - 5) : '')
       + '\n\nบันทึกต่อไหม?',
     'รหัสซ้ำ');
@@ -4364,20 +4365,30 @@ function codeSerial(str){
   const m = String(str || '').trim().match(/(?:^|-)18-(\d+)(?!\d)/);
   return m ? Number(m[1]) : null;
 }
+// ชุดรหัสที่มีเลขรัน: [วัน-]<ชุด>-<เลข>[-ชื่อ] — เพิ่มชุดใหม่ที่นี่ที่เดียว
+const CODE_SERIES = ['18', '11'];
+function codeSerialOf(str, series){
+  const m = String(str || '').trim().match(new RegExp('(?:^|-)' + series + '-(\\d+)(?!\\d)'));
+  return m ? Number(m[1]) : null;
+}
 function codeSerialBarHtml(){
-  const all = [
+  const codes = [
     ...scheduleEntries.map(e=>e.title),
     ...newStories.map(n=>n.code),
     ...recurring.map(r=>r.code),
-  ].map(codeSerial).filter(n=>n !== null);
-  if(!all.length) return '';
-  const max = Math.max(...all);
-  const reserved = [...new Set(scheduleEntries.filter(e=>e.status !== 'opened').map(e=>codeSerial(e.title)).filter(n=>n !== null))].sort((a,b)=>a-b);
-  return `<div class="code-serial-bar">
-    <span>รหัสล่าสุด <b>18-${max}</b></span>
-    <span>· เลขถัดไป <button type="button" class="code-next" onclick="openScheduleWithCode('18-${max+1}')" title="เพิ่มกำหนดการด้วยรหัสนี้">18-${max+1} ＋</button></span>
-    ${reserved.length ? `<span>· จองไว้ยังไม่เปิด: ${reserved.map(n=>'18-'+n).join(', ')}</span>` : ''}
-  </div>`;
+  ];
+  const rows = CODE_SERIES.map(series=>{
+    const all = codes.map(c=>codeSerialOf(c, series)).filter(n=>n !== null);
+    if(!all.length) return '';
+    const max = Math.max(...all);
+    const reserved = [...new Set(scheduleEntries.filter(e=>e.status !== 'opened').map(e=>codeSerialOf(e.title, series)).filter(n=>n !== null))].sort((a,b)=>a-b);
+    return `<div class="code-serial-bar">
+      <span>รหัสล่าสุด <b>${series}-${max}</b></span>
+      <span>· เลขถัดไป <button type="button" class="code-next" onclick="openScheduleWithCode('${series}-${max+1}')" title="เพิ่มกำหนดการด้วยรหัสนี้">${series}-${max+1} ＋</button></span>
+      ${reserved.length ? `<span>· จองไว้ยังไม่เปิด: ${reserved.map(n=>series + '-' + n).join(', ')}</span>` : ''}
+    </div>`;
+  }).filter(Boolean);
+  return rows.length ? `<div class="code-serial-rows">${rows.join('')}</div>` : '';
 }
 function openScheduleWithCode(code){
   openScheduleModal();
