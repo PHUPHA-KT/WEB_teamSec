@@ -1,0 +1,11 @@
+# ไฟล์โค้ดเป็น LF ทุกเครื่อง — anchor ใน tools/rebuild.js เขียนด้วย LF
+# (Windows autocrlf จะเช็คเอาต์เป็น CRLF แล้ว build หา anchor ไม่เจอ)
+*.js   text eol=lf
+*.mjs  text eol=lf
+*.html text eol=lf
+*.css  text eol=lf
+*.sql  text eol=lf
+*.md   text eol=lf
+*.svg  text eol=lf
+*.json text eol=lf
+*.ps1  text eol=crlf

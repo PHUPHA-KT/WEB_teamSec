@@ -1,0 +1,255 @@
+<!-- ============================================================
+     Supabase storage shim + login gate
+     เพิ่มเข้ามาเพื่อรันบน GitHub Pages โดยไม่แก้โค้ดแอปเดิม
+     ตั้งค่า SUPABASE_URL / SUPABASE_ANON_KEY ด้านล่าง
+     ============================================================ -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
+<style>
+  #authGate{position:fixed;inset:0;z-index:99999;background:#f6f7fb;display:flex;align-items:center;justify-content:center;padding:20px;font-family:inherit}
+  #authGate .box{background:#fff;border:1px solid #e4e8ee;border-radius:16px;padding:28px 26px;width:100%;max-width:360px;box-shadow:0 10px 40px rgba(0,0,0,.08)}
+  #authGate h2{margin:0 0 4px;font-size:19px;color:#1f2430}
+  #authGate p.sub{margin:0 0 20px;font-size:13px;color:#8a94a3}
+  #authGate label{display:block;font-size:12px;color:#5b6472;margin:12px 0 5px}
+  #authGate input{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #e4e8ee;border-radius:9px;font-size:14px;font-family:inherit;background:#fff;color:#1f2430}
+  #authGate input:focus{outline:none;border-color:#1c6fd1}
+  #authGate button{width:100%;margin-top:20px;padding:11px;border:0;border-radius:9px;background:#1c6fd1;color:#fff;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer}
+  #authGate button:disabled{opacity:.55;cursor:default}
+  #authGate .err{margin-top:12px;font-size:12.5px;color:#d13b3b;min-height:17px;line-height:1.5}
+  #logoutBtn{position:fixed;left:10px;bottom:10px;z-index:9998;font-size:11px;padding:5px 10px;border:1px solid #e4e8ee;border-radius:7px;background:#fff;color:#8a94a3;cursor:pointer;font-family:inherit;opacity:.65}
+  #logoutBtn:hover{opacity:1}
+</style>
+<script>
+(function(){
+  // ===== 1) ใส่ค่าจาก Supabase → Project Settings → API =====
+  const SUPABASE_URL      = 'https://xlmjtnfoacqhypieeitc.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsbWp0bmZvYWNxaHlwaWVlaXRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NDgyMTksImV4cCI6MjEwNDUyNDIxOX0.ZOx_iTOGFsgALncubDGvjzhDwEXNziLlSPMTrjTR_HQ';
+  // =========================================================
+
+  const TABLE = 'app_kv';
+  let sb = null;
+
+  let uid = null;
+  let currentUser = null;   // {id, email, name} ของคนที่ล็อกอิน
+  function rememberUser(u){
+    if(!u){ currentUser = null; return; }
+    const md = u.user_metadata || {};
+    currentUser = { id: u.id, email: u.email || '', name: md.name || md.full_name || md.display_name || '' };
+  }
+  let signalReady;
+  const ready = new Promise(function(res){ signalReady = res; });
+
+  // ---------- login gate ----------
+  const gate = document.createElement('div');
+  gate.id = 'authGate';
+  gate.innerHTML =
+    '<div class="box">' +
+      '<h2>ระบบจัดการงานคัดเรื่อง</h2>' +
+      '<p class="sub">เข้าสู่ระบบเพื่อใช้งาน</p>' +
+      '<label for="agEmail">อีเมล</label>' +
+      '<input id="agEmail" type="email" autocomplete="username">' +
+      '<label for="agPass">รหัสผ่าน</label>' +
+      '<input id="agPass" type="password" autocomplete="current-password">' +
+      '<button id="agBtn" type="button">เข้าสู่ระบบ</button>' +
+      '<div class="err" id="agErr"></div>' +
+    '</div>';
+  document.body.appendChild(gate);
+
+  const $ = function(id){ return document.getElementById(id); };
+
+  function showGate(){ gate.style.display = 'flex'; setTimeout(function(){ $('agEmail').focus(); }, 50); }
+  function hideGate(){
+    gate.style.display = 'none';
+    if(!$('logoutBtn')){
+      const b = document.createElement('button');
+      b.id = 'logoutBtn'; b.type = 'button'; b.textContent = 'ออกจากระบบ';
+      b.onclick = async function(){
+        if(!confirm('ออกจากระบบ?')) return;
+        await sb.auth.signOut();
+        location.reload();
+      };
+      document.body.appendChild(b);
+    }
+  }
+
+  async function doLogin(){
+    const btn = $('agBtn'), err = $('agErr');
+    const email = $('agEmail').value.trim(), pass = $('agPass').value;
+    if(!email || !pass){ err.textContent = 'กรอกอีเมลและรหัสผ่าน'; return; }
+    btn.disabled = true; btn.textContent = 'กำลังเข้าสู่ระบบ...'; err.textContent = '';
+    const res = await sb.auth.signInWithPassword({ email: email, password: pass });
+    btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ';
+    if(res.error){
+      err.textContent = /Invalid login/i.test(res.error.message)
+        ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' : ('เข้าสู่ระบบไม่สำเร็จ: ' + res.error.message);
+      return;
+    }
+    uid = res.data.user.id;
+    rememberUser(res.data.user);
+    try{ sb.realtime.setAuth(res.data.session.access_token); }catch(e){}
+    $('agPass').value = '';
+    hideGate();
+    signalReady();
+  }
+
+  $('agBtn').addEventListener('click', doLogin);
+  gate.addEventListener('keydown', function(e){ if(e.key === 'Enter') doLogin(); });
+
+  (async function boot(){
+    try{
+      if(SUPABASE_URL.indexOf('https://') !== 0 || SUPABASE_ANON_KEY.indexOf('PASTE_') === 0){
+        throw new Error('ยังไม่ได้ใส่ SUPABASE_URL / SUPABASE_ANON_KEY ในไฟล์ index.html');
+      }
+      sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: { persistSession: true, autoRefreshToken: true }
+      });
+    }catch(e){
+      showGate();
+      $('agBtn').disabled = true;
+      $('agErr').textContent = 'ตั้งค่าไม่ครบ: ' + e.message;
+      return;
+    }
+    let session = null;
+    try{ const r = await sb.auth.getSession(); session = r.data ? r.data.session : null; }catch(e){}
+    if(session && session.user){
+      uid = session.user.id;
+      rememberUser(session.user);
+      try{ sb.realtime.setAuth(session.access_token); }catch(e){}
+      hideGate(); signalReady();
+    }
+    else showGate();
+  })();
+
+  // ---------- storage shim (API เดิมของแอป) ----------
+  // shared === true  -> แถวรวมของทีม (scope 'global')
+  // shared === false -> แถวส่วนตัวของแต่ละคน (scope = user id)
+  function scopeOf(shared){ return shared ? 'global' : ('u:' + uid); }
+
+  // แคชตาม updated_at: poll ทุก 12 วิ ไม่ต้องโหลด appdata ทั้งก้อนซ้ำ
+  // ถามแค่ updated_at (~100 bytes) ถ้าไม่เปลี่ยน คืนค่าที่แคชไว้
+  const cache = Object.create(null);
+
+  window.storage = {
+    async get(key, shared){
+      await ready;
+      const scope = scopeOf(shared);
+      const ck = scope + '|' + key;
+      const hit = cache[ck];
+
+      if(hit){
+        const meta = await sb.from(TABLE)
+          .select('updated_at')
+          .eq('scope', scope).eq('key', key)
+          .maybeSingle();
+        if(meta.error) throw new Error(meta.error.message);
+        if(!meta.data){ delete cache[ck]; return null; }          // ถูกลบไปแล้ว
+        if(meta.data.updated_at === hit.updated_at){
+          return { value: hit.value };                            // ไม่มีใครแก้ = ใช้ของเดิม
+        }
+      }
+
+      const r = await sb.from(TABLE)
+        .select('value,updated_at')
+        .eq('scope', scope).eq('key', key)
+        .maybeSingle();
+      if(r.error) throw new Error(r.error.message);
+      if(!r.data){ delete cache[ck]; return null; }
+      cache[ck] = { updated_at: r.data.updated_at, value: r.data.value };
+      return { value: r.data.value };
+    },
+
+    async set(key, value, shared){
+      await ready;
+      const scope = scopeOf(shared);
+      const val = String(value);
+      const stamp = new Date().toISOString();
+      const r = await sb.from(TABLE).upsert({
+        scope: scope, key: key, value: val, updated_at: stamp
+      }, { onConflict: 'scope,key' }).select('updated_at').maybeSingle();
+      if(r.error){ delete cache[scope + '|' + key]; throw new Error(r.error.message); }
+      // แคชค่าที่เพิ่งเขียน (ใช้ updated_at ที่ DB คืนมาจริง ไม่ใช่ที่เราส่งไป)
+      cache[scope + '|' + key] = {
+        updated_at: (r.data && r.data.updated_at) ? r.data.updated_at : stamp,
+        value: val
+      };
+      return true;
+    }
+  };
+
+  // ---------- realtime ----------
+  // ส่ง token ใหม่ให้ socket ทุกครั้งที่ refresh — ไม่งั้นพอ token หมดอายุ RLS จะปฏิเสธ
+  // แล้ว event เงียบไปเฉยๆ โดยไม่มี error
+  try{
+    sb.auth.onAuthStateChange((event, session)=>{
+      if(session && session.access_token){
+        try{ sb.realtime.setAuth(session.access_token); }catch(e){}
+      }
+      // refresh token หมดอายุ/ถูกเพิกถอน: เดิมทุกคำสั่งจะ error เงียบๆ โดยผู้ใช้ไม่รู้ตัว
+      // เอาหน้า login กลับมา (ไม่รีโหลด งานที่ยังไม่ได้เซฟจะได้ไม่หาย — เซฟใหม่ได้หลังล็อกอิน)
+      if(event === 'SIGNED_OUT') showGate();
+    });
+  }catch(e){}
+
+  // แจ้งเมื่อมีคนเขียนแถวนี้ — ใช้เร่งให้เห็นไวขึ้น ไม่ใช่ตัวหลัก
+  // "เข้าห้องได้" ไม่เท่ากับ "มี event ส่งมาจริง" จึงนับ event ที่ได้รับด้วย
+  window.storage.subscribe = function(key, shared, onChange){
+    const state = {
+      status: 'connecting',
+      eventsSeen: 0,
+      lastEventAt: 0,
+      channel: null,
+      alive(){ return this.eventsSeen > 0 && (Date.now() - this.lastEventAt) < 120000; }
+    };
+    if(!sb) { state.status = 'no-client'; return state; }
+
+    const scope = scopeOf(shared);
+    let retryMs = 2000;
+    let closed = false;
+
+    function join(){
+      if(closed) return;
+      if(state.channel){ try{ sb.removeChannel(state.channel); }catch(e){} state.channel = null; }
+      state.channel = sb
+        .channel('kv-' + scope + '-' + key + '-' + Date.now())
+        .on('postgres_changes',
+          { event: '*', schema: 'public', table: TABLE, filter: 'key=eq.' + key },
+          (payload) => {
+            const row = payload.new || payload.old;
+            if(row && row.scope && row.scope !== scope) return;  // filter ได้ทีละคอลัมน์ กรอง scope เอง
+            state.eventsSeen++;
+            state.lastEventAt = Date.now();
+            try{ onChange(); }catch(e){}
+          })
+        .subscribe((status) => {
+          state.status = status;
+          if(status === 'SUBSCRIBED'){ retryMs = 2000; return; }
+          // CHANNEL_ERROR / TIMED_OUT / CLOSED -> ต่อใหม่แบบถอยเวลาเพิ่มขึ้น
+          if(status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED'){
+            setTimeout(join, retryMs);
+            retryMs = Math.min(retryMs * 2, 60000);
+          }
+        });
+    }
+    join();
+
+    state.reconnect = function(){ retryMs = 2000; join(); };
+    state.stop = function(){ closed = true; if(state.channel){ try{ sb.removeChannel(state.channel); }catch(e){} } };
+    return state;
+  };
+
+  // ไว้เช็คตอนมีปัญหา: เปิด console แล้วพิมพ์ storage.realtimeInfo()
+  // ใครล็อกอินอยู่ — ชื่อมาจาก user_metadata.name ที่ตั้งใน Supabase (ไม่ตั้ง = ว่าง)
+  window.storage.currentUser = function(){ return currentUser ? Object.assign({}, currentUser) : null; };
+
+  window.storage.realtimeInfo = function(){
+    const st = window.__rtState;
+    if(!st) return 'realtime ยังไม่ได้เริ่ม';
+    return {
+      status: st.status,
+      eventsSeen: st.eventsSeen,
+      lastEventAgoSec: st.lastEventAt ? Math.round((Date.now()-st.lastEventAt)/1000) : null,
+      ใช้งานได้จริง: st.alive()
+    };
+  };
+
+})();
+</script>

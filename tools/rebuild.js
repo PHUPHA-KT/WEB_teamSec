@@ -1,34 +1,39 @@
 #!/usr/bin/env node
-// ประกอบ index.html ใหม่จากไฟล์ export ของแอป (ที่ยังใช้ window.storage ของ host เดิม)
-// โดยใส่ชั้น Supabase + patch ทั้งหมดของ repo นี้กลับเข้าไป
+// ประกอบ index.html จากไฟล์ใน repo: src/base.html (ตัวแอปตั้งต้น ตัด SEED แล้ว) + src/shim.html (ชั้น Supabase)
+// + patch ทั้งหมดใน tools/ — ไม่ต้องพึ่งไฟล์นอก repo
 //
-//   node tools/rebuild.js <ไฟล์ export ใหม่.html>            -> index.html (เว็บหลัก)
-//   node tools/rebuild.js <ไฟล์ export ใหม่.html> --staging  -> staging/index.html (เว็บทดลอง)
-//   เพิ่ม --check = ไม่เขียนไฟล์ แค่เทียบกับไฟล์ที่มีอยู่ (ไม่ตรง = exit 1)
+//   node tools/rebuild.js                    -> index.html (เว็บหลัก)
+//   node tools/rebuild.js --staging          -> staging/index.html (เว็บทดลอง)
+//   node tools/rebuild.js --check [--staging]  ไม่เขียนไฟล์ แค่เทียบกับไฟล์ที่มีอยู่ (ไม่ตรง = exit 1)
+//   node tools/rebuild.js <ไฟล์ export.html>  ใช้ไฟล์ export ใหม่แทน src/base.html (ถ้ามี export ใหม่จาก host เดิม)
 //
 // - ขั้นที่ส่ง { staging: true } เข้าเฉพาะเว็บทดลอง — ผ่านแล้วค่อยลบ flag ออกเพื่อเข้าเว็บหลัก
 // - เว็บทดลองเก็บข้อมูลแยกด้วย key ขึ้นต้น stg_ (แตะข้อมูลเว็บหลักไม่ได้)
-// - ชั้น Supabase (shim) ดึงจาก index.html ปัจจุบัน — index.html คือความจริงเสมอ
+// - ชั้น Supabase (shim) อยู่ที่ src/shim.html — แก้ shim ที่นั่น ไม่ใช่ใน index.html
 // - ทุก patch มี "marker" ถ้าไฟล์ใหม่มีอยู่แล้ว (เช่นคุณย้าย fix ไปใส่ฝั่ง host เอง) จะข้ามให้
 // - ถ้า anchor ไม่เจอ = โครงสร้างไฟล์เปลี่ยน สคริปต์จะหยุดพร้อมบอกว่าขั้นไหน ไม่เขียนทับครึ่งๆ กลางๆ
 
 const fs = require('fs');
 const path = require('path');
 
+// anchor ทุกตัวเขียนด้วย \n — clone บน Windows (autocrlf) ได้ไฟล์ \r\n แล้วหา anchor ไม่เจอ
+// อ่านไฟล์ข้อความทุกไฟล์ในสคริปต์นี้เป็น \n เสมอ (.gitattributes บังคับ LF อีกชั้น)
+const readRaw = fs.readFileSync;
+fs.readFileSync = (p, enc) => { const r = readRaw(p, enc); return typeof r === 'string' ? r.replace(/\r\n/g, '\n') : r; };
+
 const ROOT = path.resolve(__dirname, '..');
 const CUR = path.join(ROOT, 'index.html');
 const ARGS = process.argv.slice(2);
 const STAGING = ARGS.includes('--staging');
 const CHECK = ARGS.includes('--check');
-const NEW = ARGS.find(a => !a.startsWith('--'));
+const NEW = ARGS.find(a => !a.startsWith('--')) || path.join(ROOT, 'src', 'base.html');
 const OUT = STAGING ? path.join(ROOT, 'staging', 'index.html') : CUR;
-if (!NEW || !fs.existsSync(NEW)) {
-  console.error('ใช้: node tools/rebuild.js <ไฟล์ export ใหม่.html> [--staging] [--check]');
+if (!fs.existsSync(NEW)) {
+  console.error('ไม่เจอ ' + NEW + '\nใช้: node tools/rebuild.js [ไฟล์ export.html] [--staging] [--check]');
   process.exit(1);
 }
 
-let s = fs.readFileSync(NEW, 'utf8');
-const cur = fs.readFileSync(CUR, 'utf8');
+let s = fs.readFileSync(NEW, 'utf8').replace(/\r\n/g, '\n');
 const done = [], skipped = [];
 let group = null;
 
@@ -46,12 +51,11 @@ function step(label, marker, fn, opts) {
 }
 
 // ================= 1) shim Supabase =================
+// shim อยู่ใน src/shim.html (ตัวตั้งต้น ก่อน patch ของขั้นหลังๆ เช่น setIfUnchanged)
+// เดิมก๊อปจาก index.html ปัจจุบัน -> ผลลัพธ์วนกลับมาเป็น input ตัวเอง แล้ว marker ของขั้นหลังพาข้ามโดยไม่ตั้งใจ
 step('shim Supabase', '<!-- ============================================================\n     Supabase storage shim', () => {
-  const a = cur.indexOf('<!-- ============================================================\n     Supabase storage shim');
-  const endMark = '\n})();\n</script>\n';
-  const b = cur.indexOf(endMark, a);
-  if (a < 0 || b < 0) throw new Error('ไม่เจอ shim ใน index.html ปัจจุบัน');
-  const shim = cur.slice(a, b + endMark.length);
+  const shim = fs.readFileSync(path.join(ROOT, 'src', 'shim.html'), 'utf8').replace(/\r\n/g, '\n');
+  if (!shim.includes('Supabase storage shim')) throw new Error('src/shim.html ไม่ใช่ shim');
   const app = s.indexOf('<script>\nconst SEED_RECURRING');
   if (app < 0) throw new Error('ไม่เจอจุดเริ่ม script ของแอป');
   s = s.slice(0, app) + shim + s.slice(app);

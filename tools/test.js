@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // ทดสอบส่วนที่เคยพังเงียบๆ (merge / รีเซ็ตรายสัปดาห์ / poll) — ไม่ต้องติดตั้งอะไร
 //
-//   node tools/test.js                 ทดสอบ staging/index.html (ถ้ามี) และ index.html
-//   node tools/test.js <ไฟล์ export>   + เช็คว่า rebuild ได้ไฟล์ตรงกับที่ commit ไว้
+//   node tools/test.js                 เช็คว่า rebuild จาก src/ ได้ไฟล์ตรงกับที่ commit + เทส staging/index.html และ index.html
+//   node tools/test.js <ไฟล์ export>   เช็ค rebuild จากไฟล์ export นั้นแทน src/base.html
 //
 // ดึงฟังก์ชันออกจาก <script> ของหน้าเว็บมารันใน vm (ไม่ต้องมีเบราว์เซอร์)
 
@@ -133,11 +133,10 @@ function suite(file, staging){
 
 // ---- rebuild ตรงกับไฟล์ที่ commit ----
 const SRC = process.argv[2];
-if(SRC){
-  for(const flag of [[], ['--staging']]){
-    try{ execFileSync(process.execPath, [path.join(__dirname, 'rebuild.js'), SRC, '--check', ...flag], { stdio: 'pipe' }); passed++; }
-    catch(e){ failed++; console.log('  ✗ rebuild ' + (flag[0] || '') + ' ไม่ตรงกับไฟล์ที่มีอยู่: ' + String(e.stderr || e.message).trim()); }
-  }
+for(const flag of [[], ['--staging']]){
+  const args = [path.join(__dirname, 'rebuild.js'), ...(SRC ? [SRC] : []), '--check', ...flag];
+  try{ execFileSync(process.execPath, args, { stdio: 'pipe' }); passed++; }
+  catch(e){ failed++; console.log('  ✗ rebuild ' + (flag[0] || '') + ' ไม่ตรงกับไฟล์ที่มีอยู่: ' + String(e.stderr || e.message).trim()); }
 }
 
 suite('staging/index.html', true);
