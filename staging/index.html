@@ -810,7 +810,7 @@
      เพิ่มเข้ามาเพื่อรันบน GitHub Pages โดยไม่แก้โค้ดแอปเดิม
      ตั้งค่า SUPABASE_URL / SUPABASE_ANON_KEY ด้านล่าง
      ============================================================ -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js" integrity="sha512-xOXF+nzoFmJi/kmdwH/GpVZJqJ3VMVNKDX0yaG5KSS/l+hloBoe7KLa6B/c3N11x3oYIYrdewmcakorQXpGNeg==" crossorigin="anonymous"></script>
 <style>
   #authGate{position:fixed;inset:0;z-index:99999;background:#f6f7fb;display:flex;align-items:center;justify-content:center;padding:20px;font-family:inherit}
   #authGate .box{background:#fff;border:1px solid #e4e8ee;border-radius:16px;padding:28px 26px;width:100%;max-width:360px;box-shadow:0 10px 40px rgba(0,0,0,.08)}
@@ -1839,6 +1839,47 @@ function syncMonthDatesField(){
   const w = document.getElementById('rMonthDatesWrap');
   if(w) w.style.display = on ? '' : 'none';
 }
+
+// ===== B5: เตือนรหัสซ้ำ + คนทำติดจากกำหนดการ =====
+// รหัสซ้ำ = ในรายการเดียวกัน มีเลขรัน 18-N เดียวกัน หรือรหัสตรงกันทั้งตัว
+// (คนละรายการไม่นับ — กำหนดการ -> เรื่องเปิดใหม่ -> งานประจำ ใช้เลขเดียวกันตามปกติ)
+const CODE_LIST_LABEL = { recurring:'งานประจำ', newstories:'เรื่องเปิดใหม่', schedule:'กำหนดการ' };
+function codeListOf(coll){
+  if(coll === 'recurring') return recurring.map(r=>({ id:r.id, code:r.code || '', label:(r.code || '') + (displayName(r) ? ' · ' + displayName(r) : '') }));
+  if(coll === 'newstories') return newStories.map(n=>({ id:n.id, code:n.code || '', label:n.code || '' }));
+  return scheduleEntries.map(e=>({ id:e.id, code:e.title || '', label:e.title || '' }));
+}
+function codeConflicts(coll, code, excludeId){
+  const norm = String(code || '').trim().toLowerCase();
+  if(!norm) return [];
+  const ser = codeSerial(code);
+  return codeListOf(coll).filter(x=>x.id !== excludeId && (
+    String(x.code).trim().toLowerCase() === norm || (ser !== null && codeSerial(x.code) === ser)));
+}
+// ไม่ซ้ำ = true · ซ้ำ = ถามก่อน (ตกลง = บันทึกต่อ)
+async function confirmCodeUnique(coll, code, excludeId){
+  const hits = codeConflicts(coll, code, excludeId);
+  if(!hits.length) return true;
+  const ser = codeSerial(code);
+  return uiConfirm(
+    `${ser !== null ? 'เลข 18-' + ser : 'รหัส "' + code + '"'} มีอยู่แล้วใน${CODE_LIST_LABEL[coll]}:\n`
+      + hits.slice(0, 5).map(h=>'• ' + h.label).join('\n') + (hits.length > 5 ? '\n• …อีก ' + (hits.length - 5) : '')
+      + '\n\nบันทึกต่อไหม?',
+    'รหัสซ้ำ');
+}
+// คนทำของเรื่องเปิดใหม่: จากกำหนดการที่ส่งมา (fromScheduleId) หรือกำหนดการที่เลข 18-N ตรงกัน
+function schedulePersonFor(newItem){
+  let e = newItem.fromScheduleId ? scheduleEntries.find(x=>x.id === newItem.fromScheduleId) : null;
+  if(!e || !e.person){
+    const ser = codeSerial(newItem.code);
+    if(ser !== null) e = scheduleEntries.find(x=>x.person && codeSerial(x.title) === ser) || e;
+  }
+  return e && PEOPLE.includes(e.person) ? e.person : '';
+}
+
+// พิมพ์ค้นหา: รอหยุดพิมพ์ 150ms ค่อยวาดใหม่ (เดิมวาดทั้งรายการทุกตัวอักษร)
+let searchDebounceTimer = null;
+function debounceSearch(fn){ clearTimeout(searchDebounceTimer); searchDebounceTimer = setTimeout(fn, 150); }
 
 function pendingEpCount(item){
   return (item.pendingEpisodes && item.pendingEpisodes.length) || 0;
@@ -3012,7 +3053,7 @@ function renderRecurring(){
   container.innerHTML = html;
   const sb = document.getElementById('searchBox');
   sb.addEventListener('input', e=>{
-    searchText = e.target.value; renderRecurring();
+    searchText = e.target.value; debounceSearch(renderRecurring);
   });
   // โฟกัสช่องค้นหาเฉพาะตอนที่กำลังพิมพ์ค้นหาอยู่ ไม่ใช่ทุกครั้งที่วาดใหม่ (กันหน้าเด้งขึ้นบน)
   if(searchWasFocused){
@@ -3550,6 +3591,11 @@ async function saveNewRecurring(){
   const name = document.getElementById('rName').value.trim();
   const origName = document.getElementById('rOrigName').value.trim();
   if(!name && !origName){ showToast('กรุณาใส่ชื่อเรื่อง (ชื่อแปลหรือต้นฉบับอย่างน้อย 1 ช่อง)'); return; }
+  {
+    const codeVal = document.getElementById('rCode').value.trim();
+    const prev = editingRecurringId ? recurring.find(r=>r.id===editingRecurringId) : null;
+    if((!prev || (prev.code || '') !== codeVal) && !await confirmCodeUnique('recurring', codeVal, editingRecurringId)) return;
+  }
   const isMonthly = readDayChecks().includes(MONTH_DAY);
   const mDates = isMonthly ? parseMonthDates(document.getElementById('rMonthDates').value) : [];
   if(isMonthly && !mDates.length){ showToast('ใส่วันที่ของเดือน เช่น 8, 18, 28'); document.getElementById('rMonthDates').focus(); return; }
@@ -3728,7 +3774,7 @@ function renderNewStories(){
 
   container.innerHTML = html;
   const sb2 = document.getElementById('searchBox2');
-  sb2.addEventListener('input', e=>{ searchText=e.target.value; renderNewStories(); });
+  sb2.addEventListener('input', e=>{ searchText=e.target.value; debounceSearch(renderNewStories); });
   if(searchWasFocused){
     sb2.focus({preventScroll:true});
     sb2.selectionStart = sb2.selectionEnd = sb2.value.length;
@@ -3749,7 +3795,9 @@ function promoteNewToRecurring(id){
   document.getElementById('rOrigName').value = orig;
   document.getElementById('rLink').value = item.link || '';
   document.getElementById('rDrive').value = item.gdrive || '';
-  document.getElementById('recurringModalTitle').textContent = 'ย้ายเข้างานประจำ — เลือกวันและคนทำ';
+  const fromSchedule = schedulePersonFor(item);
+  if(fromSchedule) document.getElementById('rPerson').value = fromSchedule;
+  document.getElementById('recurringModalTitle').textContent = 'ย้ายเข้างานประจำ — เลือกวัน' + (fromSchedule ? ' (คนทำจากกำหนดการ: ' + fromSchedule + ')' : 'และคนทำ');
   promoteFromNewId = id;   // saveNewRecurring จะย้ายเรื่องเปิดใหม่ตัวนี้ลงถังขยะให้หลังบันทึก
 }
 
@@ -3798,6 +3846,10 @@ function openNewModal(id){
 async function saveNewStory(){
   const code = document.getElementById('nCode').value.trim();
   if(!code){ showToast('กรุณาใส่รหัสหรือชื่อเรื่อง'); return; }
+  {
+    const prev = editingNewId ? newStories.find(n=>n.id===editingNewId) : null;
+    if((!prev || (prev.code || '') !== code) && !await confirmCodeUnique('newstories', code, editingNewId)) return;
+  }
   const data = {
     code,
     link: document.getElementById('nLink').value.trim(),
@@ -3811,7 +3863,7 @@ async function saveNewStory(){
     newStories.push({ id: uid('n'), ...data, name:'', createdAt: new Date().toISOString(), contrib:{'เหนือ':false,'บิ๊ก':false,'ยูตะ':false,'น๊อต':false} });
     logActivity(`เพิ่มเรื่องเปิดใหม่ "${data.code}"`);
     const src = scheduleSourceForNew && scheduleEntries.find(e=>e.id===scheduleSourceForNew);
-    if(src) src.sentToNew = true;
+    if(src){ src.sentToNew = true; newStories[newStories.length-1].fromScheduleId = src.id; }
   }
   scheduleSourceForNew = null;
   editingNewId = null;
@@ -4159,7 +4211,7 @@ function renderAllStories(){
   if(allLcMode){ const hr = container.querySelector('.all-table thead tr'); if(hr) hr.insertAdjacentHTML('beforeend', '<th>เช็ค LC</th>'); }
 
   const box = document.getElementById('searchBoxAll');
-  box.addEventListener('input', e=>{ allSearch = e.target.value; renderAllStories(); });
+  box.addEventListener('input', e=>{ allSearch = e.target.value; debounceSearch(renderAllStories); });
   if(wasFocused){ box.focus({preventScroll:true}); box.selectionStart = box.selectionEnd = box.value.length; }
 }
 
@@ -4331,6 +4383,10 @@ function openScheduleModal(id){
 async function saveSchedule(){
   const title = document.getElementById('sTitle').value.trim();
   if(!title){ showToast('กรุณาใส่รหัสหรือชื่อเรื่อง'); return; }
+  {
+    const prev = editingScheduleId ? scheduleEntries.find(e=>e.id===editingScheduleId) : null;
+    if((!prev || (prev.title || '') !== title) && !await confirmCodeUnique('schedule', title, editingScheduleId)) return;
+  }
   const data = {
     date: document.getElementById('sDate').value || '',
     firstDate: document.getElementById('sFirstDate').value || '',
@@ -4596,6 +4652,8 @@ async function exportCalendarImage(){
   if(window.html2canvas){ doCapture(); return; }
   const s = document.createElement('script');
   s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+  s.integrity = 'sha512-BNaRQnYJYiPSqHHDb58B0yaPfCu+Wgds8Gp/gU33kqBtgNS4tSPHuGibyoeqMV/TJlSKda6FXzoEyYGjTe+vXA==';
+  s.crossOrigin = 'anonymous';
   s.onload = doCapture;
   s.onerror = ()=>showToast('โหลดตัวสร้างรูปไม่สำเร็จ (ต้องต่อเน็ต)');
   document.head.appendChild(s);

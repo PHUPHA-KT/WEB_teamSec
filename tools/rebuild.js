@@ -2089,6 +2089,77 @@ step('ปุ่มเลือกวันแบบปุ่มเม็ด', 'c
 </style>`, 'css');
 });
 
+// ================= 51) B5: เตือนรหัสซ้ำ + คนทำติดจากกำหนดการ =================
+step('B5 เตือนรหัสซ้ำ + คนทำจากกำหนดการ', 'async function confirmCodeUnique(', () => {
+  const js = fs.readFileSync(path.join(__dirname, 'codecheck.js'), 'utf8').replace(/\n$/, '');
+  rep(`function pendingEpCount(item){`, js + `\n\nfunction pendingEpCount(item){`, 'helpers');
+
+  // งานประจำ: เช็คเมื่อเพิ่มใหม่ หรือแก้รหัส
+  rep(`  if(!name && !origName){ showToast('กรุณาใส่ชื่อเรื่อง (ชื่อแปลหรือต้นฉบับอย่างน้อย 1 ช่อง)'); return; }`,
+`  if(!name && !origName){ showToast('กรุณาใส่ชื่อเรื่อง (ชื่อแปลหรือต้นฉบับอย่างน้อย 1 ช่อง)'); return; }
+  {
+    const codeVal = document.getElementById('rCode').value.trim();
+    const prev = editingRecurringId ? recurring.find(r=>r.id===editingRecurringId) : null;
+    if((!prev || (prev.code || '') !== codeVal) && !await confirmCodeUnique('recurring', codeVal, editingRecurringId)) return;
+  }`, 'recurring check');
+  // เรื่องเปิดใหม่
+  rep(`  const code = document.getElementById('nCode').value.trim();
+  if(!code){ showToast('กรุณาใส่รหัสหรือชื่อเรื่อง'); return; }`,
+`  const code = document.getElementById('nCode').value.trim();
+  if(!code){ showToast('กรุณาใส่รหัสหรือชื่อเรื่อง'); return; }
+  {
+    const prev = editingNewId ? newStories.find(n=>n.id===editingNewId) : null;
+    if((!prev || (prev.code || '') !== code) && !await confirmCodeUnique('newstories', code, editingNewId)) return;
+  }`, 'new story check');
+  // กำหนดการ
+  rep(`  const title = document.getElementById('sTitle').value.trim();
+  if(!title){ showToast('กรุณาใส่รหัสหรือชื่อเรื่อง'); return; }`,
+`  const title = document.getElementById('sTitle').value.trim();
+  if(!title){ showToast('กรุณาใส่รหัสหรือชื่อเรื่อง'); return; }
+  {
+    const prev = editingScheduleId ? scheduleEntries.find(e=>e.id===editingScheduleId) : null;
+    if((!prev || (prev.title || '') !== title) && !await confirmCodeUnique('schedule', title, editingScheduleId)) return;
+  }`, 'schedule check');
+
+  // กำหนดการ -> เรื่องเปิดใหม่: จำว่ามาจากกำหนดการไหน (เอาคนทำไปใช้ตอนย้ายเข้างานประจำ)
+  rep(`    if(src) src.sentToNew = true;`,
+      `    if(src){ src.sentToNew = true; newStories[newStories.length-1].fromScheduleId = src.id; }`, 'link schedule');
+  // เรื่องเปิดใหม่ -> งานประจำ: กรอกคนทำจากกำหนดการ
+  rep(`  document.getElementById('rDrive').value = item.gdrive || '';
+  document.getElementById('recurringModalTitle').textContent = 'ย้ายเข้างานประจำ — เลือกวันและคนทำ';`,
+`  document.getElementById('rDrive').value = item.gdrive || '';
+  const fromSchedule = schedulePersonFor(item);
+  if(fromSchedule) document.getElementById('rPerson').value = fromSchedule;
+  document.getElementById('recurringModalTitle').textContent = 'ย้ายเข้างานประจำ — เลือกวัน' + (fromSchedule ? ' (คนทำจากกำหนดการ: ' + fromSchedule + ')' : 'และคนทำ');`, 'person from schedule');
+}, { staging: true });
+
+// ================= 52) C4: ค้นหาไม่วาดใหม่ทุกตัวอักษร + ล็อก CDN ด้วย SRI =================
+step('C4 ค้นหา debounce + SRI', 'function debounceSearch(', () => {
+  rep(`function pendingEpCount(item){`,
+`// พิมพ์ค้นหา: รอหยุดพิมพ์ 150ms ค่อยวาดใหม่ (เดิมวาดทั้งรายการทุกตัวอักษร)
+let searchDebounceTimer = null;
+function debounceSearch(fn){ clearTimeout(searchDebounceTimer); searchDebounceTimer = setTimeout(fn, 150); }
+
+function pendingEpCount(item){`, 'helper');
+  rep(`  sb.addEventListener('input', e=>{
+    searchText = e.target.value; renderRecurring();
+  });`,
+`  sb.addEventListener('input', e=>{
+    searchText = e.target.value; debounceSearch(renderRecurring);
+  });`, 'recurring search');
+  rep(`  sb2.addEventListener('input', e=>{ searchText=e.target.value; renderNewStories(); });`,
+      `  sb2.addEventListener('input', e=>{ searchText=e.target.value; debounceSearch(renderNewStories); });`, 'new search');
+  rep(`  box.addEventListener('input', e=>{ allSearch = e.target.value; renderAllStories(); });`,
+      `  box.addEventListener('input', e=>{ allSearch = e.target.value; debounceSearch(renderAllStories); });`, 'all search');
+  // SRI: ไฟล์จาก CDN ถูกเปลี่ยน = เบราว์เซอร์ไม่รัน (ค่าตรวจจากไฟล์จริง 7 ต.ค. 2026)
+  rep(`<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>`,
+      `<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js" integrity="sha512-xOXF+nzoFmJi/kmdwH/GpVZJqJ3VMVNKDX0yaG5KSS/l+hloBoe7KLa6B/c3N11x3oYIYrdewmcakorQXpGNeg==" crossorigin="anonymous"></script>`, 'supabase SRI');
+  rep(`  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';`,
+`  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+  s.integrity = 'sha512-BNaRQnYJYiPSqHHDb58B0yaPfCu+Wgds8Gp/gU33kqBtgNS4tSPHuGibyoeqMV/TJlSKda6FXzoEyYGjTe+vXA==';
+  s.crossOrigin = 'anonymous';`, 'html2canvas SRI');
+}, { staging: true });
+
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
 step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {
