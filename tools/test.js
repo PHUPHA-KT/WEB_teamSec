@@ -46,8 +46,8 @@ function load(file){
   const html = fs.readFileSync(path.join(ROOT, file), 'utf8').replace(/\r\n/g, '\n');
   const fns = ['mergeById','mergeField','isPlainObj','mergeItemFields','itemDays','isMultiDay','normalizeDays',
     'epKey','sortEpisodes','parseEpisodeInput','weekEpCount','weekEpTotal','codeSerial','sourceInfo','pruneTrash','resetNonPendingToPending','dayStatus','setDayStatus',
-    'isDateType','monthDates','parseMonthDates','ymdOf','effDateOnly','effectiveNow','currentOccurrence','nextOccurrence','isDateToday','dateOccPassed'];
-  const code = [constLine(html,'DAY_ORDER'), constLine(html,'WEEKDAY_ONLY'), constLine(html,'TRASH_MAX'), constLine(html,'TRASH_KEEP_DAYS'), constLine(html,'MONTH_DAY'), constLine(html,'DAY_ROLLOVER_HOUR')]
+    'isDateType','monthDates','parseMonthDates','ymdOf','effDateOnly','effectiveNow','currentOccurrence','nextOccurrence','isDateToday','dateOccPassed','computeSplit','splitOrderFrom'];
+  const code = [constLine(html,'DAY_ORDER'), constLine(html,'WEEKDAY_ONLY'), constLine(html,'TRASH_MAX'), constLine(html,'TRASH_KEEP_DAYS'), constLine(html,'MONTH_DAY'), constLine(html,'DAY_ROLLOVER_HOUR'), constLine(html,'SPLIT_LAST'), constLine(html,'SPLIT_ROTATE')]
     .concat(fns.map(n => extract(html, n) || '')).join('\n');
   const SOURCE = /const SOURCE_ABBR = \{[\s\S]*?\n\};/.exec(html);
   const ctx = { trash: [], esc: s => s, URL };
@@ -110,6 +110,18 @@ function suite(file, staging){
     F.resetNonPendingToPending(rs); eq(rs[0].dateStatus, {'2026-10-08':'done'}, 'monthDates: รีเซ็ตวันจันทร์ไม่แตะ');
     at(2026,10,30);   // 12:00 = ยังนับเป็นวันที่ 29 -> รอบ 28 ผ่านแล้ว
     eq([F.dateOccPassed({ ...it, monthDatesSince:'2026-10-29' }), F.dateOccPassed({ ...it, monthDatesSince:'2026-10-01' })], [false, true], 'monthDates: ไม่เตือนย้อนก่อนวันตั้ง');
+  }
+  // แบ่งตอน: ตรงกับตัวอย่าง 3 แบบที่ทีมทำมือ
+  if(F.computeSplit){
+    const ex1 = F.computeSplit(0, 21, ['บิ๊ก','ยูตะ','เหนือ','น๊อต']);
+    eq(ex1, { 'บิ๊ก':[0,4,8,12,16,20], 'ยูตะ':[1,5,9,13,17,21], 'เหนือ':[2,6,10,14,18], 'น๊อต':[3,7,11,15,19] }, 'split: ตอน 0–21');
+    eq(F.computeSplit(1, 8, ['ยูตะ','บิ๊ก','เหนือ','น๊อต']), { 'ยูตะ':[1,5], 'บิ๊ก':[2,6], 'เหนือ':[3,7], 'น๊อต':[4,8] }, 'split: ตอน 1–8');
+    eq(F.computeSplit(0, 8, ['บิ๊ก','ยูตะ','เหนือ','น๊อต'])['บิ๊ก'], [0,4,8], 'split: ตอน 0–8');
+    eq([0,1,2,3].map(i=>F.splitOrderFrom(i).join(',')), ['บิ๊ก,ยูตะ,เหนือ,น๊อต','ยูตะ,เหนือ,บิ๊ก,น๊อต','เหนือ,บิ๊ก,ยูตะ,น๊อต','บิ๊ก,ยูตะ,เหนือ,น๊อต'], 'split: วนคนได้เยอะ / น๊อตท้ายเสมอ');
+    for(let n = 1; n <= 30; n++){
+      const m = F.computeSplit(1, n, F.splitOrderFrom(n % 3)); const c = Object.values(m).map(a=>a.length);
+      if(!(m['น๊อต'].length === Math.min(...c) && Math.max(...c) - Math.min(...c) <= 1)){ eq(c, 'balanced', 'split: น๊อตน้อยสุด n=' + n); break; }
+    }
   }
   if(F.codeSerial) eq(['7-18-51-x','18-27','5-11-1','งาน 46 ตอน'].map(F.codeSerial), [51,27,null,null], 'codeSerial');
   if(F.sourceInfo) eq([F.sourceInfo('https://www.lezhin.com/x').abbr, F.sourceInfo('https://a.co.kr/').abbr, F.sourceInfo('bad')], ['LZ','a',null], 'sourceInfo');

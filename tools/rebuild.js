@@ -2160,6 +2160,31 @@ function pendingEpCount(item){`, 'helper');
   s.crossOrigin = 'anonymous';`, 'html2canvas SRI');
 }, { staging: true });
 
+// ================= 53) แบ่งตอนเรื่องเปิดใหม่ (น๊อตท้ายเสมอ อีก 3 คนผลัดกันได้เยอะ) =================
+step('แบ่งตอนเรื่องเปิดใหม่ (split)', 'function computeSplit(', () => {
+  const js = fs.readFileSync(path.join(__dirname, 'split.js'), 'utf8').replace(/\n$/, '');
+  rep(`function pendingEpCount(item){`, js + `\n\nfunction pendingEpCount(item){`, 'helpers');
+  rep(`          <button class="icon-btn" onclick="openNewModal('\${item.id}')" title="แก้ไข" style="color:#6b7480;">✎</button>
+          <button class="icon-btn" onclick="deleteNewStory('\${item.id}')">✕</button>`,
+`          <button class="btn btn-ghost sched-act" onclick="openSplitModal('\${item.id}')" title="แบ่งตอนให้ 4 คน">✂ \${item.split ? 'ตอน ' + item.split.from + '–' + item.split.to : 'แบ่งตอน'}</button>
+          <button class="icon-btn" onclick="openNewModal('\${item.id}')" title="แก้ไข" style="color:#6b7480;">✎</button>
+          <button class="icon-btn" onclick="deleteNewStory('\${item.id}')">✕</button>`, 'card button');
+  rep(`            <input type="checkbox" \${(item.contrib||{})[p]?'checked':''} onchange="toggleContrib('\${item.id}','\${p}')">
+            \${p}`,
+`            <input type="checkbox" \${(item.contrib||{})[p]?'checked':''} onchange="toggleContrib('\${item.id}','\${p}')">
+            \${p}\${splitEpsLabel(item, p)}`, 'contrib eps');
+  rep('</style>', `  /* แบ่งตอน */
+  .split-range{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .split-order-row{ display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:12.5px; color:var(--ink-soft); margin:2px 0 8px; }
+  .split-order-row .btn{ padding:5px 10px; font-size:12.5px; }
+  #splitPreview .split-table{ min-width:0; width:100%; table-layout:auto; }
+  .split-table td, .split-table th{ padding:7px 8px; font-size:13px; white-space:normal; word-break:break-word; }
+  .split-table td:first-child, .split-table td:last-child{ white-space:nowrap; }
+  .split-eps{ display:block; font-size:11px; font-weight:600; color:var(--blue); margin-top:1px; }
+  .contrib-item.on .split-eps{ color:inherit; opacity:.85; }
+</style>`, 'css');
+}, { staging: true });
+
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
 step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {
