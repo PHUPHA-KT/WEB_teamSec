@@ -114,3 +114,11 @@ git push
 - `node tools/preview.js --data <backup.json>` เปิดได้ทั้ง `/` และ `/staging` storage จำลองมีเวอร์ชัน (ทดสอบเซฟชนกันได้)
 - รวมแล้ว: รีเซ็ตรายสัปดาห์ไม่ถูกย้อน (snapshot ก่อนรีเซ็ต) · poll ไม่ทับงานในเครื่อง · รีเซ็ตเองตอนเปิดค้างข้ามจันทร์ 2 ทุ่ม · เซฟแบบเช็ค `updated_at` (ชน = อ่านใหม่ merge ใหม่ สูงสุด 3 รอบ) · ป้ายเตือน backup เกิน 36 ชม. (`backup_status`) · แถบ "ผ่านวันแล้วยังไม่ทำ" · ประวัติละเอียดขึ้น + ถามก่อนติ๊กแทน · ปุ่มสถานะคลิกเดียว / เมนู ⋯ / เลิกทำ 5 วิ / Esc-Enter · ✕ ตอนค้างในแถว · ปฏิทินคลิกย้าย + ดับเบิลคลิกแก้ไข · โน้ตด้านขวาหน้ากำหนดการ (`schedule_note`)
 - ย้อนกลับได้ที่ tag `before-staging-merge`
+
+## สร้างเว็บจาก repo อย่างเดียว (7 ต.ค. 2026)
+- แก้ฟีเจอร์ที่ `tools/*.js` หรือขั้นใน `tools/rebuild.js` แล้วรัน:
+  - `node tools/rebuild.js` → `index.html` · `node tools/rebuild.js --staging` → `staging/index.html`
+  - `node tools/test.js` → เช็คว่า build ตรงกับที่ commit + เทสทั้งหมด (ควรผ่านก่อน push ทุกครั้ง)
+- ต้นฉบับแอปอยู่ที่ `src/base.html` (ตัดข้อมูลจริงแล้ว) · ชั้น Supabase อยู่ที่ `src/shim.html` — **อย่าแก้ index.html ตรงๆ** จะโดน build ทับ
+- ไม่ต้องใช้ไฟล์ใน Downloads อีกแล้ว (ยังรับ path ไฟล์ export ได้ถ้ามี export ใหม่)
+- `.gitattributes` บังคับ LF — clone บนเครื่องไหนก็ build ได้
