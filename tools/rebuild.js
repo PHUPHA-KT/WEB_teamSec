@@ -2311,6 +2311,46 @@ function renderCalendar(){
 </style>`, 'css');
 });
 
+// ================= 56) พักชั่วคราว มีวันกลับ (pauseUntil) =================
+step('พักชั่วคราวมีวันกลับ (pauseUntil)', 'function isPaused(', () => {
+  const js = fs.readFileSync(path.join(__dirname, 'pause.js'), 'utf8').replace(/\n$/, '');
+  rep(`function pendingEpCount(item){`, js + `\n\nfunction pendingEpCount(item){`, 'helpers');
+
+  // ปุ่มสถานะ -> "พัก"
+  rep(`function statusCtlHtml(item, day){`,
+`function statusCtlHtml(item, day){
+  if(isPaused(item)) return \`<span class="st-ctl st-paused" title="พักชั่วคราว — กลับมาลง \${esc(thaiDateLabel(item.pauseUntil))} (ยกเลิกได้ที่เมนู ⋯)">⏸ พัก</span>\`;`, 'status pill');
+  // เมนู ⋯
+  rep(`    { label: '🗑 ลบเรื่อง', danger: true, onClick: ()=>deleteRecurring(id) },`,
+`    isPaused(item)
+      ? { label: '▶ ยกเลิกพัก (กลับมาแล้ว)', onClick: ()=>unpauseStory(id) }
+      : { label: '⏸ พักชั่วคราว…', onClick: ()=>openPauseModal(id) },
+    { label: '🗑 ลบเรื่อง', danger: true, onClick: ()=>deleteRecurring(id) },`, 'row menu');
+  // แถวจาง + ป้าย
+  rep(`      html += \`<div class="item-row">`, `      html += \`<div class="item-row\${isPaused(item) ? ' item-paused' : ''}">`, 'row class');
+  rep(`\${itemDays(item).length} วัน/สัปดาห์</span>\`:''}\${dropBadge}</div>`,
+      `\${itemDays(item).length} วัน/สัปดาห์</span>\`:''}\${dropBadge}\${pauseBadgeHtml(item)}</div>`, 'row badge');
+  // ไม่เตือนผ่านวันแล้วยังไม่ทำ / ไม่นับตอนต่อสัปดาห์
+  rep(`    if(isEffectivelyDropped(item)) return;
+    if(personFilter !== 'ทั้งหมด'`,
+`    if(isEffectivelyDropped(item) || isPaused(item)) return;
+    if(personFilter !== 'ทั้งหมด'`, 'missed skip');
+  rep(`function weekEpCount(item){ return itemDays(item).filter(d=>d !== 'จบแล้ว').length; }`,
+      `function weekEpCount(item){ if(isPaused(item)) return 0; return itemDays(item).filter(d=>d !== 'จบแล้ว').length; }`, 'week count');
+  // ปฏิทิน
+  rep(`· ดับเบิลคลิกเพื่อแก้ไข">\${esc((r.code?r.code+'-':'') + displayName(r))}\${badge}</span>\`;`,
+      `· ดับเบิลคลิกเพื่อแก้ไข\${isPaused(r) ? ' · พักถึง ' + esc(thaiDateLabel(r.pauseUntil)) : ''}">\${isPaused(r) ? '⏸ ' : ''}\${esc((r.code?r.code+'-':'') + displayName(r))}\${badge}</span>\`;`, 'calendar chip');
+
+  rep('</style>', `  /* พักชั่วคราว */
+  .item-paused .item-code, .item-paused .orig-name, .item-paused .lastep-badge{ opacity:.55; }   /* ตอนค้างไม่จาง (ยังต้องเคลียร์) */
+  .pause-badge{ display:inline-block; margin-left:6px; padding:1px 8px; border-radius:6px; font-size:11px; font-weight:700; background:#eef1f5; color:#5b6472; vertical-align:middle; }
+  .st-paused{ padding:6px 12px; font-size:12px; font-weight:700; background:#eef1f5; color:#5b6472; min-width:78px; justify-content:center; cursor:default; }
+  .pause-quick{ display:flex; flex-wrap:wrap; gap:6px; }
+  .pause-quick .btn{ padding:5px 10px; font-size:12.5px; }
+  body.dark .pause-badge, body.dark .st-paused{ background:#2a313c; color:#a2abba; }
+</style>`, 'css');
+}, { staging: true });
+
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
 step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {

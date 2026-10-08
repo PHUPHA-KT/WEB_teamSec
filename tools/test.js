@@ -46,7 +46,7 @@ function load(file){
   const html = fs.readFileSync(path.join(ROOT, file), 'utf8').replace(/\r\n/g, '\n');
   const fns = ['mergeById','mergeField','isPlainObj','mergeItemFields','itemDays','isMultiDay','normalizeDays',
     'epKey','sortEpisodes','parseEpisodeInput','weekEpCount','weekEpTotal','codeSerial','sourceInfo','pruneTrash','resetNonPendingToPending','dayStatus','setDayStatus',
-    'isDateType','monthDates','parseMonthDates','ymdOf','effDateOnly','effectiveNow','currentOccurrence','nextOccurrence','isDateToday','dateOccPassed','computeSplit','splitOrderFrom'];
+    'isDateType','monthDates','parseMonthDates','ymdOf','effDateOnly','effectiveNow','currentOccurrence','nextOccurrence','isDateToday','dateOccPassed','computeSplit','splitOrderFrom','isPaused','addDaysYmd'];
   const code = [constLine(html,'DAY_ORDER'), constLine(html,'WEEKDAY_ONLY'), constLine(html,'TRASH_MAX'), constLine(html,'TRASH_KEEP_DAYS'), constLine(html,'MONTH_DAY'), constLine(html,'DAY_ROLLOVER_HOUR'), constLine(html,'SPLIT_LAST'), constLine(html,'SPLIT_ROTATE')]
     .concat(fns.map(n => extract(html, n) || '')).join('\n');
   const SOURCE = /const SOURCE_ABBR = \{[\s\S]*?\n\};/.exec(html);
@@ -122,6 +122,15 @@ function suite(file, staging){
       const m = F.computeSplit(1, n, F.splitOrderFrom(n % 3)); const c = Object.values(m).map(a=>a.length);
       if(!(m['น๊อต'].length === Math.min(...c) && Math.max(...c) - Math.min(...c) <= 1)){ eq(c, 'balanced', 'split: น๊อตน้อยสุด n=' + n); break; }
     }
+  }
+  // พักชั่วคราว: ก่อนวันกลับ = พัก, ถึงวันกลับ (หลัง 2 ทุ่มคืนก่อน) = ปกติ, ไม่นับตอน/สัปดาห์
+  if(F.isPaused){
+    const at = (y,m,d,h) => { ctx.effectiveNow = () => { const x = new Date(y, m-1, d, h||12); x.setHours(x.getHours() - 20); return x; }; };
+    const p = { day:'พุธ', pauseUntil:'2026-10-21' };
+    at(2026,10,15); eq([F.isPaused(p), F.weekEpCount(p)], [true, 0], 'pause: ระหว่างพัก');
+    at(2026,10,21,19); eq(F.isPaused(p), true, 'pause: วันกลับก่อน 2 ทุ่ม ยังนับเป็นวันก่อน = ยังพัก');
+    at(2026,10,21,21); eq([F.isPaused(p), F.weekEpCount(p)], [false, 1], 'pause: วันกลับหลัง 2 ทุ่ม = กลับมาแล้ว');
+    eq([F.isPaused({ day:'พุธ' }), F.addDaysYmd('2026-10-28', 7)], [false, '2026-11-04'], 'pause: ไม่ตั้ง / บวกวันข้ามเดือน');
   }
   if(F.codeSerial) eq(['7-18-51-x','18-27','5-11-1','งาน 46 ตอน'].map(F.codeSerial), [51,27,null,null], 'codeSerial');
   if(F.sourceInfo) eq([F.sourceInfo('https://www.lezhin.com/x').abbr, F.sourceInfo('https://a.co.kr/').abbr, F.sourceInfo('bad')], ['LZ','a',null], 'sourceInfo');
