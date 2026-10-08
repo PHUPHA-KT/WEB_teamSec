@@ -2349,7 +2349,7 @@ step('พักชั่วคราวมีวันกลับ (pauseUntil)'
   .pause-quick .btn{ padding:5px 10px; font-size:12.5px; }
   body.dark .pause-badge, body.dark .st-paused{ background:#2a313c; color:#a2abba; }
 </style>`, 'css');
-}, { staging: true });
+});
 
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก

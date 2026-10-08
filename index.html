@@ -498,6 +498,13 @@
   .cal-tray-head small{ font-weight:500; color:var(--ink-soft); margin-left:6px; }
   .cal-tray-items{ display:flex; flex-wrap:wrap; gap:4px; }
   .cal-new-chip{ background:var(--card); border-color:var(--blue); }
+  /* พักชั่วคราว */
+  .item-paused .item-code, .item-paused .orig-name, .item-paused .lastep-badge{ opacity:.55; }   /* ตอนค้างไม่จาง (ยังต้องเคลียร์) */
+  .pause-badge{ display:inline-block; margin-left:6px; padding:1px 8px; border-radius:6px; font-size:11px; font-weight:700; background:#eef1f5; color:#5b6472; vertical-align:middle; }
+  .st-paused{ padding:6px 12px; font-size:12px; font-weight:700; background:#eef1f5; color:#5b6472; min-width:78px; justify-content:center; cursor:default; }
+  .pause-quick{ display:flex; flex-wrap:wrap; gap:6px; }
+  .pause-quick .btn{ padding:5px 10px; font-size:12.5px; }
+  body.dark .pause-badge, body.dark .st-paused{ background:#2a313c; color:#a2abba; }
 </style>
 </head>
 <body>
@@ -1294,7 +1301,7 @@ function itemDays(item){
 }
 function isMultiDay(item){ return itemDays(item).length > 1; }
 // ตอนต่อสัปดาห์ = จำนวนวันที่ลง (ไม่ระบุวัน = 1, จบแล้ว = 0)
-function weekEpCount(item){ return itemDays(item).filter(d=>d !== 'จบแล้ว').length; }
+function weekEpCount(item){ if(isPaused(item)) return 0; return itemDays(item).filter(d=>d !== 'จบแล้ว').length; }
 function weekEpTotal(items){ return items.reduce((n, r)=>n + weekEpCount(r), 0); }
 function dayStatus(item, day){
   if(isDateType(item)){ const occ = currentOccurrence(item); return (occ && (item.dateStatus || {})[occ]) || 'pending'; }
@@ -1544,7 +1551,7 @@ let missedOpen = false;
 function missedRows(){
   const rows = [];
   recurring.forEach(item=>{
-    if(isEffectivelyDropped(item)) return;
+    if(isEffectivelyDropped(item) || isPaused(item)) return;
     if(personFilter !== 'ทั้งหมด' && !isPersonInvolved(item, personFilter)) return;
     itemDays(item).forEach(day=>{
       if((day === MONTH_DAY ? dateOccPassed(item) : dayHasPassed(day)) && dayStatus(item, day) === 'pending') rows.push({ item, day });
@@ -1633,6 +1640,7 @@ function openPopMenu(anchor, items){
 
 // ---- ปุ่มสถานะ: คลิก = สลับ ทำแล้ว/ยังไม่ทำ, ▾ = เลือก งด/เลื่อน ----
 function statusCtlHtml(item, day){
+  if(isPaused(item)) return `<span class="st-ctl st-paused" title="พักชั่วคราว — กลับมาลง ${esc(thaiDateLabel(item.pauseUntil))} (ยกเลิกได้ที่เมนู ⋯)">⏸ พัก</span>`;
   const st = dayStatus(item, day);
   const meta = STATUS_META[st] || STATUS_META.pending;
   return `<span class="st-ctl">
@@ -1662,6 +1670,9 @@ function openRowMenu(btn, id){
     item.dropped
       ? { label: '↩ ยกเลิกการรอดรอป', onClick: ()=>undropStory(id) }
       : { label: '⏏ ดรอปเรื่อง…', onClick: ()=>openDropMenu(id) },
+    isPaused(item)
+      ? { label: '▶ ยกเลิกพัก (กลับมาแล้ว)', onClick: ()=>unpauseStory(id) }
+      : { label: '⏸ พักชั่วคราว…', onClick: ()=>openPauseModal(id) },
     { label: '🗑 ลบเรื่อง', danger: true, onClick: ()=>deleteRecurring(id) },
   ]);
 }
@@ -2011,6 +2022,70 @@ async function saveSplit(){
     try{ await window.storage.set('split_next', String(splitNext), true); }catch(e){}
   }
   showToast('บันทึกการแบ่งตอนแล้ว');
+}
+
+// ===== พักชั่วคราว (มีวันกลับ) =====
+// item.pauseUntil = 'YYYY-MM-DD' วันที่กลับมาลง — ก่อนวันนั้น (นับวันใหม่ตอน 2 ทุ่ม) = พัก
+// ระหว่างพัก: อยู่ในงานประจำแบบจาง สถานะ = พัก ไม่เตือน "ผ่านวันแล้วยังไม่ทำ" ไม่นับ ตอน/สัปดาห์
+// ตอนค้างที่มีอยู่ยังเตือนตามปกติ · ถึงวันกลับ = ปกติเอง ไม่ต้องกดอะไร
+function isPaused(item){
+  return !!item.pauseUntil && ymdOf(effDateOnly()) < item.pauseUntil;
+}
+function pauseBadgeHtml(item){
+  if(!isPaused(item)) return '';
+  return ` <span class="pause-badge" title="พักชั่วคราว — กลับมาลง ${esc(thaiDateLabel(item.pauseUntil))}">⏸ พัก · กลับ ${esc(thaiDateLabel(item.pauseUntil))}</span>`;
+}
+function addDaysYmd(ymd, n){
+  const d = new Date(ymd + 'T00:00:00'); d.setDate(d.getDate() + n); return ymdOf(d);
+}
+
+function openPauseModal(id){
+  const item = recurring.find(r=>r.id===id);
+  if(!item) return;
+  const today = ymdOf(effDateOnly());
+  const old = document.getElementById('modalPause'); if(old) old.remove();
+  const back = document.createElement('div');
+  back.className = 'modal-backdrop show';
+  back.id = 'modalPause';
+  back.innerHTML = `<div class="modal" style="max-width:400px;">
+    <h3>⏸ พักชั่วคราว — ${esc(displayName(item) || item.code)}</h3>
+    <div class="field"><label>กลับมาลงวันที่</label><input id="pauseUntil" type="date" min="${addDaysYmd(today, 1)}" value="${esc(item.pauseUntil && item.pauseUntil > today ? item.pauseUntil : addDaysYmd(today, 7))}"></div>
+    <div class="pause-quick">
+      ${[[7,'+1 สัปดาห์'],[14,'+2 สัปดาห์'],[21,'+3 สัปดาห์'],[28,'+4 สัปดาห์']].map(([n,l])=>`<button type="button" class="btn btn-ghost" onclick="document.getElementById('pauseUntil').value='${addDaysYmd(today, n)}'">${l}</button>`).join('')}
+    </div>
+    <div style="font-size:12px;color:var(--ink-soft);margin-top:8px;">ระหว่างพักไม่ต้องกดสถานะ · ตอนค้างที่มีอยู่ยังเตือนตามปกติ · ถึงวันกลับเป็นปกติเอง</div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('modalPause')">ยกเลิก</button>
+      <button type="button" class="btn btn-primary" onclick="savePause('${item.id}')">พัก</button>
+    </div>
+  </div>`;
+  back.addEventListener('click', e=>{ if(e.target === back) closeModal('modalPause'); });
+  document.body.appendChild(back);
+  const inp = document.getElementById('pauseUntil');
+  inp.addEventListener('click', ()=>{ try{ inp.showPicker && inp.showPicker(); }catch(e){} });
+}
+async function savePause(id){
+  const item = recurring.find(r=>r.id===id);
+  if(!item) return;
+  const v = document.getElementById('pauseUntil').value;
+  if(!v || v <= ymdOf(effDateOnly())){ showToast('เลือกวันที่กลับมาลง (หลังวันนี้)'); return; }
+  const undoSnap = snapItem('recurring_stories', id);
+  item.pauseUntil = v;
+  logActivity(`พัก "${displayName(item) || item.code}" ถึง ${thaiDateLabel(v)}`);
+  offerUndo(`พัก "${displayName(item) || item.code}"`, [undoSnap]);
+  closeModal('modalPause');
+  renderStats(); renderTab();
+  await persistRecurring(false);
+}
+async function unpauseStory(id){
+  const item = recurring.find(r=>r.id===id);
+  if(!item) return;
+  const undoSnap = snapItem('recurring_stories', id);
+  delete item.pauseUntil;
+  logActivity(`ยกเลิกพัก "${displayName(item) || item.code}" (กลับมาก่อนกำหนด)`);
+  offerUndo(`ยกเลิกพัก "${displayName(item) || item.code}"`, [undoSnap]);
+  renderStats(); renderTab();
+  await persistRecurring(false);
 }
 
 function pendingEpCount(item){
@@ -3154,9 +3229,9 @@ function renderRecurring(){
             ? ` <span class="drop-badge drop-badge-edit" title="กดเพื่อเปลี่ยนเหตุผล" onclick="changeDropReason('${item.id}')" style="background:${DROP_META[item.dropped].bg};color:${DROP_META[item.dropped].fg};">${DROP_META[item.dropped].label} ▾</span>`
             : ` <span class="drop-badge drop-badge-edit" title="กดเพื่อเปลี่ยนเหตุผล" onclick="changeDropReason('${item.id}')" style="background:#fdf3e3;color:#b9791b;">⏳ รอดรอป (${DROP_META[item.dropped].label}) · เคลียร์ตอนค้างก่อน ▾</span>`)
         : '';
-      html += `<div class="item-row">
+      html += `<div class="item-row${isPaused(item) ? ' item-paused' : ''}">
         <div class="item-main">
-          <div class="item-code">${sourceBadgeHtml(item)}${item.code ? esc(item.code)+' · ' : ''}${esc(displayName(item))||'(ไม่มีชื่อ)'}${isMultiDay(item)?` <span class="multi-badge" title="${esc(itemDays(item).join(' · '))}">${itemDays(item).length} วัน/สัปดาห์</span>`:''}${dropBadge}</div>
+          <div class="item-code">${sourceBadgeHtml(item)}${item.code ? esc(item.code)+' · ' : ''}${esc(displayName(item))||'(ไม่มีชื่อ)'}${isMultiDay(item)?` <span class="multi-badge" title="${esc(itemDays(item).join(' · '))}">${itemDays(item).length} วัน/สัปดาห์</span>`:''}${dropBadge}${pauseBadgeHtml(item)}</div>
           ${origNameHtml(item)}
           <div class="ep-line">${lastEpBadgeHtml(item)}</div>
           ${overdueBadgeHtml(item)}
@@ -4639,7 +4714,7 @@ function renderCalendar(){
             const by = pendingEpsByPerson(r);
             const owner = hasForeignBacklog(r) ? ' · ' + esc(Object.keys(by).filter(p=>p!==r.person).map(p=>p+' '+by[p]).join(', ')) : '';
             const badge = eps ? ` <span class="cal-chip-eps">(ค้าง ${eps}${owner})</span>` : '';
-            return `<span class="cal-chip" data-id="${r.id}" data-from="${esc(d)}" title="ลากหรือคลิกเพื่อย้ายวัน/ย้ายคน${isMultiDay(r)?' (ย้ายเฉพาะวันนี้)':''} · ดับเบิลคลิกเพื่อแก้ไข">${esc((r.code?r.code+'-':'') + displayName(r))}${badge}</span>`;
+            return `<span class="cal-chip" data-id="${r.id}" data-from="${esc(d)}" title="ลากหรือคลิกเพื่อย้ายวัน/ย้ายคน${isMultiDay(r)?' (ย้ายเฉพาะวันนี้)':''} · ดับเบิลคลิกเพื่อแก้ไข${isPaused(r) ? ' · พักถึง ' + esc(thaiDateLabel(r.pauseUntil)) : ''}">${isPaused(r) ? '⏸ ' : ''}${esc((r.code?r.code+'-':'') + displayName(r))}${badge}</span>`;
           }).join('');
           return `<tr>
             <td class="cal-day">${CAL_DAY_LABEL[d]}</td>
