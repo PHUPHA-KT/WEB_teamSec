@@ -2307,7 +2307,7 @@ function renderCalendar(){
   .cal-tray-items{ display:flex; flex-wrap:wrap; gap:4px; }
   .cal-new-chip{ background:var(--card); border-color:var(--blue); }
 </style>`, 'css');
-}, { staging: true });
+});
 
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
