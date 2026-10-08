@@ -2244,6 +2244,71 @@ function codeSerialBarHtml(){
 </style>`, 'css');
 });
 
+// ================= 55) ปฏิทิน: ลากเรื่องเปิดใหม่ลงช่องคน×วัน = ย้ายเข้างานประจำ =================
+step('ปฏิทิน: ลากเรื่องเปิดใหม่เข้างานประจำ', 'function calNewTrayHtml(', () => {
+  rep(`function renderCalendar(){
+  calSel = null;`,
+`// กล่องเรื่องเปิดใหม่ (ยังไม่เข้างานประจำ) — ลาก/คลิกไปวางช่องคน×วัน
+function calNewTrayHtml(){
+  // ไม่รวมเรื่องที่อยู่ในงานประจำแล้ว (promotedId หรือเลขรหัสชุดเดียวกันมีในงานประจำ — ข้อมูลก่อนมี promotedId)
+  const inRecurring = n => CODE_SERIES.some(s=>{ const k = codeSerialOf(n.code, s); return k !== null && recurring.some(r=>codeSerialOf(r.code, s) === k); });
+  const list = newStories.filter(n=>!promotedTarget(n) && !inRecurring(n));
+  if(!list.length) return '';
+  return \`<div class="cal-tray">
+    <div class="cal-tray-head">🆕 เรื่องเปิดใหม่ <small>ลากไปวางช่องคน × วัน เพื่อย้ายเข้างานประจำ · ดับเบิลคลิกเพื่อแก้</small></div>
+    <div class="cal-tray-items">\${list.map(n=>\`<span class="cal-chip cal-new-chip" data-new="\${n.id}" title="ลากไปวางช่องคน × วัน">\${esc(n.code || '(ไม่มีรหัส)')}</span>\`).join('')}</div>
+  </div>\`;
+}
+// วางเรื่องเปิดใหม่ลงช่อง -> เปิดหน้าต่างย้ายเข้างานประจำ กรอกคน+วันตามช่อง (เหลือใส่ชื่อแปลแล้วบันทึก)
+function placeNewStory(newId, person, day){
+  if(day === 'จบแล้ว'){ showToast('วางในช่อง "จบแล้ว" ไม่ได้ — เลือกวันที่ลง'); return; }
+  const n = newStories.find(x=>x.id===newId);
+  if(!n) return;
+  promoteNewToRecurring(newId);
+  document.getElementById('rPerson').value = person;
+  setDayChecks([day]);
+  syncMonthDatesField();
+  document.getElementById('recurringModalTitle').textContent = 'ย้ายเข้างานประจำ — ' + person + ' · ' + (CAL_DAY_LABEL[day] || day);
+  setTimeout(()=>{ const f = document.getElementById(day === MONTH_DAY ? 'rMonthDates' : 'rName'); if(f) f.focus(); }, 80);
+}
+function renderCalendar(){
+  calSel = null;`, 'tray helpers');
+  rep(`    <div id="calCapture">\${html}</div>\`;
+  bindCalendarDrag(container);`,
+`    \${calNewTrayHtml()}
+    <div id="calCapture">\${html}</div>\`;
+  bindCalendarDrag(container);`, 'tray in page');
+
+  // ลาก: จำว่าเป็นเรื่องเปิดใหม่
+  rep(`    drag = { id: chip.dataset.id, from: chip.dataset.from, chip,`,
+      `    drag = { id: chip.dataset.id, newId: chip.dataset.new, from: chip.dataset.from, chip,`, 'drag newId');
+  rep(`    const started = drag.started, id = drag.id, from = drag.from;`,
+      `    const started = drag.started, id = drag.id, from = drag.from, newId = drag.newId;`, 'end newId');
+  rep(`    if(cell) moveCalendarItem(id, cell.dataset.person, cell.dataset.day, from);`,
+      `    if(cell) newId ? placeNewStory(newId, cell.dataset.person, cell.dataset.day) : moveCalendarItem(id, cell.dataset.person, cell.dataset.day, from);`, 'drop new');
+  // คลิกเลือก แล้วคลิกช่อง
+  rep(`  const same = calSel && calSel.id === chip.dataset.id && calSel.from === chip.dataset.from;`,
+      `  const same = calSel && calSel.id === chip.dataset.id && calSel.from === chip.dataset.from && calSel.newId === chip.dataset.new;`, 'same sel');
+  rep(`  calSel = { id: chip.dataset.id, from: chip.dataset.from };`,
+      `  calSel = { id: chip.dataset.id, from: chip.dataset.from, newId: chip.dataset.new };`, 'sel newId');
+  rep(`    if(cell && calSel){ const s = calSel; calClearSel(); moveCalendarItem(s.id, cell.dataset.person, cell.dataset.day, s.from); }`,
+      `    if(cell && calSel){ const s = calSel; calClearSel(); s.newId ? placeNewStory(s.newId, cell.dataset.person, cell.dataset.day) : moveCalendarItem(s.id, cell.dataset.person, cell.dataset.day, s.from); }`, 'click new');
+  rep(`    openRecurringModal(chip.dataset.id);`,
+      `    if(chip.dataset.new) openNewModal(chip.dataset.new); else openRecurringModal(chip.dataset.id);`, 'dblclick new');
+
+  // ย้ายจากปฏิทินแล้วอยู่หน้าปฏิทินต่อ
+  rep(`  if(activeTab !== 'recurring' && !wasEdit) switchTab('recurring'); else renderTab();`,
+      `  if(activeTab !== 'recurring' && activeTab !== 'calendar' && !wasEdit) switchTab('recurring'); else renderTab();`, 'stay on calendar');
+
+  rep('</style>', `  /* ปฏิทิน: กล่องเรื่องเปิดใหม่ */
+  .cal-tray{ border:1.5px dashed var(--blue); background:var(--blue-bg); border-radius:12px; padding:8px 12px 10px; margin:0 0 12px; }
+  .cal-tray-head{ font-weight:800; font-size:13px; color:var(--blue); margin-bottom:6px; }
+  .cal-tray-head small{ font-weight:500; color:var(--ink-soft); margin-left:6px; }
+  .cal-tray-items{ display:flex; flex-wrap:wrap; gap:4px; }
+  .cal-new-chip{ background:var(--card); border-color:var(--blue); }
+</style>`, 'css');
+}, { staging: true });
+
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
 step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {
