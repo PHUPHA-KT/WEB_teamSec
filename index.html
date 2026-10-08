@@ -4599,7 +4599,9 @@ function calSelectChip(chip){
 function calNewTrayHtml(){
   // ไม่รวมเรื่องที่อยู่ในงานประจำแล้ว (promotedId หรือเลขรหัสชุดเดียวกันมีในงานประจำ — ข้อมูลก่อนมี promotedId)
   const inRecurring = n => CODE_SERIES.some(s=>{ const k = codeSerialOf(n.code, s); return k !== null && recurring.some(r=>codeSerialOf(r.code, s) === k); });
-  const list = newStories.filter(n=>!promotedTarget(n) && !inRecurring(n));
+  // รหัสขึ้นต้นด้วย 0- = เรื่องจบแล้ว ไม่ต้องวางลงปฏิทิน
+  const ended = n => String(n.code || '').trim().startsWith('0-');
+  const list = newStories.filter(n=>!promotedTarget(n) && !inRecurring(n) && !ended(n));
   if(!list.length) return '';
   return `<div class="cal-tray">
     <div class="cal-tray-head">🆕 เรื่องเปิดใหม่ <small>ลากไปวางช่องคน × วัน เพื่อย้ายเข้างานประจำ · ดับเบิลคลิกเพื่อแก้</small></div>
