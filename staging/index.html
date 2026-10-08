@@ -4677,7 +4677,10 @@ function calNewTrayHtml(){
   const inRecurring = n => CODE_SERIES.some(s=>{ const k = codeSerialOf(n.code, s); return k !== null && recurring.some(r=>codeSerialOf(r.code, s) === k); });
   // รหัสขึ้นต้นด้วย 0- = เรื่องจบแล้ว ไม่ต้องวางลงปฏิทิน
   const ended = n => String(n.code || '').trim().startsWith('0-');
-  const list = newStories.filter(n=>!promotedTarget(n) && !inRecurring(n) && !ended(n));
+  // ไม่มีรหัสเรื่อง (ต้องขึ้นต้นด้วย ตัวเลข-ตัวเลข เช่น 18-28, 7-18-53) = งานอื่น/โน้ต ไม่ต้องลงปฏิทิน
+  const isDigits = s => s !== '' && [...s].every(ch=>ch >= '0' && ch <= '9');
+  const hasCode = n => { const p = String(n.code || '').trim().split('-'); return p.length >= 2 && isDigits(p[0]) && isDigits(p[1]); };
+  const list = newStories.filter(n=>!promotedTarget(n) && !inRecurring(n) && !ended(n) && hasCode(n));
   if(!list.length) return '';
   return `<div class="cal-tray">
     <div class="cal-tray-head">🆕 เรื่องเปิดใหม่ <small>ลากไปวางช่องคน × วัน เพื่อย้ายเข้างานประจำ · ดับเบิลคลิกเพื่อแก้</small></div>
