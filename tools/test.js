@@ -60,6 +60,11 @@ function suite(file, staging){
   if(!fs.existsSync(path.join(ROOT, file))) return;
   console.log('— ' + file);
   const { html, ctx, F } = load(file);
+  // ทุก <script> ในหน้าต้อง parse ได้ (ตัวแปรซ้ำ / วงเล็บหาย = ทั้งหน้าพัง แต่เทสรายฟังก์ชันจับไม่ได้)
+  for(const m of html.matchAll(/<script>([\s\S]*?)<\/script>/g)){
+    try{ new vm.Script(m[1]); passed++; }
+    catch(e){ failed++; console.log('  ✗ syntax error ในหน้า: ' + e.message); }
+  }
 
   // mergeById: เพิ่ม/แก้/ลบ จาก 2 ฝั่ง
   const A = {id:'a', v:1}, B = {id:'b', v:1};

@@ -53,7 +53,7 @@ async function openSplitModal(id){
       <div class="field"><label>ตอนแรก</label><input id="splitFrom" type="number" min="0" value="${splitDraft.from}"></div>
       <div class="field"><label>ถึงตอน</label><input id="splitTo" type="number" min="0" value="${splitDraft.to}" placeholder="เช่น 21"></div>
     </div>
-    <div class="split-order-row"><span>ลำดับ (คนแรกได้เยอะสุด · ${SPLIT_LAST}ท้ายเสมอ)</span>
+    <div class="split-order-row"><span>คนแรกได้เยอะสุด · ลาก ⠿ หรือกด ▲▼ เพื่อสลับ</span>
       <button type="button" class="btn btn-ghost" onclick="rotateSplitOrder()" title="ให้คนถัดไปเป็นคนได้เยอะ">↻ สลับ</button></div>
     <div id="splitPreview"></div>
     <div class="modal-actions">
@@ -78,10 +78,31 @@ function renderSplitPreview(){
   if(!el || !splitDraft) return;
   const { from, to, ok } = readSplitRange();
   const m = ok ? computeSplit(from, to, splitDraft.order) : null;
-  el.innerHTML = `<table class="data-table split-table"><thead><tr><th>#</th><th>รายชื่อ</th><th>เลขตอนที่ได้</th><th>จำนวน</th></tr></thead><tbody>
-    ${splitDraft.order.map((p, i)=>`<tr><td>${i + 1}</td><td><b>${esc(p)}</b></td><td>${m ? (m[p].length ? 'ตอนที่ ' + m[p].join(', ') : '—') : '<span style="color:var(--ink-soft)">ใส่ช่วงตอน</span>'}</td><td>${m ? m[p].length + ' ตอน' : ''}</td></tr>`).join('')}
+  const n = splitDraft.order.length;
+  el.innerHTML = `<table class="data-table split-table"><thead><tr><th></th><th>#</th><th>รายชื่อ</th><th>เลขตอนที่ได้</th><th>จำนวน</th><th></th></tr></thead><tbody>
+    ${splitDraft.order.map((p, i)=>`<tr class="split-row" draggable="true" data-i="${i}">
+      <td class="split-grip" title="ลากเพื่อสลับลำดับ">⠿</td><td>${i + 1}</td><td><b>${esc(p)}</b></td>
+      <td>${m ? (m[p].length ? 'ตอนที่ ' + m[p].join(', ') : '—') : '<span style="color:var(--ink-soft)">ใส่ช่วงตอน</span>'}</td><td>${m ? m[p].length + ' ตอน' : ''}</td>
+      <td class="split-move"><button type="button" ${i ? '' : 'disabled'} onclick="moveSplit(${i},-1)" aria-label="ขึ้น">▲</button><button type="button" ${i < n - 1 ? '' : 'disabled'} onclick="moveSplit(${i},1)" aria-label="ลง">▼</button></td>
+    </tr>`).join('')}
   </tbody></table>`;
+  // ลากแถวสลับลำดับ (คนแรก = ได้เยอะสุด)
+  let dragFrom = null;
+  el.querySelectorAll('.split-row').forEach(tr=>{
+    tr.addEventListener('dragstart', e=>{ dragFrom = +tr.dataset.i; tr.classList.add('split-dragging'); e.dataTransfer.effectAllowed = 'move'; try{ e.dataTransfer.setData('text/plain', String(dragFrom)); }catch(_){} });
+    tr.addEventListener('dragend', ()=>{ tr.classList.remove('split-dragging'); el.querySelectorAll('.split-over').forEach(x=>x.classList.remove('split-over')); });
+    tr.addEventListener('dragover', e=>{ e.preventDefault(); el.querySelectorAll('.split-over').forEach(x=>x.classList.remove('split-over')); tr.classList.add('split-over'); });
+    tr.addEventListener('drop', e=>{ e.preventDefault(); const target = +tr.dataset.i; if(dragFrom !== null && dragFrom !== target) reorderSplit(dragFrom, target); dragFrom = null; });
+  });
 }
+function reorderSplit(from, to){
+  const o = splitDraft.order.slice();
+  const [p] = o.splice(from, 1);
+  o.splice(to, 0, p);
+  splitDraft.order = o;
+  renderSplitPreview();
+}
+function moveSplit(i, dir){ const j = i + dir; if(j >= 0 && j < splitDraft.order.length) reorderSplit(i, j); }
 function rotateSplitOrder(){
   if(!splitDraft) return;
   const r = splitDraft.order.filter(p=>p !== SPLIT_LAST);

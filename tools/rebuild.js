@@ -2182,6 +2182,13 @@ step('แบ่งตอนเรื่องเปิดใหม่ (split)', 
   .split-table td:first-child, .split-table td:last-child{ white-space:nowrap; }
   .split-eps{ display:block; font-size:11px; font-weight:600; color:var(--blue); margin-top:1px; }
   .contrib-item.on .split-eps{ color:inherit; opacity:.85; }
+  .split-row{ cursor:grab; }
+  .split-grip{ color:var(--ink-soft); font-size:15px; cursor:grab; user-select:none; width:14px; }
+  .split-dragging{ opacity:.4; }
+  .split-over td{ box-shadow:inset 0 2px 0 var(--blue); }
+  .split-move{ white-space:nowrap; }
+  .split-move button{ border:1px solid var(--line); background:var(--card); color:var(--ink-soft); border-radius:6px; font-size:10px; padding:2px 5px; margin-left:2px; cursor:pointer; }
+  .split-move button:disabled{ opacity:.3; cursor:default; }
 </style>`, 'css');
 });
 
