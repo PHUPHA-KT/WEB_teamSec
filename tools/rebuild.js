@@ -2354,6 +2354,48 @@ step('พักชั่วคราวมีวันกลับ (pauseUntil)'
 </style>`, 'css');
 });
 
+// ================= 57) ตอนค้างแยกกลุ่มตามคนที่ต้องเคลียร์ (กันคนใหม่ไปทำตอนของคนเดิม) =================
+step('ตอนค้างแยกกลุ่มตามเจ้าของ', 'class="ep-owner-row', () => {
+  rep(`  const chips = eps.map((e, i)=>{
+    const owner = epOwner(item, e);
+    const tip = 'ทำ' + epLabel(e) + ' เสร็จแล้ว' + (owner && owner !== item.person ? ' (ของ ' + owner + ')' : '');
+    return \`<span class="ep-inline">\${esc(typeof e === 'number' ? String(e) : e)}<button type="button" onclick="finishEpInline('\${item.id}', \${i})" title="\${esc(tip)}" aria-label="\${esc(tip)}">✕</button></span>\`;
+  }).join('');
+  return \`<div class="ep-line">\`
+    + \`<span class="overdue-badge" style="background:\${bg}">ค้าง \${eps.length} ตอน\${hasForeignBacklog(item) ? ' · ' + esc(foreignBacklogLabel(item)) : ''}</span>\`
+    + \` <span class="ep-list">ตอน</span>\${chips}</div>\`;`,
+`  const chip = (e, i, foreignOwner) => {
+    const tip = 'ทำ' + epLabel(e) + ' เสร็จแล้ว' + (foreignOwner ? ' — ตอนนี้ ' + foreignOwner + ' ต้องเคลียร์ ไม่ใช่ของ ' + (item.person || 'คนทำปัจจุบัน') : '');
+    const color = foreignOwner && PERSON_COLOR[foreignOwner] ? PERSON_COLOR[foreignOwner] : '';
+    return \`<span class="ep-inline\${foreignOwner ? ' ep-foreign' : ''}"\${color ? \` style="--own:var(--\${color});--own-bg:var(--\${color}-bg)"\` : ''} title="\${esc(tip)}">\${esc(typeof e === 'number' ? String(e) : e)}<button type="button" onclick="finishEpInline('\${item.id}', \${i})" aria-label="\${esc(tip)}">✕</button></span>\`;
+  };
+  const badge = \`<span class="overdue-badge" style="background:\${bg}">ค้าง \${eps.length} ตอน</span>\`;
+  if(!hasForeignBacklog(item)){
+    return \`<div class="ep-line">\${badge} <span class="ep-list">ตอน</span>\${eps.map((e, i)=>chip(e, i, '')).join('')}</div>\`;
+  }
+  // มีตอนของคนเดิม: แยกแถวตามเจ้าของ — คนทำปัจจุบันก่อน แล้วคนเดิม (สีประจำตัว + กรอบประ)
+  const groups = {};
+  eps.forEach((e, i)=>{ const o = epOwner(item, e) || item.person || ''; (groups[o] = groups[o] || []).push([e, i]); });
+  const owners = Object.keys(groups).sort((a, b)=>(a === item.person ? -1 : b === item.person ? 1 : 0));
+  return \`<div class="ep-line">\${badge}</div>\` + owners.map(o=>{
+    const foreign = o !== item.person;
+    const color = PERSON_COLOR[o] || 'gray';
+    return \`<div class="ep-owner-row\${foreign ? ' ep-owner-foreign' : ''}">
+      <span class="ep-owner" style="background:var(--\${color}-bg);color:var(--\${color});border-color:var(--\${color})">\${esc(o || 'ไม่ระบุ')}</span>
+      \${groups[o].map(([e, i])=>chip(e, i, foreign ? o : '')).join('')}
+      \${foreign ? \`<span class="ep-owner-note">\${esc(o)}ต้องเคลียร์</span>\` : ''}
+    </div>\`;
+  }).join('');`, 'grouped backlog');
+  rep('</style>', `  /* ตอนค้างแยกตามเจ้าของ */
+  .ep-owner-row{ display:flex; align-items:center; flex-wrap:wrap; gap:4px; margin-top:4px; }
+  .ep-owner{ display:inline-block; min-width:44px; text-align:center; padding:1px 8px; border-radius:999px; border:1px solid; font-size:11.5px; font-weight:800; }
+  .ep-owner-note{ font-size:11.5px; font-weight:700; color:var(--ink-soft); margin-left:2px; }
+  .ep-inline.ep-foreign{ background:var(--own-bg, #f1f3f6); color:var(--own, #5b6472); border:1px dashed var(--own, #8a94a3); }
+  .ep-inline.ep-foreign button{ color:var(--own, #5b6472); }
+  .ep-inline.ep-foreign button:hover{ background:var(--own, #5b6472); color:#fff; }
+</style>`, 'css');
+});
+
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
 step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {
