@@ -2403,6 +2403,29 @@ step('ตอนค้างแยกกลุ่มตามเจ้าขอ�
 </style>`, 'css');
 });
 
+// ================= 58) ปฏิทิน: เรื่องหลายวัน/สัปดาห์ เด่น + เรื่องตามวันที่ สีเฉพาะ =================
+step('ปฏิทิน: ไฮไลต์หลายวัน + ตามวันที่', 'cal-chip-tag', () => {
+  rep(`<span class="cal-chip" data-id="\${r.id}" data-from="\${esc(d)}"`,
+      `<span class="cal-chip\${isMultiDay(r) ? ' cal-multi' : ''}\${isDateType(r) ? ' cal-monthly' : ''}" data-id="\${r.id}" data-from="\${esc(d)}"`, 'chip class');
+  rep(`+ displayName(r))}\${badge}</span>\`;`,
+      `+ displayName(r))}\${isMultiDay(r) ? \`<span class="cal-chip-tag">×\${itemDays(r).length}/สัปดาห์</span>\` : ''}\${isDateType(r) ? \`<span class="cal-chip-tag">📅 \${esc(monthDates(r).join('·'))}</span>\` : ''}\${badge}</span>\`;`, 'chip tag');
+  rep(`      <button class="btn btn-primary" onclick="exportCalendarImage()">📷 บันทึกเป็นรูป</button>
+    </div>`,
+`      <button class="btn btn-primary" onclick="exportCalendarImage()">📷 บันทึกเป็นรูป</button>
+    </div>
+    <div class="cal-legend"><span class="cal-chip cal-multi">เรื่อง<span class="cal-chip-tag">×3/สัปดาห์</span></span> ลงหลายวันต่อสัปดาห์ <span class="cal-chip cal-monthly">เรื่อง<span class="cal-chip-tag">📅 8·18·28</span></span> ลงตามวันที่ของเดือน</div>`, 'legend');
+  rep('</style>', `  /* ปฏิทิน: หลายวัน / ตามวันที่ */
+  .cal-chip.cal-multi{ border:1.5px solid var(--blue); font-weight:700; background:var(--blue-bg); }
+  .cal-chip.cal-monthly{ border:1.5px solid #0e7c86; background:#e4f5f7; color:#0b5f66; font-weight:700; }
+  .cal-chip-tag{ display:inline-block; margin-left:5px; padding:0 6px; border-radius:999px; font-size:10.5px; font-weight:800; background:rgba(0,0,0,.07); }
+  .cal-multi .cal-chip-tag{ background:var(--blue); color:#fff; }
+  .cal-monthly .cal-chip-tag{ background:#0e7c86; color:#fff; }
+  .cal-legend{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:12px; color:var(--ink-soft); margin:0 0 10px; }
+  .cal-legend .cal-chip{ cursor:default; pointer-events:none; }   /* ตัวอย่าง ไม่ใช่ชิปจริง — กันระบบลากจับ */
+  body.dark .cal-chip.cal-monthly{ background:#123a3e; color:#7fd3da; border-color:#2a9aa4; }
+</style>`, 'css');
+});
+
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
 step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {

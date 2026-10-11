@@ -519,6 +519,15 @@
   .ep-inline.ep-foreign{ background:var(--own-bg, #f1f3f6); color:var(--own, #5b6472); border:1px dashed var(--own, #8a94a3); }
   .ep-inline.ep-foreign button{ color:var(--own, #5b6472); }
   .ep-inline.ep-foreign button:hover{ background:var(--own, #5b6472); color:#fff; }
+  /* ปฏิทิน: หลายวัน / ตามวันที่ */
+  .cal-chip.cal-multi{ border:1.5px solid var(--blue); font-weight:700; background:var(--blue-bg); }
+  .cal-chip.cal-monthly{ border:1.5px solid #0e7c86; background:#e4f5f7; color:#0b5f66; font-weight:700; }
+  .cal-chip-tag{ display:inline-block; margin-left:5px; padding:0 6px; border-radius:999px; font-size:10.5px; font-weight:800; background:rgba(0,0,0,.07); }
+  .cal-multi .cal-chip-tag{ background:var(--blue); color:#fff; }
+  .cal-monthly .cal-chip-tag{ background:#0e7c86; color:#fff; }
+  .cal-legend{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:12px; color:var(--ink-soft); margin:0 0 10px; }
+  .cal-legend .cal-chip{ cursor:default; pointer-events:none; }   /* ตัวอย่าง ไม่ใช่ชิปจริง — กันระบบลากจับ */
+  body.dark .cal-chip.cal-monthly{ background:#123a3e; color:#7fd3da; border-color:#2a9aa4; }
 </style>
 </head>
 <body>
@@ -4766,7 +4775,7 @@ function renderCalendar(){
             const by = pendingEpsByPerson(r);
             const owner = hasForeignBacklog(r) ? ' · ' + esc(Object.keys(by).filter(p=>p!==r.person).map(p=>p+' '+by[p]).join(', ')) : '';
             const badge = eps ? ` <span class="cal-chip-eps">(ค้าง ${eps}${owner})</span>` : '';
-            return `<span class="cal-chip" data-id="${r.id}" data-from="${esc(d)}" title="ลากหรือคลิกเพื่อย้ายวัน/ย้ายคน${isMultiDay(r)?' (ย้ายเฉพาะวันนี้)':''} · ดับเบิลคลิกเพื่อแก้ไข${isPaused(r) ? ' · พักถึง ' + esc(thaiDateLabel(r.pauseUntil)) : ''}">${isPaused(r) ? '⏸ ' : ''}${esc((r.code?r.code+'-':'') + displayName(r))}${badge}</span>`;
+            return `<span class="cal-chip${isMultiDay(r) ? ' cal-multi' : ''}${isDateType(r) ? ' cal-monthly' : ''}" data-id="${r.id}" data-from="${esc(d)}" title="ลากหรือคลิกเพื่อย้ายวัน/ย้ายคน${isMultiDay(r)?' (ย้ายเฉพาะวันนี้)':''} · ดับเบิลคลิกเพื่อแก้ไข${isPaused(r) ? ' · พักถึง ' + esc(thaiDateLabel(r.pauseUntil)) : ''}">${isPaused(r) ? '⏸ ' : ''}${esc((r.code?r.code+'-':'') + displayName(r))}${isMultiDay(r) ? `<span class="cal-chip-tag">×${itemDays(r).length}/สัปดาห์</span>` : ''}${isDateType(r) ? `<span class="cal-chip-tag">📅 ${esc(monthDates(r).join('·'))}</span>` : ''}${badge}</span>`;
           }).join('');
           return `<tr>
             <td class="cal-day">${CAL_DAY_LABEL[d]}</td>
@@ -4782,6 +4791,7 @@ function renderCalendar(){
       <span style="font-size:13px;color:var(--ink-soft);">ลากเรื่องไปวางช่องอื่น หรือคลิกเรื่องแล้วคลิกช่องที่จะย้ายไป (Esc ยกเลิก) · ดับเบิลคลิกเพื่อแก้ไข · มือถือแตะค้างแล้วลาก (ไม่รวมเรื่องที่ดรอป)</span>
       <button class="btn btn-primary" onclick="exportCalendarImage()">📷 บันทึกเป็นรูป</button>
     </div>
+    <div class="cal-legend"><span class="cal-chip cal-multi">เรื่อง<span class="cal-chip-tag">×3/สัปดาห์</span></span> ลงหลายวันต่อสัปดาห์ <span class="cal-chip cal-monthly">เรื่อง<span class="cal-chip-tag">📅 8·18·28</span></span> ลงตามวันที่ของเดือน</div>
     ${calNewTrayHtml()}
     <div id="calCapture">${html}</div>`;
   bindCalendarDrag(container);
