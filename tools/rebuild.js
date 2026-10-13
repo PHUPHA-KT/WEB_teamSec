@@ -2426,6 +2426,45 @@ step('ปฏิทิน: ไฮไลต์หลายวัน + ตามว
 </style>`, 'css');
 });
 
+// ================= 59) เรื่องเปิดใหม่: เลือกวันที่ลงได้ตั้งแต่เพิ่ม =================
+step('เรื่องเปิดใหม่: เลือกวันที่ลง', 'function newDayChecksHtml(', () => {
+  const js = fs.readFileSync(path.join(__dirname, 'newdays.js'), 'utf8').replace(/\n$/, '');
+  rep(`function pendingEpCount(item){`, js + `\n\nfunction pendingEpCount(item){`, 'helpers');
+  rep(`    <div class="field"><label>ลิงก์ Google Drive (ไม่บังคับ)</label><input id="nDrive" type="text" placeholder="https://drive.google.com/..."></div>`,
+`    <div class="field"><label>ลิงก์ Google Drive (ไม่บังคับ)</label><input id="nDrive" type="text" placeholder="https://drive.google.com/..."></div>
+    <div class="field"><label>วันที่ลง (ไม่บังคับ — ใช้ตอนย้ายเข้างานประจำ)</label>
+      <div id="nDays" class="day-checks"></div>
+      <div id="nMonthDatesWrap" style="display:none;margin-top:8px;"><input id="nMonthDates" type="text" placeholder="วันที่ของเดือน เช่น 8, 18, 28"></div>
+    </div>`, 'modal field');
+  rep(`  document.getElementById('nDrive').value = item ? (item.gdrive||'') : '';`,
+`  document.getElementById('nDrive').value = item ? (item.gdrive||'') : '';
+  setNewDayChecks(item ? item.days : [], item ? item.monthDates : null);`, 'openNewModal');
+  rep(`    gdrive: document.getElementById('nDrive').value.trim(),
+  };`,
+`    gdrive: document.getElementById('nDrive').value.trim(),
+    days: readNewDays().length ? readNewDays() : undefined,
+    monthDates: readNewDays().includes(MONTH_DAY) ? parseMonthDates(document.getElementById('nMonthDates').value) : undefined,
+  };
+  if(data.days && data.days.includes(MONTH_DAY) && !data.monthDates.length){ showToast('ใส่วันที่ของเดือน เช่น 8, 18, 28'); document.getElementById('nMonthDates').focus(); return; }`, 'saveNewStory');
+  // มาจากกำหนดการ: เลือกวันในสัปดาห์ของวันที่เปิด
+  rep(`  document.getElementById('nLink').value = e.link || '';`,
+`  document.getElementById('nLink').value = e.link || '';
+  { const wd = e.date ? weekdayOfYmd(e.date) : null; if(wd) setNewDayChecks([wd], null); }`, 'from schedule');
+  // ย้ายเข้างานประจำ: กรอกวันตามที่เลือกไว้
+  rep(`  document.getElementById('rDrive').value = item.gdrive || '';
+  const fromSchedule = schedulePersonFor(item);`,
+`  document.getElementById('rDrive').value = item.gdrive || '';
+  if(item.days && item.days.length){
+    setDayChecks(item.days);
+    document.getElementById('rMonthDates').value = item.monthDates ? item.monthDates.join(', ') : '';
+    syncMonthDatesField();
+  }
+  const fromSchedule = schedulePersonFor(item);`, 'promote days');
+  // การ์ด
+  rep(`          <div class="new-code">\${esc(item.code)}</div>`,
+      `          <div class="new-code">\${esc(item.code)}\${newDaysBadgeHtml(item)}</div>`, 'card badge');
+}, { staging: true });
+
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
 step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {
