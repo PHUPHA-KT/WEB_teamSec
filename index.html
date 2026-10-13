@@ -593,6 +593,10 @@
     <div class="field"><label>รหัส/ชื่อเรื่อง</label><input id="nCode" type="text" placeholder="เช่น 18-27 หรือ ชื่อเรื่อง"></div>
     <div class="field"><label>ลิงก์ต้นทาง (ไม่บังคับ)</label><input id="nLink" type="text" placeholder="https://"></div>
     <div class="field"><label>ลิงก์ Google Drive (ไม่บังคับ)</label><input id="nDrive" type="text" placeholder="https://drive.google.com/..."></div>
+    <div class="field"><label>วันที่ลง (ไม่บังคับ — ใช้ตอนย้ายเข้างานประจำ)</label>
+      <div id="nDays" class="day-checks"></div>
+      <div id="nMonthDatesWrap" style="display:none;margin-top:8px;"><input id="nMonthDates" type="text" placeholder="วันที่ของเดือน เช่น 8, 18, 28"></div>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('modalNew')">ยกเลิก</button>
       <button class="btn btn-primary" onclick="saveNewStory()">บันทึก</button>
@@ -2130,6 +2134,49 @@ async function unpauseStory(id){
   offerUndo(`ยกเลิกพัก "${displayName(item) || item.code}"`, [undoSnap]);
   renderStats(); renderTab();
   await persistRecurring(false);
+}
+
+// ===== วันที่ลงของเรื่องเปิดใหม่ (item.days / item.monthDates) — ไม่บังคับ =====
+// เลือกไว้ตั้งแต่เพิ่มเรื่องเปิดใหม่ แล้วกรอกให้ตอนย้ายเข้างานประจำ
+// มาจากกำหนดการ = เลือกวันในสัปดาห์ของวันที่เปิดให้เอง
+function newDayChecksHtml(){
+  const pill = d => `<label class="day-check"><input type="checkbox" value="${d}" onchange="onNewDayCheck(this)"><span>${d}</span></label>`;
+  const choices = DAY_CHOICES.filter(d=>d !== 'จบแล้ว');
+  const week = choices.filter(d=>WEEKDAY_ONLY.includes(d));
+  const other = choices.filter(d=>!WEEKDAY_ONLY.includes(d));
+  return `<div class="day-check-group">${week.map(pill).join('')}</div><div class="day-check-group day-check-other">${other.map(pill).join('')}</div>`;
+}
+function syncNewMonthDates(){
+  const on = !!document.querySelector('#nDays input[value="' + MONTH_DAY + '"]:checked');
+  const w = document.getElementById('nMonthDatesWrap');
+  if(w) w.style.display = on ? '' : 'none';
+}
+function setNewDayChecks(days, dates){
+  const box = document.getElementById('nDays');
+  if(!box.children.length) box.innerHTML = newDayChecksHtml();
+  const set = new Set(days || []);
+  box.querySelectorAll('input').forEach(cb=>{ cb.checked = set.has(cb.value); });
+  document.getElementById('nMonthDates').value = dates && dates.length ? dates.join(', ') : '';
+  syncNewMonthDates();
+}
+function readNewDays(){ return Array.from(document.querySelectorAll('#nDays input:checked')).map(cb=>cb.value); }
+function onNewDayCheck(cb){
+  setTimeout(syncNewMonthDates, 0);
+  if(!cb.checked) return;
+  const boxes = Array.from(document.querySelectorAll('#nDays input'));
+  if(DAY_EXCLUSIVE.includes(cb.value)) boxes.forEach(b=>{ if(b !== cb) b.checked = false; });
+  else boxes.forEach(b=>{ if(DAY_EXCLUSIVE.includes(b.value)) b.checked = false; });
+}
+function weekdayOfYmd(ymd){
+  const d = new Date(String(ymd) + 'T00:00:00');
+  return isNaN(d) ? null : WEEKDAY_ONLY[(d.getDay() + 6) % 7];
+}
+// ป้ายวันบนการ์ดเรื่องเปิดใหม่
+function newDaysBadgeHtml(item){
+  const days = item.days || [];
+  if(!days.length) return '';
+  const label = days.includes(MONTH_DAY) ? 'วันที่ ' + (item.monthDates || []).join('·') : days.join(' · ');
+  return ` <span class="day-pill" style="${dayPillStyle(days[0])}">${esc(label)}</span>`;
 }
 
 function pendingEpCount(item){
@@ -3999,7 +4046,7 @@ function renderNewStories(){
     return `<div class="new-card">
       <div class="new-card-top">
         <div>
-          <div class="new-code">${esc(item.code)}</div>
+          <div class="new-code">${esc(item.code)}${newDaysBadgeHtml(item)}</div>
           ${item.link?`<a href="${safeUrl(item.link)}" target="_blank" style="font-size:12px;color:#1c6fd1;margin-right:8px;">🔗 ลิงก์</a>`:''}
           ${item.gdrive?`<a href="${safeUrl(item.gdrive)}" target="_blank" style="font-size:12px;color:#1a9c6b;">📁 Drive</a>`:''}
           ${metaBits.length?`<div class="sched-meta">${metaBits.join(' · ')}</div>`:''}
@@ -4061,6 +4108,11 @@ function promoteNewToRecurring(id){
   document.getElementById('rOrigName').value = orig;
   document.getElementById('rLink').value = item.link || '';
   document.getElementById('rDrive').value = item.gdrive || '';
+  if(item.days && item.days.length){
+    setDayChecks(item.days);
+    document.getElementById('rMonthDates').value = item.monthDates ? item.monthDates.join(', ') : '';
+    syncMonthDatesField();
+  }
   const fromSchedule = schedulePersonFor(item);
   if(fromSchedule) document.getElementById('rPerson').value = fromSchedule;
   document.getElementById('recurringModalTitle').textContent = 'ย้ายเข้างานประจำ — เลือกวัน' + (fromSchedule ? ' (คนทำจากกำหนดการ: ' + fromSchedule + ')' : 'และคนทำ');
@@ -4107,6 +4159,7 @@ function openNewModal(id){
   document.getElementById('nCode').value = item ? (item.code||'') : '';
   document.getElementById('nLink').value = item ? (item.link||'') : '';
   document.getElementById('nDrive').value = item ? (item.gdrive||'') : '';
+  setNewDayChecks(item ? item.days : [], item ? item.monthDates : null);
   openModal('modalNew');
 }
 async function saveNewStory(){
@@ -4120,7 +4173,10 @@ async function saveNewStory(){
     code,
     link: document.getElementById('nLink').value.trim(),
     gdrive: document.getElementById('nDrive').value.trim(),
+    days: readNewDays().length ? readNewDays() : undefined,
+    monthDates: readNewDays().includes(MONTH_DAY) ? parseMonthDates(document.getElementById('nMonthDates').value) : undefined,
   };
+  if(data.days && data.days.includes(MONTH_DAY) && !data.monthDates.length){ showToast('ใส่วันที่ของเดือน เช่น 8, 18, 28'); document.getElementById('nMonthDates').focus(); return; }
   if(editingNewId){
     const item = newStories.find(n=>n.id===editingNewId);
     if(!item){ showToast('เรื่องนี้ถูกลบไปแล้ว'); closeModal('modalNew'); return; }
@@ -4634,6 +4690,7 @@ function scheduleToNewStory(id){
   openNewModal();
   document.getElementById('nCode').value = e.title || '';
   document.getElementById('nLink').value = e.link || '';
+  { const wd = e.date ? weekdayOfYmd(e.date) : null; if(wd) setNewDayChecks([wd], null); }
   document.getElementById('newModalTitle').textContent = 'เพิ่มเรื่องเปิดใหม่ (จากกำหนดการ)';
   scheduleSourceForNew = id;   // บันทึกแล้ว saveNewStory จะติด sentToNew ให้
 }

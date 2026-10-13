@@ -2463,7 +2463,7 @@ step('เรื่องเปิดใหม่: เลือกวันที
   // การ์ด
   rep(`          <div class="new-code">\${esc(item.code)}</div>`,
       `          <div class="new-code">\${esc(item.code)}\${newDaysBadgeHtml(item)}</div>`, 'card badge');
-}, { staging: true });
+});
 
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
