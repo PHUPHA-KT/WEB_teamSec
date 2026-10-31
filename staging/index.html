@@ -528,6 +528,11 @@
   .cal-legend{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:12px; color:var(--ink-soft); margin:0 0 10px; }
   .cal-legend .cal-chip{ cursor:default; pointer-events:none; }   /* ตัวอย่าง ไม่ใช่ชิปจริง — กันระบบลากจับ */
   body.dark .cal-chip.cal-monthly{ background:#123a3e; color:#7fd3da; border-color:#2a9aa4; }
+  /* ลากลิงก์โหลดรายวัน */
+  .daylink-grip{ cursor:grab; color:var(--ink-soft); font-size:15px; padding:0 2px; user-select:none; }
+  .daylink-dragging{ opacity:.4; }
+  .daylink-day.daylink-over{ outline:2px solid var(--blue); outline-offset:2px; border-radius:10px; background:var(--blue-bg); }
+  .daylink-item.daylink-before{ box-shadow:inset 0 2px 0 var(--blue); }
   .staging-bar{ position:sticky; top:0; z-index:9000; background:#6a3fb3; color:#fff; text-align:center; font-size:12.5px; font-weight:700; padding:6px 12px; }
 </style>
 </head>
@@ -2180,6 +2185,66 @@ function newDaysBadgeHtml(item){
   return ` <span class="day-pill" style="${dayPillStyle(days[0])}">${esc(label)}</span>`;
 }
 
+// ===== ลิงก์โหลดรายวัน: ลากย้ายวัน / สลับลำดับ =====
+// ลากที่ ⠿ ไปวางกล่องวันอื่น = ย้ายไปต่อท้ายวันนั้น · วางทับลิงก์ = แทรกก่อนลิงก์นั้น
+// ลำดับในวัน = ลำดับใน dayLinks (dayLinksOf กรองตามวันแบบคงลำดับ)
+async function moveDayLink(id, toDay, beforeId){
+  const i = dayLinks.findIndex(x=>x.id===id);
+  if(i < 0 || beforeId === id) return;
+  const link = dayLinks[i];
+  const fromDay = link.day;
+  const arr = dayLinks.slice();
+  arr.splice(i, 1);
+  const moved = { ...link, day: toDay };
+  let at = beforeId ? arr.findIndex(x=>x.id===beforeId) : -1;
+  if(at < 0){
+    // ต่อท้ายลิงก์สุดท้ายของวันปลายทาง (ไม่มีเลย = ท้ายรายการ)
+    let last = -1;
+    arr.forEach((x, k)=>{ if(x.day === toDay) last = k; });
+    at = last < 0 ? arr.length : last + 1;
+  }
+  arr.splice(at, 0, moved);
+  if(JSON.stringify(arr) === JSON.stringify(dayLinks)) return;
+  dayLinks = arr;
+  if(fromDay !== toDay) logActivity(`ย้ายลิงก์โหลด "${link.label || linkHostLabel(link.url)}" จาก${fromDay} → ${toDay}`);
+  renderRecurring();
+  await persistDayLinks();
+}
+// ผูกครั้งเดียวที่ document — แถบลิงก์ถูกวาดใหม่ทุกครั้งที่ renderRecurring
+(function(){
+  let dragId = null;
+  const clear = () => document.querySelectorAll('.daylink-over, .daylink-before').forEach(x=>x.classList.remove('daylink-over', 'daylink-before'));
+  document.addEventListener('dragstart', e=>{
+    const it = e.target.closest && e.target.closest('.daylink-item[data-link]');
+    if(!it) return;
+    dragId = it.dataset.link;
+    it.classList.add('daylink-dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    try{ e.dataTransfer.setData('text/plain', dragId); }catch(_){}
+  });
+  document.addEventListener('dragend', ()=>{ dragId = null; clear(); document.querySelectorAll('.daylink-dragging').forEach(x=>x.classList.remove('daylink-dragging')); });
+  document.addEventListener('dragover', e=>{
+    if(!dragId) return;
+    const day = e.target.closest && e.target.closest('.daylink-day[data-day]');
+    if(!day) return;
+    e.preventDefault();
+    clear();
+    day.classList.add('daylink-over');
+    const it = e.target.closest('.daylink-item[data-link]');
+    if(it && it.dataset.link !== dragId) it.classList.add('daylink-before');
+  });
+  document.addEventListener('drop', e=>{
+    if(!dragId) return;
+    const day = e.target.closest && e.target.closest('.daylink-day[data-day]');
+    if(!day) return;
+    e.preventDefault();
+    const it = e.target.closest('.daylink-item[data-link]');
+    const id = dragId;
+    dragId = null; clear();
+    moveDayLink(id, day.dataset.day, it ? it.dataset.link : null);
+  });
+})();
+
 function pendingEpCount(item){
   return (item.pendingEpisodes && item.pendingEpisodes.length) || 0;
 }
@@ -3499,12 +3564,13 @@ function dayLinksBarHtml(){
   const rows = days.map(d=>{
     const links = dayLinksOf(d);
     const linkItems = links.map(l=>`
-      <div class="daylink-item">
-        <a class="btn btn-ghost" style="font-size:12px;padding:6px 10px;flex:1;justify-content:flex-start;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" href="${safeUrl(l.url)}" target="_blank">📥 ${esc(l.label || linkHostLabel(l.url))}</a>
+      <div class="daylink-item" draggable="true" data-link="${l.id}">
+        <span class="daylink-grip" title="ลากเพื่อย้ายวัน / สลับลำดับ">⠿</span>
+        <a class="btn btn-ghost" draggable="false" style="font-size:12px;padding:6px 10px;flex:1;justify-content:flex-start;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" href="${safeUrl(l.url)}" target="_blank">📥 ${esc(l.label || linkHostLabel(l.url))}</a>
         <button class="icon-btn" onclick="editDayLink('${l.id}')" title="แก้ลิงก์" style="color:#6b7480;">✎</button>
         <button class="icon-btn" onclick="removeDayLink('${l.id}')" title="ลบลิงก์นี้">✕</button>
       </div>`).join('');
-    return `<div class="daylink-day">
+    return `<div class="daylink-day" data-day="${d}">
       <div class="daylink-day-head">
         <span class="day-pill" style="${dayPillStyle(d)}">${d}</span>
         ${links.length ? `<span style="font-size:11px;color:var(--ink-soft);">${links.length} ลิงก์</span>` : `<span style="font-size:12px;color:var(--ink-soft);">— ยังไม่มีลิงก์ —</span>`}

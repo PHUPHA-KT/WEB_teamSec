@@ -2465,6 +2465,24 @@ step('เรื่องเปิดใหม่: เลือกวันที
       `          <div class="new-code">\${esc(item.code)}\${newDaysBadgeHtml(item)}</div>`, 'card badge');
 });
 
+// ================= 60) ลิงก์โหลดรายวัน: ลากย้ายวัน / สลับลำดับ =================
+step('ลิงก์โหลดรายวันลากย้ายได้', 'async function moveDayLink(', () => {
+  const js = fs.readFileSync(path.join(__dirname, 'daylinkdrag.js'), 'utf8').replace(/\n$/, '');
+  rep(`function pendingEpCount(item){`, js + `\n\nfunction pendingEpCount(item){`, 'helpers');
+  rep(`      <div class="daylink-item">
+        <a class="btn btn-ghost"`,
+`      <div class="daylink-item" draggable="true" data-link="\${l.id}">
+        <span class="daylink-grip" title="ลากเพื่อย้ายวัน / สลับลำดับ">⠿</span>
+        <a class="btn btn-ghost" draggable="false"`, 'item draggable');
+  rep(`    return \`<div class="daylink-day">`, `    return \`<div class="daylink-day" data-day="\${d}">`, 'day drop target');
+  rep('</style>', `  /* ลากลิงก์โหลดรายวัน */
+  .daylink-grip{ cursor:grab; color:var(--ink-soft); font-size:15px; padding:0 2px; user-select:none; }
+  .daylink-dragging{ opacity:.4; }
+  .daylink-day.daylink-over{ outline:2px solid var(--blue); outline-offset:2px; border-radius:10px; background:var(--blue-bg); }
+  .daylink-item.daylink-before{ box-shadow:inset 0 2px 0 var(--blue); }
+</style>`, 'css');
+});
+
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
 step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {
