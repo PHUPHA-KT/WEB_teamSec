@@ -2483,6 +2483,30 @@ step('ลิงก์โหลดรายวันลากย้ายได�
 </style>`, 'css');
 });
 
+// ================= 61) งานประจำ: ปุ่มคัดลอกลิงก์ / ชื่อ ต่อท้ายชื่อเรื่อง =================
+step('ปุ่มคัดลอกลิงก์/ชื่อ', 'async function copyStoryField(', () => {
+  rep(`function pendingEpCount(item){`,
+`// คัดลอกลิงก์ต้นทาง / ชื่อเรื่อง (ชื่อแปล ถ้าไม่มีใช้ต้นฉบับ)
+async function copyStoryField(id, field){
+  const item = recurring.find(r=>r.id===id);
+  if(!item) return;
+  const text = field === 'link' ? (item.link || '') : displayName(item);
+  if(!text){ showToast(field === 'link' ? 'เรื่องนี้ยังไม่มีลิงก์ต้นทาง' : 'เรื่องนี้ยังไม่มีชื่อ'); return; }
+  try{ await navigator.clipboard.writeText(text); showToast(field === 'link' ? 'คัดลอกลิงก์แล้ว' : 'คัดลอกชื่อแล้ว: ' + text); }
+  catch(e){ showToast('คัดลอกไม่ได้ (เบราว์เซอร์ไม่อนุญาต)'); }
+}
+
+function pendingEpCount(item){`, 'helper');
+  rep(`\${dropBadge}\${pauseBadgeHtml(item)}</div>`,
+      `\${dropBadge}\${pauseBadgeHtml(item)}<span class="copy-btns"><button type="button" class="copy-btn" \${item.link ? '' : 'disabled'} onclick="copyStoryField('\${item.id}','link')" title="\${item.link ? 'คัดลอกลิงก์ต้นทาง' : 'ยังไม่มีลิงก์ต้นทาง'}" aria-label="คัดลอกลิงก์ต้นทาง">🔗</button><button type="button" class="copy-btn" onclick="copyStoryField('\${item.id}','name')" title="คัดลอกชื่อเรื่อง" aria-label="คัดลอกชื่อเรื่อง">📋</button></span></div>`, 'row buttons');
+  rep('</style>', `  /* ปุ่มคัดลอกข้างชื่อเรื่อง */
+  .copy-btns{ display:inline-flex; gap:3px; margin-left:6px; vertical-align:middle; }
+  .copy-btn{ border:1px solid var(--line); background:var(--card); border-radius:6px; font-size:11.5px; line-height:1; padding:3px 5px; cursor:pointer; }
+  .copy-btn:hover{ border-color:var(--blue); background:var(--blue-bg); }
+  .copy-btn:disabled{ opacity:.35; cursor:default; }
+</style>`, 'css');
+});
+
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
 step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {
