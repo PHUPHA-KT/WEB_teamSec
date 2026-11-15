@@ -2487,7 +2487,7 @@ step('ลิงก์โหลดรายวันลากย้ายได�
 step('ปุ่มคัดลอกลิงก์/ชื่อ', 'async function copyStoryField(', () => {
   rep(`function pendingEpCount(item){`,
 `// คัดลอกลิงก์ต้นทาง / รหัส · ชื่อเรื่อง (ชื่อแปล ถ้าไม่มีใช้ต้นฉบับ)
-async function copyStoryField(id, field){
+async function copyStoryField(id, field, day){
   const item = recurring.find(r=>r.id===id);
   if(!item) return;
   // ชื่อ = รหัส · ชื่อเรื่อง (เช่น 7-18-44 · การลงโทษ) ตามที่แสดงในแถว
@@ -2496,8 +2496,10 @@ async function copyStoryField(id, field){
   if(!text){ showToast(field === 'link' ? 'เรื่องนี้ยังไม่มีลิงก์ต้นทาง' : 'เรื่องนี้ยังไม่มีชื่อ'); return; }
   try{ await navigator.clipboard.writeText(text); showToast(field === 'link' ? 'คัดลอกลิงก์แล้ว' : 'คัดลอกชื่อแล้ว: ' + text); }
   catch(e){ showToast('คัดลอกไม่ได้ (เบราว์เซอร์ไม่อนุญาต)'); return; }
-  markCopiedToday(id, field);
-  document.querySelectorAll(\`.copy-btn[data-copy="\${id}:\${field}"]\`).forEach(b=>b.classList.add('copied'));
+  // จำแยกตามแถววัน (เรื่องหลายวันมีหลายแถว)
+  const key = field + (day ? ':' + day : '');
+  markCopiedToday(id, key);
+  document.querySelectorAll(\`.copy-btn[data-copy="\${id}:\${key}"]\`).forEach(b=>b.classList.add('copied'));
 }
 // ปุ่มที่กดแล้ววันนี้เป็นสีเขียว — จำต่อเครื่อง (localStorage) ขึ้นวันใหม่ (2 ทุ่ม) ล้างเอง
 const COPIED_KEY = 'copied_today';
@@ -2517,7 +2519,7 @@ function copyBtnCls(id, field){ return copiedTodaySet().has(id + ':' + field) ? 
 
 function pendingEpCount(item){`, 'helper');
   rep(`\${dropBadge}\${pauseBadgeHtml(item)}</div>`,
-      `\${dropBadge}\${pauseBadgeHtml(item)}<span class="copy-btns"><button type="button" class="copy-btn\${copyBtnCls(item.id,'link')}" data-copy="\${item.id}:link" \${item.link ? '' : 'disabled'} onclick="copyStoryField('\${item.id}','link')" title="\${item.link ? 'คัดลอกลิงก์ต้นทาง' : 'ยังไม่มีลิงก์ต้นทาง'}" aria-label="คัดลอกลิงก์ต้นทาง">🔗</button><button type="button" class="copy-btn\${copyBtnCls(item.id,'name')}" data-copy="\${item.id}:name" onclick="copyStoryField('\${item.id}','name')" title="คัดลอกรหัส · ชื่อเรื่อง" aria-label="คัดลอกรหัสและชื่อเรื่อง">📋</button></span></div>`, 'row buttons');
+      `\${dropBadge}\${pauseBadgeHtml(item)}<span class="copy-btns"><button type="button" class="copy-btn\${copyBtnCls(item.id,'link:' + rowDay)}" data-copy="\${item.id}:link:\${rowDay}" \${item.link ? '' : 'disabled'} onclick="copyStoryField('\${item.id}','link','\${rowDay}')" title="\${item.link ? 'คัดลอกลิงก์ต้นทาง' : 'ยังไม่มีลิงก์ต้นทาง'}" aria-label="คัดลอกลิงก์ต้นทาง">🔗</button><button type="button" class="copy-btn\${copyBtnCls(item.id,'name:' + rowDay)}" data-copy="\${item.id}:name:\${rowDay}" onclick="copyStoryField('\${item.id}','name','\${rowDay}')" title="คัดลอกรหัส · ชื่อเรื่อง" aria-label="คัดลอกรหัสและชื่อเรื่อง">📋</button></span></div>`, 'row buttons');
   rep('</style>', `  /* ปุ่มคัดลอกข้างชื่อเรื่อง */
   .copy-btns{ display:inline-flex; gap:3px; margin-left:6px; vertical-align:middle; }
   .copy-btn{ border:1px solid var(--line); background:var(--card); border-radius:6px; font-size:11.5px; line-height:1; padding:3px 5px; cursor:pointer; }
