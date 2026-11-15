@@ -2495,17 +2495,35 @@ async function copyStoryField(id, field){
   const text = field === 'link' ? (item.link || '') : name;
   if(!text){ showToast(field === 'link' ? 'เรื่องนี้ยังไม่มีลิงก์ต้นทาง' : 'เรื่องนี้ยังไม่มีชื่อ'); return; }
   try{ await navigator.clipboard.writeText(text); showToast(field === 'link' ? 'คัดลอกลิงก์แล้ว' : 'คัดลอกชื่อแล้ว: ' + text); }
-  catch(e){ showToast('คัดลอกไม่ได้ (เบราว์เซอร์ไม่อนุญาต)'); }
+  catch(e){ showToast('คัดลอกไม่ได้ (เบราว์เซอร์ไม่อนุญาต)'); return; }
+  markCopiedToday(id, field);
+  document.querySelectorAll(\`.copy-btn[data-copy="\${id}:\${field}"]\`).forEach(b=>b.classList.add('copied'));
 }
+// ปุ่มที่กดแล้ววันนี้เป็นสีเขียว — จำต่อเครื่อง (localStorage) ขึ้นวันใหม่ (2 ทุ่ม) ล้างเอง
+const COPIED_KEY = 'copied_today';
+function copiedTodaySet(){
+  try{
+    const v = JSON.parse(localStorage.getItem(COPIED_KEY) || 'null');
+    return new Set(v && v.d === ymdOf(effDateOnly()) ? v.k : []);
+  }catch(e){ return new Set(); }
+}
+function markCopiedToday(id, field){
+  try{
+    const s = copiedTodaySet(); s.add(id + ':' + field);
+    localStorage.setItem(COPIED_KEY, JSON.stringify({ d: ymdOf(effDateOnly()), k: [...s] }));
+  }catch(e){}
+}
+function copyBtnCls(id, field){ return copiedTodaySet().has(id + ':' + field) ? ' copied' : ''; }
 
 function pendingEpCount(item){`, 'helper');
   rep(`\${dropBadge}\${pauseBadgeHtml(item)}</div>`,
-      `\${dropBadge}\${pauseBadgeHtml(item)}<span class="copy-btns"><button type="button" class="copy-btn" \${item.link ? '' : 'disabled'} onclick="copyStoryField('\${item.id}','link')" title="\${item.link ? 'คัดลอกลิงก์ต้นทาง' : 'ยังไม่มีลิงก์ต้นทาง'}" aria-label="คัดลอกลิงก์ต้นทาง">🔗</button><button type="button" class="copy-btn" onclick="copyStoryField('\${item.id}','name')" title="คัดลอกรหัส · ชื่อเรื่อง" aria-label="คัดลอกรหัสและชื่อเรื่อง">📋</button></span></div>`, 'row buttons');
+      `\${dropBadge}\${pauseBadgeHtml(item)}<span class="copy-btns"><button type="button" class="copy-btn\${copyBtnCls(item.id,'link')}" data-copy="\${item.id}:link" \${item.link ? '' : 'disabled'} onclick="copyStoryField('\${item.id}','link')" title="\${item.link ? 'คัดลอกลิงก์ต้นทาง' : 'ยังไม่มีลิงก์ต้นทาง'}" aria-label="คัดลอกลิงก์ต้นทาง">🔗</button><button type="button" class="copy-btn\${copyBtnCls(item.id,'name')}" data-copy="\${item.id}:name" onclick="copyStoryField('\${item.id}','name')" title="คัดลอกรหัส · ชื่อเรื่อง" aria-label="คัดลอกรหัสและชื่อเรื่อง">📋</button></span></div>`, 'row buttons');
   rep('</style>', `  /* ปุ่มคัดลอกข้างชื่อเรื่อง */
   .copy-btns{ display:inline-flex; gap:3px; margin-left:6px; vertical-align:middle; }
   .copy-btn{ border:1px solid var(--line); background:var(--card); border-radius:6px; font-size:11.5px; line-height:1; padding:3px 5px; cursor:pointer; }
   .copy-btn:hover{ border-color:var(--blue); background:var(--blue-bg); }
   .copy-btn:disabled{ opacity:.35; cursor:default; }
+  .copy-btn.copied{ background:var(--green-bg); border-color:var(--green); box-shadow:inset 0 0 0 1px var(--green); }
 </style>`, 'css');
 });
 
