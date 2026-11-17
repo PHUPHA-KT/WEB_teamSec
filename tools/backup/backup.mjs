@@ -72,6 +72,7 @@ const importable = JSON.stringify({
     schedule_entries: app.schedule_entries || [],
     day_links: app.day_links || [],
     day_links_archive: app.day_links_archive || [],
+    new_story_history: app.new_story_history || [],
   },
 }, null, 1);
 

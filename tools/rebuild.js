@@ -2530,6 +2530,66 @@ function pendingEpCount(item){`, 'helper');
 </style>`, 'css');
 });
 
+// ================= 62) ประวัติเรื่องเปิดใหม่ (new_story_history) =================
+step('ประวัติเรื่องเปิดใหม่', 'function syncNewStoryHistory(', () => {
+  const js = fs.readFileSync(path.join(__dirname, 'newhistory.js'), 'utf8').replace(/\n$/, '');
+  rep(`function pendingEpCount(item){`, js + `\n\nfunction pendingEpCount(item){`, 'helpers');
+
+  // ชุดข้อมูลใหม่ในก้อน appdata
+  rep(`let activity = [];`, `let newStoryHistory = [];   // ประวัติเรื่องเปิดใหม่ (ถาวร)
+let activity = [];`, 'declare');
+  rep(`const DATA_KEYS = ['recurring_stories','new_stories','expenses','schedule_entries','trash','day_links','day_links_archive','activity'];`,
+      `const DATA_KEYS = ['recurring_stories','new_stories','expenses','schedule_entries','trash','day_links','day_links_archive','activity','new_story_history'];`, 'DATA_KEYS');
+  rep(`    case 'activity': return activity;`, `    case 'activity': return activity;
+    case 'new_story_history': return newStoryHistory;`, 'getColl');
+  rep(`    case 'activity': activity = v; break;`, `    case 'activity': activity = v; break;
+    case 'new_story_history': newStoryHistory = v; break;`, 'setColl');
+  rep(`  activity        = (app && Array.isArray(app.activity))          ? app.activity : [];`,
+`  activity        = (app && Array.isArray(app.activity))          ? app.activity : [];
+  newStoryHistory = (app && Array.isArray(app.new_story_history)) ? app.new_story_history : [];`, 'loadAll');
+  rep(`  lastSeen['activity'] = JSON.stringify(activity);`, `  lastSeen['activity'] = JSON.stringify(activity);
+  lastSeen['new_story_history'] = JSON.stringify(newStoryHistory);`, 'snapshotAll');
+  // ส่งออก / กู้คืน
+  rep(`      day_links_archive: dayLinksArchive
+    }`, `      day_links_archive: dayLinksArchive,
+      new_story_history: newStoryHistory
+    }`, 'export');
+  rep(`  if(Array.isArray(d.day_links_archive)) dayLinksArchive = d.day_links_archive;`,
+`  if(Array.isArray(d.day_links_archive)) dayLinksArchive = d.day_links_archive;
+  if(Array.isArray(d.new_story_history)) newStoryHistory = d.new_story_history;`, 'import restore');
+  rep(`      activity: activity || [],
+    };`, `      activity: activity || [],
+      new_story_history: newStoryHistory || [],
+    };`, 'import write');
+
+  // อัปเดตประวัติจากการ์ดทุกครั้งก่อนเซฟ
+  rep(`async function persistDataNow(toast){
+  try{`, `async function persistDataNow(toast){
+  try{
+    syncNewStoryHistory();`, 'sync before save');
+  // จำเวลาที่แต่ละคนติ๊ก
+  rep(`  item.contrib[person] = !item.contrib[person];
+`, `  item.contrib[person] = !item.contrib[person];
+  item.contribAt = item.contribAt || {};
+  if(item.contrib[person]) item.contribAt[person] = new Date().toISOString(); else delete item.contribAt[person];
+`, 'contribAt');
+  // ปุ่มเปิดประวัติ
+  rep(`      <button class="btn btn-primary" onclick="openNewModal()">+ เพิ่มเรื่องเปิดใหม่</button>`,
+      `      <button class="btn btn-primary" onclick="openNewModal()">+ เพิ่มเรื่องเปิดใหม่</button>
+      <button class="btn btn-ghost" onclick="openNewHistory()" title="เรื่องเปิดใหม่ทั้งหมด: มาเมื่อ / ใครได้ตอนไหน / เสร็จวันไหน">📜 ประวัติ</button>`, 'button');
+  rep('</style>', `  /* ประวัติเรื่องเปิดใหม่ */
+  .nh-table td{ vertical-align:top; font-size:12.5px; }
+  .nh-person{ white-space:nowrap; line-height:1.7; }
+  .nh-eps{ color:var(--ink-soft); }
+  .nh-at{ font-size:11.5px; color:var(--ink-soft); }
+  .nh-at.nh-done{ color:var(--green); font-weight:700; }
+  .nh-sub{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
+  .nh-badge{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:11.5px; font-weight:700; background:#fdf3e3; color:#b9791b; white-space:nowrap; }
+  .nh-badge-done{ background:var(--green-bg); color:var(--green); }
+  .nh-badge-removed{ background:#f1f3f6; color:#8a94a3; }
+</style>`, 'css');
+}, { staging: true });
+
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
 step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {
