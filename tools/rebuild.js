@@ -2588,7 +2588,7 @@ let activity = [];`, 'declare');
   .nh-badge-done{ background:var(--green-bg); color:var(--green); }
   .nh-badge-removed{ background:#f1f3f6; color:#8a94a3; }
 </style>`, 'css');
-}, { staging: true });
+});
 
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
