@@ -2265,18 +2265,19 @@ async function copyStoryField(id, field, day){
   markCopiedToday(id, key);
   document.querySelectorAll(`.copy-btn[data-copy="${id}:${key}"]`).forEach(b=>b.classList.add('copied'));
 }
-// ปุ่มที่กดแล้ววันนี้เป็นสีเขียว — จำต่อเครื่อง (localStorage) ขึ้นวันใหม่ (2 ทุ่ม) ล้างเอง
+// ปุ่มที่กดแล้วสัปดาห์นี้เป็นสีเขียว (แยกตามแถววัน) — จำต่อเครื่อง (localStorage)
+// ล้างพร้อมรีเซ็ตสถานะรายสัปดาห์ (จันทร์ 2 ทุ่ม = currentWeekMondayStr เปลี่ยน)
 const COPIED_KEY = 'copied_today';
 function copiedTodaySet(){
   try{
     const v = JSON.parse(localStorage.getItem(COPIED_KEY) || 'null');
-    return new Set(v && v.d === ymdOf(effDateOnly()) ? v.k : []);
+    return new Set(v && v.d === currentWeekMondayStr() ? v.k : []);
   }catch(e){ return new Set(); }
 }
 function markCopiedToday(id, field){
   try{
     const s = copiedTodaySet(); s.add(id + ':' + field);
-    localStorage.setItem(COPIED_KEY, JSON.stringify({ d: ymdOf(effDateOnly()), k: [...s] }));
+    localStorage.setItem(COPIED_KEY, JSON.stringify({ d: currentWeekMondayStr(), k: [...s] }));
   }catch(e){}
 }
 function copyBtnCls(id, field){ return copiedTodaySet().has(id + ':' + field) ? ' copied' : ''; }
