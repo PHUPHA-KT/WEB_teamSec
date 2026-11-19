@@ -2590,6 +2590,34 @@ let activity = [];`, 'declare');
 </style>`, 'css');
 });
 
+// ================= 63) รับข้อมูลจากเครื่องอื่นโดยคงตัวรายการเดิม (กันการแก้ระหว่างกล่องเปิดหาย) =================
+// บั๊ก: กด ✎ (ตอนล่าสุด/ชื่อ/ลิงก์/ดรอป…) -> โค้ดจับ item ไว้ แล้วรอผู้ใช้พิมพ์ในกล่อง
+// ระหว่างนั้น poll/merge แทนรายการทั้งชุดด้วย object ใหม่ -> พอกดตกลง ค่าลง object เก่าที่ไม่อยู่ในรายการแล้ว
+// -> ไม่ถูกเซฟ (แต่ประวัติบันทึกว่าแก้แล้ว) · แก้: อัปเดต object เดิมในที่ แทนการเปลี่ยนเป็น object ใหม่
+step('รับข้อมูลเครื่องอื่นแบบคงตัวรายการเดิม', 'function applyCollKeepRefs(', () => {
+  rep(`function setColl(k, v){`,
+`// แทนรายการด้วยค่าใหม่ แต่รายการที่มีอยู่แล้ว (id/trashId เดียวกัน) ใช้ object เดิมแล้วอัปเดตค่าในตัว
+// โค้ดที่ถือ item ไว้ระหว่างรอกล่อง (uiPrompt/uiConfirm/uiPick) จะยังแก้ตัวที่อยู่ในรายการจริง
+function applyCollKeepRefs(k, next){
+  const cur = getColl(k) || [];
+  const key = x => (x && x.id !== undefined) ? x.id : (x && x.trashId);
+  const byKey = new Map();
+  cur.forEach(x=>{ const kk = key(x); if(kk !== undefined && !byKey.has(kk)) byKey.set(kk, x); });
+  const out = next.map(n=>{
+    const o = n && byKey.get(key(n));
+    if(!o || o === n || typeof o !== 'object' || typeof n !== 'object') return n;
+    Object.keys(o).forEach(p=>{ if(!(p in n)) delete o[p]; });
+    Object.assign(o, n);
+    return o;
+  });
+  setColl(k, out);
+}
+function setColl(k, v){`, 'helper');
+  rep(`        setColl(k, merged);`, `        applyCollKeepRefs(k, merged);`, 'persistDataNow');
+  rep(`          setColl(k, mergeById(base, local, remote[k]));`, `          applyCollKeepRefs(k, mergeById(base, local, remote[k]));`, 'pollOnce merge');
+  rep(`          setColl(k, remote[k]);`, `          applyCollKeepRefs(k, remote[k]);`, 'pollOnce replace');
+});
+
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
 step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {

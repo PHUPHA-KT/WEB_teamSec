@@ -153,6 +153,8 @@ function suite(file, staging){
   const save = extract(html, 'persistDataNow') || '';
   ok(html.includes(".eq('updated_at', hit.updated_at)"), 'A3: shim ต้องเขียนแบบเช็ค updated_at');
   ok(save.includes('setIfUnchanged(') && /attempt < 3/.test(save), 'A3: เซฟต้องเช็คเวอร์ชันและวนอ่านใหม่เมื่อชน (มีทางออกหลัง 3 รอบ)');
+  // รับข้อมูลเครื่องอื่นต้องคงตัวรายการเดิม — ไม่งั้นการแก้ระหว่างกล่องเปิด (✎ ตอนล่าสุด ฯลฯ) หายเงียบ
+  ok(!pollOnce.includes('setColl(k, remote[k])') && pollOnce.includes('applyCollKeepRefs(') && save.includes('applyCollKeepRefs('), 'poll/save ต้องอัปเดตรายการเดิมในที่ (applyCollKeepRefs)');
   if(staging) ok(html.includes("const STAGING_KEY_PREFIX = 'stg_'"), 'เว็บทดลองต้องใช้ key stg_');
   else ok(!html.includes('STAGING_KEY_PREFIX'), 'เว็บหลักต้องไม่มี key stg_');
 }

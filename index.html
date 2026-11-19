@@ -2818,6 +2818,22 @@ function getColl(k){
     case 'new_story_history': return newStoryHistory;
   }
 }
+// แทนรายการด้วยค่าใหม่ แต่รายการที่มีอยู่แล้ว (id/trashId เดียวกัน) ใช้ object เดิมแล้วอัปเดตค่าในตัว
+// โค้ดที่ถือ item ไว้ระหว่างรอกล่อง (uiPrompt/uiConfirm/uiPick) จะยังแก้ตัวที่อยู่ในรายการจริง
+function applyCollKeepRefs(k, next){
+  const cur = getColl(k) || [];
+  const key = x => (x && x.id !== undefined) ? x.id : (x && x.trashId);
+  const byKey = new Map();
+  cur.forEach(x=>{ const kk = key(x); if(kk !== undefined && !byKey.has(kk)) byKey.set(kk, x); });
+  const out = next.map(n=>{
+    const o = n && byKey.get(key(n));
+    if(!o || o === n || typeof o !== 'object' || typeof n !== 'object') return n;
+    Object.keys(o).forEach(p=>{ if(!(p in n)) delete o[p]; });
+    Object.assign(o, n);
+    return o;
+  });
+  setColl(k, out);
+}
 function setColl(k, v){
   switch(k){
     case 'recurring_stories': recurring = v; break;
@@ -2944,7 +2960,7 @@ async function persistDataNow(toast){
           if(JSON.stringify(merged) !== JSON.stringify(ours)) pulledExternal = true;
           bases[k] = JSON.stringify(theirs);
         }
-        setColl(k, merged);
+        applyCollKeepRefs(k, merged);
         full[k] = merged;
       }
       const s = JSON.stringify(full);
@@ -3202,10 +3218,10 @@ async function pollOnce(){
         if(JSON.stringify(local) !== lastSeen[k]){
           // ในเครื่องมีการแก้ที่ยังไม่ได้เซฟ (เช่นเซฟล้มแล้วรอ retry) -> รวม ไม่ทับ แล้วเซฟผลรวม
           const base = lastSeen[k] ? JSON.parse(lastSeen[k]) : remote[k];
-          setColl(k, mergeById(base, local, remote[k]));
+          applyCollKeepRefs(k, mergeById(base, local, remote[k]));
           localPending = true;
         } else {
-          setColl(k, remote[k]);
+          applyCollKeepRefs(k, remote[k]);
         }
         lastSeen[k] = val;
         changed = true;
