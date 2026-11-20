@@ -128,6 +128,8 @@
   .cal-head-green{ background:var(--green); }
   .cal-head-purple{ background:var(--purple); }
   .cal-head-orange{ background:var(--orange); }
+  .cal-head-gray{ background:var(--gray); }
+  .cal-unassigned{ grid-column:1/-1; }
   .cal-blue{ background:var(--blue-bg); }
   .cal-green{ background:var(--green-bg); }
   .cal-purple{ background:var(--purple-bg); }
@@ -5080,11 +5082,12 @@ function renderCalendar(){
   const active = recurring.filter(r=>!isEffectivelyDropped(r));
 
   let html = `<div class="cal-grid">`;
-  PEOPLE.forEach(person=>{
-    const mine = active.filter(r=>r.person===person);
-    const color = PERSON_COLOR[person];
-    html += `<div class="cal-card cal-${color}">
-      <div class="cal-head cal-head-${color}">${esc(person)} <span style="opacity:.85;font-weight:700;">(${mine.length} เรื่อง · ${weekEpTotal(mine)} ตอน/สัปดาห์)</span></div>
+  const unassigned = active.filter(r=>!PEOPLE.includes(r.person));
+  [...PEOPLE, ...(unassigned.length ? [''] : [])].forEach(person=>{
+    const mine = person ? active.filter(r=>r.person===person) : unassigned;
+    const color = person ? PERSON_COLOR[person] : 'gray';
+    html += `<div class="cal-card cal-${color}${person ? '' : ' cal-unassigned'}">
+      <div class="cal-head cal-head-${color}">${person ? esc(person) : '❔ ยังไม่ระบุคนทำ'} <span style="opacity:.85;font-weight:700;">(${mine.length} เรื่อง · ${weekEpTotal(mine)} ตอน/สัปดาห์)</span></div>
       <table class="cal-table"><tbody>
         ${CAL_DAYS.map(d=>{
           const items = mine.filter(r=>itemDays(r).includes(d));
@@ -5097,7 +5100,7 @@ function renderCalendar(){
           }).join('');
           return `<tr>
             <td class="cal-day">${CAL_DAY_LABEL[d]}</td>
-            <td class="cal-items ${items.length?'':'cal-empty'}" data-person="${esc(person)}" data-day="${esc(d)}">${chips || '-'}</td>
+            <td class="cal-items ${items.length?'':'cal-empty'}" ${person ? `data-person="${esc(person)}"` : ''} data-day="${esc(d)}">${chips || '-'}</td>
           </tr>`;
         }).join('')}
       </tbody></table>

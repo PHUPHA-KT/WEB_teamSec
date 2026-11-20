@@ -2618,6 +2618,20 @@ function setColl(k, v){`, 'helper');
   rep(`          setColl(k, remote[k]);`, `          applyCollKeepRefs(k, remote[k]);`, 'pollOnce replace');
 });
 
+// ================= 64) ปฏิทิน: การ์ด "ยังไม่ระบุคนทำ" =================
+// เรื่องที่ person ไม่ใช่คนในทีม (ว่าง/ไม่ระบุ) เดิมไม่ขึ้นในปฏิทินเลย -> เพิ่มการ์ดสีเทาท้ายสุด (เต็มแถว)
+// ลากเรื่องออกจากการ์ดนี้ไปให้คนได้ · การ์ดนี้ไม่ใช่ช่องวาง (ไม่มี data-person) กันลากเรื่องไปทิ้งไว้ไม่มีคนทำ
+step('ปฏิทิน: การ์ดยังไม่ระบุคนทำ', 'cal-unassigned', () => {
+  rep('  PEOPLE.forEach(person=>{\n    const mine = active.filter(r=>r.person===person);\n    const color = PERSON_COLOR[person];\n    html += `<div class="cal-card cal-${color}">',
+      '  const unassigned = active.filter(r=>!PEOPLE.includes(r.person));\n  [...PEOPLE, ...(unassigned.length ? [\'\'] : [])].forEach(person=>{\n    const mine = person ? active.filter(r=>r.person===person) : unassigned;\n    const color = person ? PERSON_COLOR[person] : \'gray\';\n    html += `<div class="cal-card cal-${color}${person ? \'\' : \' cal-unassigned\'}">', 'card loop');
+  rep('<div class="cal-head cal-head-${color}">${esc(person)} <span',
+      '<div class="cal-head cal-head-${color}">${person ? esc(person) : \'❔ ยังไม่ระบุคนทำ\'} <span', 'head');
+  rep('" data-person="${esc(person)}" data-day="${esc(d)}">',
+      '" ${person ? `data-person="${esc(person)}"` : \'\'} data-day="${esc(d)}">', 'cell');
+  rep('  .cal-head-orange{ background:var(--orange); }',
+      '  .cal-head-orange{ background:var(--orange); }\n  .cal-head-gray{ background:var(--gray); }\n  .cal-unassigned{ grid-column:1/-1; }', 'css');
+}, { staging: true });
+
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
 step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {
