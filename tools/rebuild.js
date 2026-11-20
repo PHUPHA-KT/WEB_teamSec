@@ -2656,6 +2656,13 @@ step('ปฏิทิน: เรื่องไม่มีคนทำในก
       '  .cal-unassigned{ grid-column:1/-1; }\n  .cal-noowner-chip{ border-style:dashed; }', 'css');
 });
 
+// ================= 67) บันทึกปฏิทินเป็นรูป: เฉพาะ 4 คน ไม่มีจำนวนตอนค้าง =================
+// ตัดในสำเนาที่ html2canvas สร้าง (onclone) — หน้าจอจริงไม่เปลี่ยน
+step('รูปปฏิทิน: เฉพาะ 4 คน ไม่มีตอนค้าง', 'cal-export-clean', () => {
+  rep("scale:2}).then(canvas=>{",
+      "scale:2,\n      onclone: doc=>{ /* cal-export-clean */ doc.querySelectorAll('#calCapture .cal-unassigned, #calCapture .cal-chip-eps').forEach(x=>x.remove()); }}).then(canvas=>{", 'onclone');
+});
+
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
 step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {

@@ -5326,7 +5326,8 @@ async function exportCalendarImage(){
   showToast('กำลังสร้างรูป...');
   function doCapture(){
     const el = document.getElementById('calCapture');
-    window.html2canvas(el, {backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg')||'#fff', scale:2}).then(canvas=>{
+    window.html2canvas(el, {backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg')||'#fff', scale:2,
+      onclone: doc=>{ /* cal-export-clean */ doc.querySelectorAll('#calCapture .cal-unassigned, #calCapture .cal-chip-eps').forEach(x=>x.remove()); }}).then(canvas=>{
       const a = document.createElement('a');
       a.href = canvas.toDataURL('image/png');
       a.download = 'ตารางปฏิทิน-คัดเรื่อง.png';
