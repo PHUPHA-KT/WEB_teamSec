@@ -2630,7 +2630,7 @@ step('ปฏิทิน: การ์ดยังไม่ระบุคนท
       '" ${person ? `data-person="${esc(person)}"` : \'\'} data-day="${esc(d)}">', 'cell');
   rep('  .cal-head-orange{ background:var(--orange); }',
       '  .cal-head-orange{ background:var(--orange); }\n  .cal-head-gray{ background:var(--gray); }\n  .cal-unassigned{ grid-column:1/-1; }', 'css');
-}, { staging: true });
+});
 
 // ================= 65) ตรวจเรื่องจบซีประจำเดือน =================
 step('ตรวจเรื่องจบซีประจำเดือน', 'function endCheckStripHtml(', () => {
@@ -2639,7 +2639,7 @@ step('ตรวจเรื่องจบซีประจำเดือน',
   rep('    ${missedStripHtml()}\n', '    ${missedStripHtml()}\n    ${endCheckStripHtml()}\n', 'strip');
   rep('  body.dark .missed-head{ color:#e3b463; }',
       '  body.dark .missed-head{ color:#e3b463; }\n  .endcheck-strip{ border-color:#bfe0e4; background:#eaf6f8; }\n  .endcheck-strip .missed-head{ color:#0e6b74; }\n  .endcheck-strip .missed-list{ border-top-color:#bfe0e4; }\n  body.dark .endcheck-strip{ background:#13292c; border-color:#24474b; }\n  body.dark .endcheck-strip .missed-head{ color:#7fd0d8; }', 'css');
-}, { staging: true });
+});
 
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
