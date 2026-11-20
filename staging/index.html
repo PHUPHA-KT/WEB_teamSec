@@ -130,6 +130,7 @@
   .cal-head-orange{ background:var(--orange); }
   .cal-head-gray{ background:var(--gray); }
   .cal-unassigned{ grid-column:1/-1; }
+  .cal-noowner-chip{ border-style:dashed; }
   .cal-blue{ background:var(--blue-bg); }
   .cal-green{ background:var(--green-bg); }
   .cal-purple{ background:var(--purple-bg); }
@@ -5114,10 +5115,12 @@ function calNewTrayHtml(){
   const isDigits = s => s !== '' && [...s].every(ch=>ch >= '0' && ch <= '9');
   const hasCode = n => { const p = String(n.code || '').trim().split('-'); return p.length >= 2 && isDigits(p[0]) && isDigits(p[1]); };
   const list = newStories.filter(n=>!promotedTarget(n) && !inRecurring(n) && !ended(n) && hasCode(n));
-  if(!list.length) return '';
+  // งานประจำที่ยังไม่ระบุคนทำ (ไม่ใช่รหัส 0-) — ลากไปวางช่องคน × วันเพื่อให้คนทำ
+  const noOwner = recurring.filter(r=>!PEOPLE.includes(r.person) && !isEffectivelyDropped(r) && !String(r.code || '').trim().startsWith('0-'));
+  if(!list.length && !noOwner.length) return '';
   return `<div class="cal-tray">
-    <div class="cal-tray-head">🆕 เรื่องเปิดใหม่ <small>ลากไปวางช่องคน × วัน เพื่อย้ายเข้างานประจำ · ดับเบิลคลิกเพื่อแก้</small></div>
-    <div class="cal-tray-items">${list.map(n=>`<span class="cal-chip cal-new-chip" data-new="${n.id}" title="ลากไปวางช่องคน × วัน">${esc(n.code || '(ไม่มีรหัส)')}</span>`).join('')}</div>
+    <div class="cal-tray-head">🆕 เรื่องเปิดใหม่${noOwner.length ? ' · ❔ ยังไม่ระบุคนทำ' : ''} <small>ลากไปวางช่องคน × วัน เพื่อย้ายเข้างานประจำ · ดับเบิลคลิกเพื่อแก้</small></div>
+    <div class="cal-tray-items">${list.map(n=>`<span class="cal-chip cal-new-chip" data-new="${n.id}" title="ลากไปวางช่องคน × วัน">${esc(n.code || '(ไม่มีรหัส)')}</span>`).join('')}${noOwner.map(r=>`<span class="cal-chip cal-noowner-chip" data-id="${r.id}" data-from="${esc(itemDays(r)[0] || '')}" title="ยังไม่ระบุคนทำ — ลากไปวางช่องคน × วัน · ดับเบิลคลิกเพื่อแก้">❔ ${esc((r.code ? r.code + '-' : '') + displayName(r))}</span>`).join('')}</div>
   </div>`;
 }
 // วางเรื่องเปิดใหม่ลงช่อง -> เปิดหน้าต่างย้ายเข้างานประจำ กรอกคน+วันตามช่อง (เหลือใส่ชื่อแปลแล้วบันทึก)
@@ -5138,7 +5141,7 @@ function renderCalendar(){
   const active = recurring.filter(r=>!isEffectivelyDropped(r));
 
   let html = `<div class="cal-grid">`;
-  const unassigned = active.filter(r=>!PEOPLE.includes(r.person));
+  const unassigned = active.filter(r=>!PEOPLE.includes(r.person) && String(r.code || '').trim().startsWith('0-'));
   [...PEOPLE, ...(unassigned.length ? [''] : [])].forEach(person=>{
     const mine = person ? active.filter(r=>r.person===person) : unassigned;
     const color = person ? PERSON_COLOR[person] : 'gray';

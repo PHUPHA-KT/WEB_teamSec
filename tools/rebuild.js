@@ -2641,6 +2641,21 @@ step('ตรวจเรื่องจบซีประจำเดือน',
       '  body.dark .missed-head{ color:#e3b463; }\n  .endcheck-strip{ border-color:#bfe0e4; background:#eaf6f8; }\n  .endcheck-strip .missed-head{ color:#0e6b74; }\n  .endcheck-strip .missed-list{ border-top-color:#bfe0e4; }\n  body.dark .endcheck-strip{ background:#13292c; border-color:#24474b; }\n  body.dark .endcheck-strip .missed-head{ color:#7fd0d8; }', 'css');
 });
 
+// ================= 66) ปฏิทิน: เรื่องไม่มีคนทำ (ไม่ใช่รหัส 0-) ขึ้นในกล่องเรื่องเปิดใหม่ =================
+// การ์ดเทา "ยังไม่ระบุคนทำ" เหลือเฉพาะรหัส 0- (จบแล้ว) · ที่เหลือไปอยู่ในกล่องด้านบน ลากไปวางช่องคน × วันได้เลย
+step('ปฏิทิน: เรื่องไม่มีคนทำในกล่องเรื่องเปิดใหม่', 'cal-noowner-chip', () => {
+  rep('  const unassigned = active.filter(r=>!PEOPLE.includes(r.person));',
+      '  const unassigned = active.filter(r=>!PEOPLE.includes(r.person) && String(r.code || \'\').trim().startsWith(\'0-\'));', 'gray card 0- only');
+  rep('  if(!list.length) return \'\';\n  return `<div class="cal-tray">',
+      '  // งานประจำที่ยังไม่ระบุคนทำ (ไม่ใช่รหัส 0-) — ลากไปวางช่องคน × วันเพื่อให้คนทำ\n  const noOwner = recurring.filter(r=>!PEOPLE.includes(r.person) && !isEffectivelyDropped(r) && !String(r.code || \'\').trim().startsWith(\'0-\'));\n  if(!list.length && !noOwner.length) return \'\';\n  return `<div class="cal-tray">', 'noOwner list');
+  rep('🆕 เรื่องเปิดใหม่ <small>',
+      '🆕 เรื่องเปิดใหม่${noOwner.length ? \' · ❔ ยังไม่ระบุคนทำ\' : \'\'} <small>', 'head');
+  rep('title="ลากไปวางช่องคน × วัน">${esc(n.code || \'(ไม่มีรหัส)\')}</span>`).join(\'\')}',
+      'title="ลากไปวางช่องคน × วัน">${esc(n.code || \'(ไม่มีรหัส)\')}</span>`).join(\'\')}${noOwner.map(r=>`<span class="cal-chip cal-noowner-chip" data-id="${r.id}" data-from="${esc(itemDays(r)[0] || \'\')}" title="ยังไม่ระบุคนทำ — ลากไปวางช่องคน × วัน · ดับเบิลคลิกเพื่อแก้">❔ ${esc((r.code ? r.code + \'-\' : \'\') + displayName(r))}</span>`).join(\'\')}', 'chips');
+  rep('  .cal-unassigned{ grid-column:1/-1; }',
+      '  .cal-unassigned{ grid-column:1/-1; }\n  .cal-noowner-chip{ border-style:dashed; }', 'css');
+});
+
 // ================= เว็บทดลอง: ข้อมูลแยก (key stg_) + แถบบอก =================
 // ขั้นนี้ไม่มีวันเข้าเว็บหลัก
 step('เว็บทดลอง: key stg_ + แถบบอก', 'const STAGING_KEY_PREFIX', () => {
