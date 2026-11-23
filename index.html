@@ -1630,6 +1630,7 @@ let endCheckOpen = false;
 function monthKeyOf(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
 function endCheckDue(item){
   if(isEffectivelyDropped(item) || !itemDays(item).includes(ENDED_DAY)) return false;
+  if(String(item.code || '').trim().startsWith('0-')) return false;   // รหัส 0- = จบถาวร ไม่ต้องตรวจ
   if(!item.seasonCheckedAt) return true;
   const d = new Date(item.seasonCheckedAt);
   return isNaN(d) || monthKeyOf(d) !== monthKeyOf(new Date());
